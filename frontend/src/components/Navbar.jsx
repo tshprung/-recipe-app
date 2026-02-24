@@ -1,35 +1,63 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   function handleLogout() {
     logout()
     navigate('/login', { replace: true })
   }
 
+  const initials = user?.email?.[0]?.toUpperCase() ?? '?'
+  const isSettings = location.pathname === '/settings'
+
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/" className="font-bold text-gray-900 hover:text-indigo-600 transition-colors">
-          Recipe Translator{' '}
-          <span className="font-normal text-gray-400 text-sm">עברית → Polski</span>
+    <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10">
+      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm text-xl">
+            🍳
+          </div>
+          <div className="leading-none">
+            <div className="font-bold text-stone-800 group-hover:text-amber-600 transition-colors text-[15px]">
+              Recipe Translator
+            </div>
+            <div className="text-[11px] text-stone-400 mt-0.5">עברית → Polski</div>
+          </div>
         </Link>
-        <div className="flex items-center gap-5">
-          <span className="text-sm text-gray-400 hidden sm:block truncate max-w-[180px]">
-            {user?.email}
-          </span>
+
+        {/* Right side */}
+        <div className="flex items-center gap-1">
           <Link
             to="/settings"
-            className="text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+            className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              isSettings
+                ? 'bg-amber-50 text-amber-700'
+                : 'text-stone-500 hover:bg-stone-100 hover:text-stone-700'
+            }`}
           >
             Ustawienia
           </Link>
+
+          <div className="w-px h-5 bg-stone-200 mx-2" />
+
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">
+              {initials}
+            </div>
+            <span className="text-sm text-stone-500 hidden md:block max-w-[160px] truncate">
+              {user?.email}
+            </span>
+          </div>
+
           <button
             onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-red-500 transition-colors"
+            className="ml-1 px-3 py-2 rounded-xl text-sm font-medium text-stone-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             Wyloguj
           </button>
