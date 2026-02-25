@@ -1,10 +1,12 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const { recipeIds, openPanel } = useShoppingList()
 
   function handleLogout() {
     logout()
@@ -13,9 +15,10 @@ export default function Navbar() {
 
   const initials = user?.email?.[0]?.toUpperCase() ?? '?'
   const isSettings = location.pathname === '/settings'
+  const listCount = recipeIds.size
 
   return (
-    <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10">
+    <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10 print:hidden">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
 
         {/* Logo */}
@@ -33,6 +36,22 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-1">
+          {/* Shopping list button */}
+          <button
+            onClick={openPanel}
+            className="relative p-2 rounded-xl text-stone-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+            title="Lista zakupów"
+          >
+            <span className="text-xl">🛒</span>
+            {listCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-amber-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold px-1">
+                {listCount}
+              </span>
+            )}
+          </button>
+
+          <div className="w-px h-5 bg-stone-200 mx-1" />
+
           <Link
             to="/settings"
             className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -44,7 +63,7 @@ export default function Navbar() {
             Ustawienia
           </Link>
 
-          <div className="w-px h-5 bg-stone-200 mx-2" />
+          <div className="w-px h-5 bg-stone-200 mx-1" />
 
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">

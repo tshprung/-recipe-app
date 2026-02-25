@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ShoppingListProvider } from './context/ShoppingListContext'
 import LoginPage from './pages/LoginPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import Navbar from './components/Navbar'
+import ShoppingListPanel from './components/ShoppingListPanel'
 
 // Decorative food items scattered around the background edges
 const FOOD_DECOR = [
@@ -73,21 +75,24 @@ function AppRoutes() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <FoodBackground />
-      {/* Wrap content in relative z-[1] so it sits above the fixed background */}
-      <div className="relative" style={{ zIndex: 1 }}>
-        <Navbar />
-        <main className="max-w-5xl mx-auto px-4 py-8">
-          <Routes>
-            <Route path="/"            element={<RecipeListPage />} />
-            <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-            <Route path="/settings"    element={<SettingsPage />} />
-            <Route path="*"            element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
+    <ShoppingListProvider>
+      <div className="min-h-screen bg-stone-50">
+        <FoodBackground />
+        {/* Wrap content in relative z-[1] so it sits above the fixed background */}
+        <div className="relative" style={{ zIndex: 1 }}>
+          <Navbar />
+          <main className="max-w-5xl mx-auto px-4 py-8">
+            <Routes>
+              <Route path="/"            element={<RecipeListPage />} />
+              <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+              <Route path="/settings"    element={<SettingsPage />} />
+              <Route path="*"            element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+        <ShoppingListPanel />
       </div>
-    </div>
+    </ShoppingListProvider>
   )
 }
 

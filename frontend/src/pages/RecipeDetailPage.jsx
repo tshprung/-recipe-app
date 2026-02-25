@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import ShoppingListModal from '../components/ShoppingListModal'
 
 const TAG_COLORS = [
   'bg-amber-100 text-amber-700',
@@ -47,7 +46,6 @@ export default function RecipeDetailPage() {
   const [error, setError] = useState('')
   const [notes, setNotes] = useState('')
   const [notesSaved, setNotesSaved] = useState(false)
-  const [showShopping, setShowShopping] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
   useEffect(() => {
@@ -291,22 +289,6 @@ export default function RecipeDetailPage() {
         </Card>
       </Section>
 
-      {/* Shopping list */}
-      <button
-        onClick={() => setShowShopping(true)}
-        className="w-full bg-white hover:bg-amber-50 border-2 border-amber-200 hover:border-amber-400 text-amber-600 hover:text-amber-700 rounded-2xl py-4 text-sm font-bold transition-all hover:shadow-md hover:shadow-amber-100 active:scale-[0.99] flex items-center justify-center gap-2"
-      >
-        <span className="text-lg">🛒</span>
-        Lista zakupów
-      </button>
-
-      {showShopping && (
-        <ShoppingListModal
-          ingredients={recipe.ingredients_pl}
-          title={recipe.title_pl}
-          onClose={() => setShowShopping(false)}
-        />
-      )}
     </div>
   )
 }

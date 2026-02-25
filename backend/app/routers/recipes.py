@@ -108,5 +108,9 @@ def delete_recipe(
     recipe = db.get(models.Recipe, recipe_id)
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    # Remove from any shopping lists before deleting the recipe
+    db.query(models.ShoppingListRecipe).filter(
+        models.ShoppingListRecipe.recipe_id == recipe_id
+    ).delete()
     db.delete(recipe)
     db.commit()

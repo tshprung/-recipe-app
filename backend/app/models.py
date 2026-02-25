@@ -67,6 +67,22 @@ class Recipe(Base):
     user: Mapped["User"] = relationship("User", back_populates="recipes")
 
 
+class ShoppingListRecipe(Base):
+    __tablename__ = "shopping_list_recipes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    recipe_id: Mapped[int] = mapped_column(Integer, ForeignKey("recipes.id"), nullable=False)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User")
+    recipe: Mapped["Recipe"] = relationship("Recipe")
+
+
 class IngredientSubstitution(Base):
     __tablename__ = "ingredient_substitutions"
 

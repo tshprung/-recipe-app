@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useShoppingList } from '../context/ShoppingListContext'
 import AddRecipeModal from '../components/AddRecipeModal'
 
 const CARD_ACCENTS = [
@@ -23,9 +24,12 @@ const TAG_COLORS = [
   'bg-violet-100 text-violet-700',
 ]
 
-function RecipeCard({ recipe, onToggleFavorite, onDelete }) {
+function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveFromList }) {
   const navigate = useNavigate()
+  const { isInList, actionLoadingId } = useShoppingList()
   const accent = CARD_ACCENTS[recipe.id % CARD_ACCENTS.length]
+  const inList = isInList(recipe.id)
+  const isActioning = actionLoadingId === recipe.id
 
   return (
     <div
@@ -61,21 +65,46 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete }) {
         <div className="flex-1" />
 
         {/* Footer */}
-        <div className="flex justify-between items-center pt-3 border-t border-stone-100 mt-2">
+        <div className="pt-3 border-t border-stone-100 mt-2 space-y-2">
+          {/* Add / Remove shopping list button */}
           <button
-            onClick={e => { e.stopPropagation(); onToggleFavorite(recipe) }}
-            className={`text-xl transition-all hover:scale-110 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
-            title={recipe.is_favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+            onClick={e => {
+              e.stopPropagation()
+              inList ? onRemoveFromList(recipe.id) : onAddToList(recipe.id)
+            }}
+            disabled={isActioning}
+            className={`w-full flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all ${
+              inList
+                ? 'bg-amber-50 text-amber-700 hover:bg-red-50 hover:text-red-600 border border-amber-200 hover:border-red-200'
+                : 'bg-stone-50 text-stone-500 hover:bg-amber-50 hover:text-amber-600 border border-stone-200 hover:border-amber-200'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            ★
+            {isActioning ? (
+              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : inList ? (
+              <>✓ Na liście zakupów</>
+            ) : (
+              <>+ Dodaj do listy</>
+            )}
           </button>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(recipe) }}
-            className="text-stone-300 hover:text-red-400 transition-colors text-sm p-1 rounded-lg hover:bg-red-50"
-            title="Usuń przepis"
-          >
-            🗑
-          </button>
+
+          {/* Favorite + Delete */}
+          <div className="flex justify-between items-center">
+            <button
+              onClick={e => { e.stopPropagation(); onToggleFavorite(recipe) }}
+              className={`text-xl transition-all hover:scale-110 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
+              title={recipe.is_favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+            >
+              ★
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(recipe) }}
+              className="text-stone-300 hover:text-red-400 transition-colors text-sm p-1 rounded-lg hover:bg-red-50"
+              title="Usuń przepis"
+            >
+              🗑
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -109,6 +138,9 @@ export default function RecipeListPage() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [toast, setToast] = useState(null)
+
+  const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
   const fetchRecipes = useCallback(async () => {
     try {
@@ -122,6 +154,11 @@ export default function RecipeListPage() {
   }, [])
 
   useEffect(() => { fetchRecipes() }, [fetchRecipes])
+
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
 
   async function handleToggleFavorite(recipe) {
     try {
@@ -139,9 +176,22 @@ export default function RecipeListPage() {
     try {
       await api.delete(`/recipes/${recipe.id}`)
       setRecipes(rs => rs.filter(r => r.id !== recipe.id))
+      evictFromList(recipe.id)
     } catch (e) {
       console.error(e)
     }
+  }
+
+  function handleAddToList(id) {
+    if (isInList(id)) {
+      showToast('Przepis już jest na liście zakupów')
+      return
+    }
+    addRecipe(id)
+  }
+
+  function handleRemoveFromList(id) {
+    removeRecipe(id)
   }
 
   const visible = filter === 'favorites' ? recipes.filter(r => r.is_favorite) : recipes
@@ -149,6 +199,13 @@ export default function RecipeListPage() {
 
   return (
     <div>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-stone-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg pointer-events-none">
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap gap-4 justify-between items-start mb-8">
         <div>
@@ -222,6 +279,8 @@ export default function RecipeListPage() {
               recipe={recipe}
               onToggleFavorite={handleToggleFavorite}
               onDelete={handleDelete}
+              onAddToList={handleAddToList}
+              onRemoveFromList={handleRemoveFromList}
             />
           ))}
         </div>

@@ -81,6 +81,21 @@ class RecipeFavoriteUpdate(BaseModel):
     is_favorite: bool
 
 
+# --- Shopping List ---
+
+class ShoppingListAddRequest(BaseModel):
+    recipe_id: int
+
+
+class ShoppingListRecipeIdsOut(BaseModel):
+    recipe_ids: list[int]
+
+
+class ShoppingListOut(BaseModel):
+    recipe_ids: list[int]
+    items: dict  # {"Warzywa i owoce": [...], "Nabiał": [...], ...}
+
+
 # --- Ingredient Substitution ---
 
 class IngredientSubstitutionOut(BaseModel):
