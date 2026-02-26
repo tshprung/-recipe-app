@@ -147,3 +147,68 @@ describe('RecipeDetailPage — adaptation', () => {
     })
   })
 })
+
+describe('RecipeDetailPage — return to original', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.get.mockImplementation(path =>
+      path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
+    )
+    api.post.mockResolvedValue({
+      can_adapt: true,
+      variant: MOCK_VEGAN_VARIANT,
+      alternatives: [],
+    })
+  })
+
+  async function adaptToVegan() {
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+    await userEvent.click(screen.getByText(/Dostosuj przepis/))
+    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
+    await waitFor(() => screen.getAllByText('Wegański'))
+  }
+
+  it('"Wróć do oryginału" button is visible when viewing a variant', async () => {
+    await adaptToVegan()
+    expect(screen.getByText(/Wróć do oryginału/)).toBeInTheDocument()
+  })
+
+  it('"Wróć do oryginału" is NOT shown when already on original tab', async () => {
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+    expect(screen.queryByText(/Wróć do oryginału/)).not.toBeInTheDocument()
+  })
+
+  it('clicking "Wróć do oryginału" switches back to the original recipe', async () => {
+    await adaptToVegan()
+
+    // Currently on the vegan variant — variant ingredient is visible
+    expect(screen.getByText('1 cebula bez masła')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText(/Wróć do oryginału/))
+
+    // Back to original — original ingredient is visible again
+    await waitFor(() => {
+      expect(screen.queryByText('1 cebula bez masła')).not.toBeInTheDocument()
+    })
+    // "Oryginał" appears in both the hero badge and the tab bar
+    expect(screen.getAllByText('Oryginał').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('tab bar highlights the active tab and allows switching', async () => {
+    await adaptToVegan()
+
+    // The Oryginał tab button exists in the tab bar
+    const originalTab = screen.getByRole('button', { name: 'Oryginał' })
+    expect(originalTab).toBeInTheDocument()
+
+    // Click the Oryginał tab
+    await userEvent.click(originalTab)
+
+    // Should be back on original — variant-specific ingredient gone
+    await waitFor(() => {
+      expect(screen.queryByText('1 cebula bez masła')).not.toBeInTheDocument()
+    })
+  })
+})

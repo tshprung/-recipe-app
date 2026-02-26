@@ -299,6 +299,14 @@ export default function RecipeDetailPage() {
                 )
               })()}
               <h1 className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
+              {activeTab !== 'original' && (
+                <button
+                  onClick={() => setActiveTab('original')}
+                  className="mt-2 text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors"
+                >
+                  ← Wróć do oryginału
+                </button>
+              )}
             </div>
           )}
 
