@@ -139,3 +139,16 @@ def test_add_notes_can_be_cleared(client, auth_headers):
         headers=auth_headers,
     )
     assert r.json()["user_notes"] is None
+
+
+def test_create_recipe_without_openai_key_returns_503(client, auth_headers):
+    """POST /api/recipes/ must return 503 when OPENAI_API_KEY is not configured.
+    Regression: missing key produced an unhandled 500; now returns a clear 503."""
+    with patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
+        r = client.post(
+            "/api/recipes/",
+            json={"raw_input": "מרק עגבניות"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 503
+    assert "OPENAI_API_KEY" in r.json()["detail"]

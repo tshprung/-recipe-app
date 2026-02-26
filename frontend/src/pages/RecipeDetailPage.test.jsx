@@ -148,6 +148,34 @@ describe('RecipeDetailPage — adaptation', () => {
   })
 })
 
+describe('RecipeDetailPage — error handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows the actual API error message when the recipe fetch fails', async () => {
+    api.get.mockRejectedValue(new Error('Recipe not found'))
+    renderPage()
+    await screen.findByText('Recipe not found')
+  })
+
+  it('shows the actual error message when only the variants fetch fails', async () => {
+    api.get.mockImplementation(path =>
+      path.endsWith('/variants')
+        ? Promise.reject(new Error('Not Found'))
+        : Promise.resolve(MOCK_RECIPE)
+    )
+    renderPage()
+    await screen.findByText('Not Found')
+  })
+
+  it('falls back to Polish message when the error has no message text', async () => {
+    api.get.mockRejectedValue(new Error(''))
+    renderPage()
+    await screen.findByText('Nie znaleziono przepisu')
+  })
+})
+
 describe('RecipeDetailPage — return to original', () => {
   beforeEach(() => {
     vi.clearAllMocks()

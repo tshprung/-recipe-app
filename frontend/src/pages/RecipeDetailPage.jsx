@@ -102,7 +102,7 @@ export default function RecipeDetailPage() {
         setNotes(data.user_notes ?? '')
         setVariants(variantData)
       })
-      .catch(() => setError('Nie znaleziono przepisu'))
+      .catch(e => setError(e.message || 'Nie znaleziono przepisu'))
       .finally(() => setLoading(false))
   }, [id])
 

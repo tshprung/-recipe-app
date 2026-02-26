@@ -298,6 +298,27 @@ def test_adapt_recipe_with_curly_braces_in_data():
     assert result["can_adapt"] is True
 
 
+def test_adapt_recipe_without_anthropic_key_returns_503(client, auth_headers, recipe):
+    """POST /api/recipes/{id}/adapt must return 503 when ANTHROPIC_API_KEY is missing.
+    Regression: the missing key error was surfaced as an unhandled 500."""
+    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
+        r = client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_type": "vegetarian"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 503
+    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+
+def test_variants_route_returns_401_not_404_unauthenticated(client):
+    """GET /api/recipes/{id}/variants must be a registered route.
+    Unauthenticated requests return 401 (auth required), not 404 (route missing).
+    Regression: stale uvicorn processes from an older code version served 404."""
+    r = client.get("/api/recipes/1/variants")
+    assert r.status_code == 401
+
+
 def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
     """
     adapt_recipe() must send a prompt to Claude that includes:
