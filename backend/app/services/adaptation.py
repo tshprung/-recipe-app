@@ -1,5 +1,6 @@
 import json
 import os
+from string import Template
 
 import anthropic
 
@@ -18,8 +19,8 @@ SYSTEM_PROMPT = (
     "Always respond with valid JSON only — no markdown, no prose outside the JSON."
 )
 
-ADAPTED_TEMPLATE = """\
-Adapt this Polish recipe to be {diet_label}.
+ADAPTED_TEMPLATE = Template("""\
+Adapt this Polish recipe to be $diet_label.
 
 Rules:
 - ALWAYS attempt to replace every non-compliant ingredient with the closest compliant Polish supermarket equivalent.
@@ -45,36 +46,36 @@ Kosher-specific rules (when diet is kosher):
 - Flag ingredients needing kosher certification (wine, vinegar, gelatin) in notes
 
 Return JSON with exactly this shape:
-{{
+{
   "can_adapt": true,
   "title_pl": "...",
   "ingredients_pl": ["..."],
   "steps_pl": ["..."],
-  "notes": {{"ostrzeżenia": []}},
+  "notes": {"ostrzeżenia": []},
   "alternatives": []
-}}
+}
 OR if cannot adapt:
-{{
+{
   "can_adapt": false,
   "title_pl": null,
   "ingredients_pl": [],
   "steps_pl": [],
-  "notes": {{}},
+  "notes": {},
   "alternatives": [
-    {{"title": "...", "reason": "...", "instruction": "..."}}
+    {"title": "...", "reason": "...", "instruction": "..."}
   ]
-}}
+}
 
-Recipe title: {title}
+Recipe title: $title
 Ingredients:
-{ingredients}
+$ingredients
 
 Steps:
-{steps}
-"""
+$steps
+""")
 
-CUSTOM_TEMPLATE = """\
-Adapt this Polish recipe using the following instruction: {instruction}
+CUSTOM_TEMPLATE = Template("""\
+Adapt this Polish recipe using the following instruction: $instruction
 
 Rules:
 - Apply the instruction faithfully while keeping as much of the original recipe's character as possible.
@@ -82,22 +83,22 @@ Rules:
 - Return the full adapted recipe — do not leave anything out.
 
 Return JSON with exactly this shape:
-{{
+{
   "can_adapt": true,
   "title_pl": "...",
   "ingredients_pl": ["..."],
   "steps_pl": ["..."],
-  "notes": {{}},
+  "notes": {},
   "alternatives": []
-}}
+}
 
-Recipe title: {title}
+Recipe title: $title
 Ingredients:
-{ingredients}
+$ingredients
 
 Steps:
-{steps}
-"""
+$steps
+""")
 
 
 def _build_recipe_text(recipe) -> tuple[str, str]:
@@ -119,24 +120,20 @@ def adapt_recipe(recipe, variant_type: str, custom_instruction: str | None = Non
 
     ingredients_text, steps_text = _build_recipe_text(recipe)
 
-    # Escape curly braces in user data so str.format() doesn't misinterpret them
-    def _esc(s: str) -> str:
-        return s.replace('{', '{{').replace('}', '}}')
-
     if custom_instruction:
-        prompt = CUSTOM_TEMPLATE.format(
-            instruction=_esc(custom_instruction),
-            title=_esc(recipe.title_pl),
-            ingredients=_esc(ingredients_text),
-            steps=_esc(steps_text),
+        prompt = CUSTOM_TEMPLATE.safe_substitute(
+            instruction=custom_instruction,
+            title=recipe.title_pl,
+            ingredients=ingredients_text,
+            steps=steps_text,
         )
     else:
         diet_label = DIET_LABELS.get(variant_type, variant_type)
-        prompt = ADAPTED_TEMPLATE.format(
+        prompt = ADAPTED_TEMPLATE.safe_substitute(
             diet_label=diet_label,
-            title=_esc(recipe.title_pl),
-            ingredients=_esc(ingredients_text),
-            steps=_esc(steps_text),
+            title=recipe.title_pl,
+            ingredients=ingredients_text,
+            steps=steps_text,
         )
 
     client = anthropic.Anthropic(api_key=api_key)

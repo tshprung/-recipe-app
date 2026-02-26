@@ -256,6 +256,48 @@ def test_variant_badge_type_matches_request(client, auth_headers, recipe):
     assert "dairy_free" in types
 
 
+def test_adapt_recipe_with_curly_braces_in_data():
+    """
+    Regression: recipe data containing { } must never raise
+    'Single } encountered in format string' (or any format error).
+    Previously broke because str.format() was used with un-escaped user data.
+    Now uses string.Template which treats { } as literals.
+    """
+    from app.services.adaptation import adapt_recipe
+
+    class MockRecipe:
+        title_pl = "Przepis {specjalny} z {nawiasami}"
+        ingredients_pl = [
+            {"amount": "2 {sztuki}", "name": "jajka {duże, rozmiar L}"},
+            "100g mąki {pszennej}",
+            "1 łyżka sosu {sojowego}",
+        ]
+        steps_pl = [
+            "Krok {1}: wymieszaj {składniki} razem.",
+            "Krok {2}: piecz w {180}°C przez 30 minut.",
+        ]
+
+    mock_response = json.dumps({
+        "can_adapt": True,
+        "title_pl": "Przepis wegański",
+        "ingredients_pl": ["2 sztuki tofu", "100g mąki", "1 łyżka sosu sojowego"],
+        "steps_pl": ["Krok 1: wymieszaj.", "Krok 2: piecz."],
+        "notes": {"ostrzeżenia": []},
+        "alternatives": [],
+    })
+    mock_msg = MagicMock()
+    mock_msg.content = [MagicMock(text=mock_response)]
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_msg
+
+    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+        with patch("anthropic.Anthropic", return_value=mock_client):
+            # Must not raise any format/template error
+            result = adapt_recipe(MockRecipe(), "vegan")
+
+    assert result["can_adapt"] is True
+
+
 def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
     """
     adapt_recipe() must send a prompt to Claude that includes:
