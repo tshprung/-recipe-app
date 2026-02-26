@@ -62,6 +62,7 @@ export default function RecipeDetailPage() {
   const [adaptLoading, setAdaptLoading] = useState(false)
   const [adaptDropdownOpen, setAdaptDropdownOpen] = useState(false)
   const [alternatives, setAlternatives] = useState(null)
+  const [pendingVariantType, setPendingVariantType] = useState(null)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -117,13 +118,34 @@ export default function RecipeDetailPage() {
     }
     setAdaptLoading(true)
     setAlternatives(null)
+    setPendingVariantType(type)
     try {
       const result = await api.post(`/recipes/${id}/adapt`, { variant_type: type })
       if (result.can_adapt) {
         setVariants(vs => [...vs, result.variant])
-        setActiveTab(type)
+        setActiveTab(result.variant.variant_type)
       } else {
         setAlternatives(result.alternatives)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAdaptLoading(false)
+    }
+  }
+
+  async function handleAdaptAlternative(alt) {
+    setAlternatives(null)
+    setAdaptLoading(true)
+    try {
+      const result = await api.post(`/recipes/${id}/adapt`, {
+        variant_type: pendingVariantType,
+        custom_instruction: alt.instruction,
+        custom_title: alt.title,
+      })
+      if (result.can_adapt) {
+        setVariants(vs => [...vs, result.variant])
+        setActiveTab(result.variant.variant_type)
       }
     } catch (e) {
       console.error(e)
@@ -226,7 +248,7 @@ export default function RecipeDetailPage() {
               <h1 className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
               {activeTab !== 'original' && (
                 <p className="text-xs text-stone-400 mt-1">
-                  Wersja: {VARIANT_OPTIONS.find(o => o.key === activeTab)?.label}
+                  Wersja: {VARIANT_OPTIONS.find(o => o.key === activeTab)?.label ?? displayData?.title_pl}
                 </p>
               )}
             </div>
@@ -283,7 +305,7 @@ export default function RecipeDetailPage() {
                   : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
               }`}
             >
-              {VARIANT_OPTIONS.find(o => o.key === v.variant_type)?.label ?? v.variant_type}
+              {VARIANT_OPTIONS.find(o => o.key === v.variant_type)?.label ?? v.title_pl}
             </button>
           ))}
           {adaptLoading && (
@@ -298,21 +320,30 @@ export default function RecipeDetailPage() {
       {/* Alternatives panel */}
       {alternatives !== null && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
-          <p className="font-semibold text-amber-800 mb-3">
-            Tego przepisu nie można w pełni dostosować. Może zainteresują Cię:
+          <p className="font-semibold text-amber-800 mb-1">
+            Przepisu nie można w pełni dostosować w wersji{' '}
+            <span className="italic">{VARIANT_OPTIONS.find(o => o.key === pendingVariantType)?.label}</span>.
           </p>
-          {alternatives.map((alt, i) => (
-            <div key={i} className="flex items-start gap-3 py-2">
-              <span className="text-amber-600 font-bold">{i + 1}.</span>
-              <div>
-                <p className="font-medium text-stone-800">{alt.title}</p>
-                <p className="text-sm text-stone-500">{alt.reason}</p>
+          <p className="text-sm text-amber-700 mb-4">Wybierz jedną z dostępnych opcji:</p>
+          <div className="space-y-3">
+            {alternatives.map((alt, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 bg-white rounded-xl border border-amber-100 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-stone-800 text-sm">{alt.title}</p>
+                  <p className="text-xs text-stone-500 mt-0.5">{alt.reason}</p>
+                </div>
+                <button
+                  onClick={() => handleAdaptAlternative(alt)}
+                  className="flex-shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors active:scale-95"
+                >
+                  Wygeneruj
+                </button>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
           <button
             onClick={() => setAlternatives(null)}
-            className="mt-2 text-xs text-stone-400 hover:text-stone-600"
+            className="mt-3 text-xs text-stone-400 hover:text-stone-600"
           >
             Zamknij
           </button>

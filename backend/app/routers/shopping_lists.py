@@ -14,11 +14,18 @@ router = APIRouter(prefix="/api/shopping-list", tags=["shopping-list"])
 def _get_recipe_ids(user_id: int, db: Session) -> list[int]:
     records = (
         db.query(models.ShoppingListRecipe)
+        .join(models.Recipe, models.ShoppingListRecipe.recipe_id == models.Recipe.id)
         .filter(models.ShoppingListRecipe.user_id == user_id)
         .order_by(models.ShoppingListRecipe.added_at)
         .all()
     )
-    return [r.recipe_id for r in records]
+    seen: set[int] = set()
+    result: list[int] = []
+    for r in records:
+        if r.recipe_id not in seen:
+            seen.add(r.recipe_id)
+            result.append(r.recipe_id)
+    return result
 
 
 def _apply_substitutions(label: str, user: models.User, db: Session) -> str:

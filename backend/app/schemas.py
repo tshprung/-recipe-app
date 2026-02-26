@@ -112,6 +112,8 @@ class IngredientSubstitutionOut(BaseModel):
 
 class AdaptRequest(BaseModel):
     variant_type: str  # "vegetarian" | "vegan" | "dairy_free" | "gluten_free" | "kosher"
+    custom_instruction: str | None = None  # for user-chosen alternatives
+    custom_title: str | None = None        # display title for the resulting variant tab
 
 
 class RecipeVariantOut(BaseModel):

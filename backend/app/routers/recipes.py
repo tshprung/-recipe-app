@@ -123,30 +123,48 @@ def adapt_recipe_endpoint(
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
 
-    existing = (
-        db.query(models.RecipeVariant)
-        .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
-        .first()
-    )
-    if existing:
-        return {
-            "can_adapt": True,
-            "variant": schemas.RecipeVariantOut.model_validate(existing),
-            "alternatives": [],
-        }
+    # For standard (non-custom) adaptations, check cache first
+    if not payload.custom_instruction:
+        existing = (
+            db.query(models.RecipeVariant)
+            .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
+            .first()
+        )
+        if existing:
+            return {
+                "can_adapt": True,
+                "variant": schemas.RecipeVariantOut.model_validate(existing),
+                "alternatives": [],
+            }
 
     try:
-        result = adapt_recipe(recipe, payload.variant_type)
+        result = adapt_recipe(recipe, payload.variant_type, payload.custom_instruction)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Adaptation failed: {e}")
 
     if result.get("can_adapt"):
+        # For custom alternatives, build a unique variant_type slug
+        if payload.custom_instruction:
+            existing_count = (
+                db.query(models.RecipeVariant)
+                .filter(
+                    models.RecipeVariant.recipe_id == recipe_id,
+                    models.RecipeVariant.variant_type.like(f"{payload.variant_type}_alt%"),
+                )
+                .count()
+            )
+            variant_type = f"{payload.variant_type}_alt{existing_count}"
+        else:
+            variant_type = payload.variant_type
+
+        title_pl = payload.custom_title or result["title_pl"]
+
         variant = models.RecipeVariant(
             recipe_id=recipe_id,
-            variant_type=payload.variant_type,
-            title_pl=result["title_pl"],
+            variant_type=variant_type,
+            title_pl=title_pl,
             ingredients_pl=result["ingredients_pl"],
             steps_pl=result["steps_pl"],
             notes=result.get("notes", {}),
