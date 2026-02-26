@@ -89,6 +89,7 @@ export default function RecipeDetailPage() {
   const [adaptDropdownOpen, setAdaptDropdownOpen] = useState(false)
   const [alternatives, setAlternatives] = useState(null)
   const [pendingVariantType, setPendingVariantType] = useState(null)
+  const [adaptError, setAdaptError] = useState(null)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -137,8 +138,11 @@ export default function RecipeDetailPage() {
   }
 
   async function handleAdapt(type) {
+    console.log('[handleAdapt] button clicked, type:', type)
     setAdaptDropdownOpen(false)
+    setAdaptError(null)
     if (variants.find(v => v.variant_type === type)) {
+      console.log('[handleAdapt] variant already cached, switching tab')
       setActiveTab(type)
       return
     }
@@ -146,15 +150,20 @@ export default function RecipeDetailPage() {
     setAlternatives(null)
     setPendingVariantType(type)
     try {
+      console.log('[handleAdapt] calling POST /recipes/' + id + '/adapt')
       const result = await api.post(`/recipes/${id}/adapt`, { variant_type: type })
+      console.log('[handleAdapt] API response:', result)
       if (result.can_adapt) {
+        console.log('[handleAdapt] can_adapt=true, variant:', result.variant)
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
       } else {
+        console.log('[handleAdapt] can_adapt=false, alternatives:', result.alternatives)
         setAlternatives(result.alternatives)
       }
     } catch (e) {
-      console.error(e)
+      console.error('[handleAdapt] ERROR:', e)
+      setAdaptError(e.message || 'Nie udało się dostosować przepisu.')
     } finally {
       setAdaptLoading(false)
     }
@@ -162,6 +171,7 @@ export default function RecipeDetailPage() {
 
   async function handleAdaptAlternative(alt) {
     setAlternatives(null)
+    setAdaptError(null)
     setAdaptLoading(true)
     try {
       const result = await api.post(`/recipes/${id}/adapt`, {
@@ -174,7 +184,8 @@ export default function RecipeDetailPage() {
         setActiveTab(result.variant.variant_type)
       }
     } catch (e) {
-      console.error(e)
+      console.error('[handleAdaptAlternative] ERROR:', e)
+      setAdaptError(e.message || 'Nie udało się wygenerować wariantu.')
     } finally {
       setAdaptLoading(false)
     }
@@ -362,6 +373,18 @@ export default function RecipeDetailPage() {
               Dostosowuję…
             </div>
           )}
+        </div>
+      )}
+
+      {/* Adaptation error */}
+      {adaptError && (
+        <div
+          role="alert"
+          className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4 flex items-start gap-3 text-sm text-red-700"
+        >
+          <span className="text-base flex-shrink-0">⚠️</span>
+          <span className="flex-1">{adaptError}</span>
+          <button onClick={() => setAdaptError(null)} className="text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
         </div>
       )}
 
