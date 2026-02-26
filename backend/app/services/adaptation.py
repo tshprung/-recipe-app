@@ -22,13 +22,19 @@ ADAPTED_TEMPLATE = """\
 Adapt this Polish recipe to be {diet_label}.
 
 Rules:
-- Replace any non-compliant ingredients with the closest compliant Polish supermarket equivalent.
-- If a core ingredient cannot be replaced without destroying the dish's identity, set "can_adapt": false
-  and provide 2-3 actionable alternatives. Each alternative must have:
+- ALWAYS attempt to replace every non-compliant ingredient with the closest compliant Polish supermarket equivalent.
+- If a suitable substitute exists, use it — never leave a non-compliant ingredient unchanged without flagging it.
+- If an individual ingredient truly cannot be substituted (no acceptable replacement exists):
+    * Keep the ingredient in ingredients_pl as-is (do NOT remove it silently).
+    * Add a warning string to the "ostrzeżenia" list in "notes":
+      "Nie znaleziono zamiennika dla: [ingredient name]. Rozważ pominięcie."
+- Set "can_adapt": false ONLY when the dish's ENTIRE identity depends on a non-compliant ingredient
+  (e.g. the whole dish is a meat roast and there is truly no plant-based version).
+  In that case provide 2-3 actionable alternatives, each with:
     - "title": short Polish name (e.g. "Wersja z rybą")
     - "reason": one sentence why this works
-    - "instruction": precise English instruction to pass back for adaptation (e.g. "Replace all meat with salmon or cod fillet")
-- If adaptation is possible, set "can_adapt": true and return the full adapted recipe.
+    - "instruction": precise English instruction to pass back for re-adaptation
+- If adaptation is possible (even partially), always set "can_adapt": true.
 
 Kosher-specific rules (when diet is kosher):
 - No mixing meat + dairy — if the recipe has both, set can_adapt=false and offer:
@@ -44,7 +50,7 @@ Return JSON with exactly this shape:
   "title_pl": "...",
   "ingredients_pl": ["..."],
   "steps_pl": ["..."],
-  "notes": {{}},
+  "notes": {{"ostrzeżenia": []}},
   "alternatives": []
 }}
 OR if cannot adapt:

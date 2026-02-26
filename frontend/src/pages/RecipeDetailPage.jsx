@@ -25,6 +25,32 @@ const VARIANT_OPTIONS = [
   { key: 'kosher',     label: 'Koszerny' },
 ]
 
+// Badge shown on the recipe hero card for original and each variant
+const VARIANT_BADGE = {
+  original:    { label: 'Oryginał',      cls: 'bg-stone-100 text-stone-500' },
+  vegetarian:  { label: 'Wegetariański', cls: 'bg-emerald-100 text-emerald-700' },
+  vegan:       { label: 'Wegański',      cls: 'bg-emerald-100 text-emerald-700' },
+  dairy_free:  { label: 'Bez nabiału',   cls: 'bg-sky-100 text-sky-700' },
+  gluten_free: { label: 'Bez glutenu',   cls: 'bg-violet-100 text-violet-700' },
+  kosher:      { label: 'Koszerny',      cls: 'bg-blue-100 text-blue-700' },
+}
+
+// Keywords for auto-detecting ingredient content tags
+const CONTENT_KEYWORDS = [
+  { label: 'Zawiera mięso', icon: '🥩', words: ['mięso', 'kurczak', 'wołowina', 'wieprzowina', 'indyk', 'boczek', 'kiełbasa', 'wędlina', 'szynka', 'wątróbka', 'żeberka', 'mielone', 'kotlet', 'schab', 'cielęcina', 'kaczka', 'jagnięcina', 'baranina', 'rostbef'] },
+  { label: 'Zawiera nabiał', icon: '🧀', words: ['mleko', 'śmietana', 'śmietanka', 'ser', 'masło', 'jogurt', 'twaróg', 'ricotta', 'mozzarella', 'parmezan', 'kefir', 'maślanka', 'brie', 'camembert', 'feta', 'gouda', 'edam'] },
+  { label: 'Zawiera jajka', icon: '🥚', words: ['jajko', 'jajka', 'jaja', 'żółtko'] },
+  { label: 'Zawiera ryby', icon: '🐟', words: ['ryba', 'łosoś', 'tuńczyk', 'dorsz', 'śledź', 'makrela', 'sardynka', 'pstrąg', 'karp', 'halibut', 'flądra', 'mintaj', 'krewetki', 'kalmary'] },
+]
+
+function detectContentTags(ingredients) {
+  const text = (ingredients || [])
+    .map(ing => (typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}` : ing))
+    .join(' ')
+    .toLowerCase()
+  return CONTENT_KEYWORDS.filter(cat => cat.words.some(w => text.includes(w)))
+}
+
 function Section({ title, icon, children }) {
   return (
     <div className="mb-6">
@@ -174,6 +200,8 @@ export default function RecipeDetailPage() {
   const hasSteps         = displayData?.steps_pl?.length > 0
   const hasSubstitutions = activeTab === 'original' && Object.keys(recipe.substitutions ?? {}).length > 0
   const hasNotes         = activeTab === 'original' && Object.keys(recipe.notes ?? {}).length > 0
+  const contentTags      = activeTab === 'original' ? detectContentTags(recipe.ingredients_pl) : []
+  const variantWarnings  = activeTab !== 'original' ? (displayData?.notes?.ostrzeżenia ?? []) : []
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
@@ -235,7 +263,12 @@ export default function RecipeDetailPage() {
           {showOriginal && activeTab === 'original' ? (
             <div className="grid grid-cols-2 gap-6 mb-4">
               <div>
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Polski</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">Polski</p>
+                  <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${VARIANT_BADGE.original.cls}`}>
+                    {VARIANT_BADGE.original.label}
+                  </span>
+                </div>
                 <h1 className="text-xl font-bold text-stone-800 leading-snug">{recipe.title_pl}</h1>
               </div>
               <div className="text-right" dir="rtl">
@@ -245,21 +278,36 @@ export default function RecipeDetailPage() {
             </div>
           ) : (
             <div className="mb-4">
+              {(() => {
+                const baseKey = activeTab.replace(/_alt\d+$/, '')
+                const badge = VARIANT_BADGE[baseKey] ?? { label: VARIANT_OPTIONS.find(o => o.key === baseKey)?.label ?? displayData?.title_pl, cls: 'bg-stone-100 text-stone-500' }
+                return (
+                  <span className={`inline-block text-xs font-semibold rounded-full px-2.5 py-0.5 mb-2 ${badge.cls}`}>
+                    {badge.label}
+                  </span>
+                )
+              })()}
               <h1 className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
-              {activeTab !== 'original' && (
-                <p className="text-xs text-stone-400 mt-1">
-                  Wersja: {VARIANT_OPTIONS.find(o => o.key === activeTab)?.label ?? displayData?.title_pl}
-                </p>
-              )}
             </div>
           )}
 
           {/* Tags */}
           {recipe.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               {recipe.tags.map((tag, i) => (
                 <span key={i} className={`text-xs font-semibold rounded-full px-3 py-1 ${TAG_COLORS[i % TAG_COLORS.length]}`}>
                   {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Content tags — original recipe only */}
+          {contentTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {contentTags.map(tag => (
+                <span key={tag.label} className="text-xs font-medium bg-stone-50 text-stone-500 border border-stone-200 rounded-full px-3 py-1">
+                  {tag.icon} {tag.label}
                 </span>
               ))}
             </div>
@@ -374,6 +422,17 @@ export default function RecipeDetailPage() {
             )
           })}
         </div>
+      )}
+
+      {/* Variant warnings (e.g. unsubstitutable ingredients flagged by Claude) */}
+      {variantWarnings.length > 0 && (
+        <Section title="Uwagi" icon="⚠️">
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
+            {variantWarnings.map((msg, i) => (
+              <p key={i} className="text-sm text-amber-800">{msg}</p>
+            ))}
+          </div>
+        </Section>
       )}
 
       {/* Ingredients */}

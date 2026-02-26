@@ -1,5 +1,6 @@
 """Tests for recipe adaptation (vegetarian / vegan / kosher etc.)."""
-from unittest.mock import patch
+import json
+from unittest.mock import MagicMock, patch
 
 
 MOCK_VARIANT = {
@@ -166,3 +167,138 @@ def test_variants_deleted_with_recipe(client, auth_headers, recipe):
     # Recipe is gone; attempting to list variants returns 404
     r = client.get(f"/api/recipes/{recipe['id']}/variants", headers=auth_headers)
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# New tests from work.txt
+# ---------------------------------------------------------------------------
+
+def test_vegan_adaptation_with_eggs_flagged_in_notes(client, auth_headers, recipe):
+    """
+    When Claude cannot substitute eggs in a vegan recipe, it must either
+    remove the eggs from ingredients_pl OR keep them and add a warning note.
+    The API must pass this information through unchanged.
+    """
+    vegan_with_flagged_eggs = {
+        "can_adapt": True,
+        "title_pl": "Jajecznica wegańska",
+        "ingredients_pl": ["3 jajka"],        # eggs kept — no replacement found
+        "steps_pl": ["Podsmaż."],
+        "notes": {
+            "ostrzeżenia": [
+                "Nie znaleziono zamiennika dla: 3 jajka. Rozważ pominięcie."
+            ]
+        },
+        "alternatives": [],
+    }
+    with patch("app.routers.recipes.adapt_recipe", return_value=vegan_with_flagged_eggs):
+        r = client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_type": "vegan"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["can_adapt"] is True
+    variant = data["variant"]
+    ingredients_text = " ".join(str(i) for i in variant["ingredients_pl"])
+    warnings = variant["notes"].get("ostrzeżenia", [])
+    # Either eggs were replaced (not in list) OR a warning note exists
+    eggs_present = "jajka" in ingredients_text or "jajko" in ingredients_text
+    assert not eggs_present or len(warnings) > 0, (
+        "Eggs are present in ingredients_pl but no warning note was added"
+    )
+
+
+def test_vegan_adaptation_variant_type_saved_as_vegan(client, auth_headers, recipe):
+    """variant_type must be saved exactly as 'vegan' in recipe_variants table."""
+    with patch("app.routers.recipes.adapt_recipe", return_value=MOCK_VARIANT):
+        r = client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_type": "vegan"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+    assert r.json()["variant"]["variant_type"] == "vegan"
+
+    # Verify via the variants list endpoint
+    r = client.get(f"/api/recipes/{recipe['id']}/variants", headers=auth_headers)
+    assert r.json()[0]["variant_type"] == "vegan"
+
+
+def test_original_recipe_has_no_variant_type_field(client, auth_headers, recipe):
+    """GET /recipes/{id} returns a recipe object (no variant_type) — it IS the original."""
+    r = client.get(f"/api/recipes/{recipe['id']}", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    # Original recipes don't have variant_type; variants do
+    assert "variant_type" not in data
+    assert data["title_pl"] == "Zupa Pomidorowa"
+
+
+def test_variant_badge_type_matches_request(client, auth_headers, recipe):
+    """Each variant's variant_type field matches what was requested."""
+    for vtype in ("vegetarian", "dairy_free"):
+        adapted = {**MOCK_VARIANT, "title_pl": f"Wersja {vtype}"}
+        with patch("app.routers.recipes.adapt_recipe", return_value=adapted):
+            r = client.post(
+                f"/api/recipes/{recipe['id']}/adapt",
+                json={"variant_type": vtype},
+                headers=auth_headers,
+            )
+        assert r.json()["variant"]["variant_type"] == vtype
+
+    variants = client.get(
+        f"/api/recipes/{recipe['id']}/variants", headers=auth_headers
+    ).json()
+    types = {v["variant_type"] for v in variants}
+    assert "vegetarian" in types
+    assert "dairy_free" in types
+
+
+def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
+    """
+    adapt_recipe() must send a prompt to Claude that includes:
+    - the diet label (e.g. 'wegańskim')
+    - the flagging rule keyword ('ostrzeżenia')
+    - the 'Nie znaleziono' warning language
+    """
+    from app.services.adaptation import adapt_recipe
+
+    class MockRecipe:
+        title_pl = "Jajecznica z boczkiem"
+        ingredients_pl = [
+            {"amount": "3 sztuki", "name": "jajka"},
+            {"amount": "100g", "name": "boczek"},
+        ]
+        steps_pl = ["Ubij jajka.", "Podsmaż boczek.", "Połącz składniki."]
+
+    mock_response_body = json.dumps({
+        "can_adapt": True,
+        "title_pl": "Jajecznica wegańska",
+        "ingredients_pl": ["tofu scramble", "boczek wegański"],
+        "steps_pl": ["Pokrusz tofu.", "Podsmaż."],
+        "notes": {"ostrzeżenia": []},
+        "alternatives": [],
+    })
+
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured["system"] = kwargs.get("system", "")
+        captured["prompt"] = kwargs.get("messages", [{}])[0].get("content", "")
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text=mock_response_body)]
+        return mock_msg
+
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = fake_create
+
+    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+        with patch("anthropic.Anthropic", return_value=mock_client):
+            adapt_recipe(MockRecipe(), "vegan")
+
+    prompt = captured["prompt"]
+    assert "wegańskim" in prompt, "Prompt must contain the Polish diet label"
+    assert "ostrzeżenia" in prompt, "Prompt must mention the 'ostrzeżenia' notes key"
+    assert "Nie znaleziono" in prompt, "Prompt must include the flagging warning language"
