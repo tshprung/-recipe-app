@@ -13,7 +13,8 @@ const CATEGORY_ICONS = {
 }
 
 export default function ShoppingListPanel() {
-  const { isOpen, closePanel, recipeIds } = useShoppingList()
+  const { isOpen, closePanel, recipeIds, clearList } = useShoppingList()
+  const [clearError, setClearError] = useState('')
 
   const [items, setItems] = useState(null)      // null = not yet loaded
   const [itemsLoading, setItemsLoading] = useState(false)
@@ -21,11 +22,18 @@ export default function ShoppingListPanel() {
   const [emailStatus, setEmailStatus] = useState(null) // null | 'loading' | 'sent' | 'error'
   const [emailError, setEmailError] = useState('')
 
+  // Substitution report state
+  const [reportingKey, setReportingKey] = useState(null)
+  const [reportInput, setReportInput] = useState('')
+  const [reportSaved, setReportSaved] = useState(new Set())
+
   // Reload items whenever the panel opens or the recipe set changes (while open)
   useEffect(() => {
     if (!isOpen) return
     setItemsLoading(true)
     setChecked(new Set())
+    setReportingKey(null)
+    setReportSaved(new Set())
     api.get('/shopping-list/')
       .then(data => setItems(data.items))
       .catch(console.error)
@@ -38,6 +46,20 @@ export default function ShoppingListPanel() {
       next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
+  }
+
+  async function handleReport(key, originalLabel) {
+    try {
+      await api.post('/substitutions/report', {
+        original_label: originalLabel,
+        better_substitution: reportInput,
+      })
+      setReportSaved(prev => new Set([...prev, key]))
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setReportingKey(null)
+    }
   }
 
   async function handlePrint() {
@@ -168,11 +190,52 @@ export default function ShoppingListPanel() {
                                 </svg>
                               )}
                             </span>
-                            <span className={`text-sm transition-colors print:text-stone-800 ${
+                            <span className={`text-sm transition-colors print:text-stone-800 flex-1 min-w-0 ${
                               isChecked ? 'line-through text-stone-300' : 'text-stone-700'
                             }`}>
                               {label}
                             </span>
+
+                            {/* Report button / form */}
+                            {!reportSaved.has(key) ? (
+                              reportingKey === key ? (
+                                <div
+                                  className="ml-auto flex items-center gap-1.5 flex-shrink-0"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <input
+                                    autoFocus
+                                    value={reportInput}
+                                    onChange={e => setReportInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && reportInput.trim()) handleReport(key, label) }}
+                                    placeholder="Lepszy zamiennik…"
+                                    className="text-xs border border-stone-200 rounded-lg px-2 py-1 w-32 focus:outline-none focus:border-amber-400"
+                                  />
+                                  <button
+                                    onClick={() => reportInput.trim() && handleReport(key, label)}
+                                    className="text-xs bg-amber-500 text-white rounded-lg px-2 py-1 hover:bg-amber-600 transition-colors"
+                                  >
+                                    Zapisz
+                                  </button>
+                                  <button
+                                    onClick={() => setReportingKey(null)}
+                                    className="text-xs text-stone-400 hover:text-stone-600"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={e => { e.stopPropagation(); setReportingKey(key); setReportInput('') }}
+                                  className="ml-auto text-stone-300 hover:text-amber-500 text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
+                                  title="Zgłoś lepszy zamiennik"
+                                >
+                                  ⚠
+                                </button>
+                              )
+                            ) : (
+                              <span className="ml-auto text-xs text-emerald-500 flex-shrink-0">✓</span>
+                            )}
                           </li>
                         )
                       })}
@@ -190,6 +253,23 @@ export default function ShoppingListPanel() {
             {emailStatus === 'error' && (
               <p className="text-xs text-red-500 text-center">{emailError}</p>
             )}
+            {clearError && (
+              <p className="text-xs text-red-500 text-center">{clearError}</p>
+            )}
+            <button
+              onClick={async () => {
+                setClearError('')
+                try {
+                  await clearList()
+                  setItems(null)
+                } catch (e) {
+                  setClearError(e.message || 'Błąd czyszczenia listy')
+                }
+              }}
+              className="w-full text-xs text-stone-400 hover:text-red-500 transition-colors py-1"
+            >
+              Wyczyść listę
+            </button>
             <div className="flex gap-2">
               <button
                 onClick={handlePrint}

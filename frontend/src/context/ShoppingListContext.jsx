@@ -40,6 +40,11 @@ export function ShoppingListProvider({ children }) {
     }
   }
 
+  async function clearList() {
+    await api.delete('/shopping-list/clear')
+    setRecipeIds(new Set())
+  }
+
   function evictFromList(id) {
     setRecipeIds(prev => {
       const next = new Set(prev)
@@ -56,6 +61,7 @@ export function ShoppingListProvider({ children }) {
       closePanel: () => setIsOpen(false),
       addRecipe,
       removeRecipe,
+      clearList,
       isInList: id => recipeIds.has(id),
       actionLoadingId,
       evictFromList,

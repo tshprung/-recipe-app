@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
+from ..services.adaptation import adapt_recipe
 from ..services.translation import translate_recipe
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -97,6 +98,73 @@ def toggle_favorite(
     db.commit()
     db.refresh(recipe)
     return recipe
+
+
+@router.get("/{recipe_id}/variants", response_model=list[schemas.RecipeVariantOut])
+def list_variants(
+    recipe_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    return recipe.variants
+
+
+@router.post("/{recipe_id}/adapt")
+def adapt_recipe_endpoint(
+    recipe_id: int,
+    payload: schemas.AdaptRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    existing = (
+        db.query(models.RecipeVariant)
+        .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
+        .first()
+    )
+    if existing:
+        return {
+            "can_adapt": True,
+            "variant": schemas.RecipeVariantOut.model_validate(existing),
+            "alternatives": [],
+        }
+
+    try:
+        result = adapt_recipe(recipe, payload.variant_type)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Adaptation failed: {e}")
+
+    if result.get("can_adapt"):
+        variant = models.RecipeVariant(
+            recipe_id=recipe_id,
+            variant_type=payload.variant_type,
+            title_pl=result["title_pl"],
+            ingredients_pl=result["ingredients_pl"],
+            steps_pl=result["steps_pl"],
+            notes=result.get("notes", {}),
+        )
+        db.add(variant)
+        db.commit()
+        db.refresh(variant)
+        return {
+            "can_adapt": True,
+            "variant": schemas.RecipeVariantOut.model_validate(variant),
+            "alternatives": [],
+        }
+    else:
+        return {
+            "can_adapt": False,
+            "variant": None,
+            "alternatives": result.get("alternatives", []),
+        }
 
 
 @router.delete("/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)

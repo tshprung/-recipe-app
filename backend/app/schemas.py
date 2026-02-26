@@ -106,3 +106,29 @@ class IngredientSubstitutionOut(BaseModel):
     substitution: str
 
     model_config = {"from_attributes": True}
+
+
+# --- Recipe Adaptations ---
+
+class AdaptRequest(BaseModel):
+    variant_type: str  # "vegetarian" | "vegan" | "dairy_free" | "gluten_free" | "kosher"
+
+
+class RecipeVariantOut(BaseModel):
+    id: int
+    recipe_id: int
+    variant_type: str
+    title_pl: str
+    ingredients_pl: list
+    steps_pl: list
+    notes: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SubstitutionReportRequest(BaseModel):
+    original_label: str
+    better_substitution: str
+    source_country: str = "IL"
+    target_country: str = "PL"

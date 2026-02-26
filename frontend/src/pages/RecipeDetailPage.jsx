@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
@@ -16,6 +16,14 @@ const NOTE_META = {
   czas_przygotowania:  { label: 'Przygotowanie',  icon: '⏱' },
   czas_gotowania:      { label: 'Gotowanie',      icon: '🔥' },
 }
+
+const VARIANT_OPTIONS = [
+  { key: 'vegetarian', label: 'Wegetariański' },
+  { key: 'vegan',      label: 'Wegański' },
+  { key: 'dairy_free', label: 'Bez nabiału' },
+  { key: 'gluten_free',label: 'Bez glutenu' },
+  { key: 'kosher',     label: 'Koszerny' },
+]
 
 function Section({ title, icon, children }) {
   return (
@@ -48,15 +56,38 @@ export default function RecipeDetailPage() {
   const [notesSaved, setNotesSaved] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
+  // Adaptation state
+  const [variants, setVariants] = useState([])
+  const [activeTab, setActiveTab] = useState('original')
+  const [adaptLoading, setAdaptLoading] = useState(false)
+  const [adaptDropdownOpen, setAdaptDropdownOpen] = useState(false)
+  const [alternatives, setAlternatives] = useState(null)
+  const dropdownRef = useRef(null)
+
   useEffect(() => {
-    api.get(`/recipes/${id}`)
-      .then(data => {
+    Promise.all([
+      api.get(`/recipes/${id}`),
+      api.get(`/recipes/${id}/variants`),
+    ])
+      .then(([data, variantData]) => {
         setRecipe(data)
         setNotes(data.user_notes ?? '')
+        setVariants(variantData)
       })
       .catch(() => setError('Nie znaleziono przepisu'))
       .finally(() => setLoading(false))
   }, [id])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setAdaptDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function handleSaveNotes() {
     try {
@@ -78,6 +109,29 @@ export default function RecipeDetailPage() {
     }
   }
 
+  async function handleAdapt(type) {
+    setAdaptDropdownOpen(false)
+    if (variants.find(v => v.variant_type === type)) {
+      setActiveTab(type)
+      return
+    }
+    setAdaptLoading(true)
+    setAlternatives(null)
+    try {
+      const result = await api.post(`/recipes/${id}/adapt`, { variant_type: type })
+      if (result.can_adapt) {
+        setVariants(vs => [...vs, result.variant])
+        setActiveTab(type)
+      } else {
+        setAlternatives(result.alternatives)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAdaptLoading(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex justify-center py-20">
       <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -92,24 +146,60 @@ export default function RecipeDetailPage() {
     </div>
   )
 
-  const hasIngredients   = recipe.ingredients_pl?.length > 0
-  const hasSteps         = recipe.steps_pl?.length > 0
-  const hasSubstitutions = Object.keys(recipe.substitutions ?? {}).length > 0
-  const hasNotes         = Object.keys(recipe.notes ?? {}).length > 0
+  const displayData = activeTab === 'original' ? recipe : variants.find(v => v.variant_type === activeTab)
+
+  const hasIngredients   = displayData?.ingredients_pl?.length > 0
+  const hasSteps         = displayData?.steps_pl?.length > 0
+  const hasSubstitutions = activeTab === 'original' && Object.keys(recipe.substitutions ?? {}).length > 0
+  const hasNotes         = activeTab === 'original' && Object.keys(recipe.notes ?? {}).length > 0
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
       {/* Top bar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 bg-white hover:bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-xl transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 bg-white hover:bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-xl transition-colors flex-shrink-0"
         >
           ← Wróć
         </button>
+
+        {/* Adapt dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setAdaptDropdownOpen(v => !v)}
+            disabled={adaptLoading}
+            className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
+          >
+            {adaptLoading ? (
+              <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
+            ) : (
+              '✨'
+            )}
+            Dostosuj przepis ▾
+          </button>
+          {adaptDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-1.5 min-w-[180px]">
+              {VARIANT_OPTIONS.map(opt => {
+                const alreadyHas = variants.find(v => v.variant_type === opt.key)
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => handleAdapt(opt.key)}
+                    className="w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-700 transition-colors flex items-center justify-between"
+                  >
+                    {opt.label}
+                    {alreadyHas && <span className="text-xs text-emerald-500 font-medium">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={handleToggleFavorite}
-          className={`text-2xl transition-all hover:scale-110 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
+          className={`text-2xl transition-all hover:scale-110 flex-shrink-0 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
           title={recipe.is_favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
         >
           ★
@@ -120,7 +210,7 @@ export default function RecipeDetailPage() {
       <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden mb-6">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400" />
         <div className="p-6">
-          {showOriginal ? (
+          {showOriginal && activeTab === 'original' ? (
             <div className="grid grid-cols-2 gap-6 mb-4">
               <div>
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Polski</p>
@@ -132,7 +222,14 @@ export default function RecipeDetailPage() {
               </div>
             </div>
           ) : (
-            <h1 className="text-2xl font-bold text-stone-800 leading-snug mb-4">{recipe.title_pl}</h1>
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
+              {activeTab !== 'original' && (
+                <p className="text-xs text-stone-400 mt-1">
+                  Wersja: {VARIANT_OPTIONS.find(o => o.key === activeTab)?.label}
+                </p>
+              )}
+            </div>
           )}
 
           {/* Tags */}
@@ -151,7 +248,7 @@ export default function RecipeDetailPage() {
             <p className="text-xs text-stone-400">
               {new Date(recipe.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
-            {recipe.title_original && (
+            {recipe.title_original && activeTab === 'original' && (
               <button
                 onClick={() => setShowOriginal(v => !v)}
                 className="text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors bg-stone-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg border border-stone-100"
@@ -163,6 +260,65 @@ export default function RecipeDetailPage() {
         </div>
       </div>
 
+      {/* Variant tab bar */}
+      {(variants.length > 0 || adaptLoading) && (
+        <div className="flex gap-1 mb-6 bg-white border border-stone-100 rounded-2xl p-1 shadow-sm overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('original')}
+            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 ${
+              activeTab === 'original'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+            }`}
+          >
+            Oryginał
+          </button>
+          {variants.map(v => (
+            <button
+              key={v.variant_type}
+              onClick={() => setActiveTab(v.variant_type)}
+              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 ${
+                activeTab === v.variant_type
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+              }`}
+            >
+              {VARIANT_OPTIONS.find(o => o.key === v.variant_type)?.label ?? v.variant_type}
+            </button>
+          ))}
+          {adaptLoading && (
+            <div className="px-3 py-1.5 flex items-center gap-1.5 text-sm text-stone-400 flex-shrink-0">
+              <span className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              Dostosowuję…
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alternatives panel */}
+      {alternatives !== null && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+          <p className="font-semibold text-amber-800 mb-3">
+            Tego przepisu nie można w pełni dostosować. Może zainteresują Cię:
+          </p>
+          {alternatives.map((alt, i) => (
+            <div key={i} className="flex items-start gap-3 py-2">
+              <span className="text-amber-600 font-bold">{i + 1}.</span>
+              <div>
+                <p className="font-medium text-stone-800">{alt.title}</p>
+                <p className="text-sm text-stone-500">{alt.reason}</p>
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => setAlternatives(null)}
+            className="mt-2 text-xs text-stone-400 hover:text-stone-600"
+          >
+            Zamknij
+          </button>
+        </div>
+      )}
+
       {/* Pending translation */}
       {!hasIngredients && !hasSteps && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
@@ -171,7 +327,7 @@ export default function RecipeDetailPage() {
         </div>
       )}
 
-      {/* Notes metadata (servings, times) */}
+      {/* Notes metadata (servings, times) — original only */}
       {hasNotes && (
         <div className="flex flex-wrap gap-3 mb-6">
           {Object.entries(recipe.notes).map(([k, v]) => {
@@ -193,7 +349,7 @@ export default function RecipeDetailPage() {
       {hasIngredients && (
         <Section title="Składniki" icon="🧅">
           <Card>
-            {showOriginal ? (
+            {showOriginal && activeTab === 'original' ? (
               <div>
                 <div className="grid grid-cols-2 gap-4 pb-2 mb-1 border-b border-stone-100">
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">Polski</span>
@@ -213,7 +369,7 @@ export default function RecipeDetailPage() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {recipe.ingredients_pl.map((ing, i) => {
+                {displayData.ingredients_pl.map((ing, i) => {
                   const label = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
                   return (
                     <li key={i} className="flex items-start gap-3 text-sm text-stone-700 py-1 border-b border-stone-50 last:border-0">
@@ -235,7 +391,7 @@ export default function RecipeDetailPage() {
         <Section title="Przygotowanie" icon="👨‍🍳">
           <Card>
             <ol className="space-y-5">
-              {recipe.steps_pl.map((step, i) => (
+              {displayData.steps_pl.map((step, i) => (
                 <li key={i} className="flex gap-4">
                   <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-400 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
                     {i + 1}
@@ -248,7 +404,7 @@ export default function RecipeDetailPage() {
         </Section>
       )}
 
-      {/* Substitutions */}
+      {/* Substitutions — original recipe only */}
       {hasSubstitutions && (
         <Section title="Zamienniki składników" icon="🔄">
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-3">

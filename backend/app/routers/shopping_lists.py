@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -20,7 +21,20 @@ def _get_recipe_ids(user_id: int, db: Session) -> list[int]:
     return [r.recipe_id for r in records]
 
 
-def _collect_ingredients(recipe_ids: list[int], user_id: int, db: Session) -> list[str]:
+def _apply_substitutions(label: str, user: models.User, db: Session) -> str:
+    row = (
+        db.query(models.IngredientSubstitution)
+        .filter(
+            models.IngredientSubstitution.source_country == user.source_country,
+            models.IngredientSubstitution.target_country == user.target_country,
+            func.lower(models.IngredientSubstitution.ingredient_name) == label.lower(),
+        )
+        .first()
+    )
+    return row.substitution if row else label
+
+
+def _collect_ingredients(recipe_ids: list[int], user_id: int, db: Session, user: models.User | None = None) -> list[str]:
     recipes = (
         db.query(models.Recipe)
         .filter(
@@ -37,6 +51,8 @@ def _collect_ingredients(recipe_ids: list[int], user_id: int, db: Session) -> li
             else:
                 label = str(ing)
             if label:
+                if user is not None:
+                    label = _apply_substitutions(label, user, db)
                 ingredients.append(label)
     return ingredients
 
@@ -63,7 +79,10 @@ def get_shopping_list(
         return {"recipe_ids": [], "items": {cat: [] for cat in
                 ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]}}
 
-    ingredients = _collect_ingredients(recipe_ids, current_user.id, db)
+    ingredients = _collect_ingredients(recipe_ids, current_user.id, db, user=current_user)
+    if not ingredients:
+        return {"recipe_ids": recipe_ids, "items": {cat: [] for cat in
+                ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]}}
 
     try:
         items = categorize_ingredients(ingredients)
@@ -131,6 +150,20 @@ def remove_recipe(
     return {"recipe_ids": _get_recipe_ids(current_user.id, db)}
 
 
+# --- DELETE /clear — remove all recipes from the shopping list ---
+
+@router.delete("/clear", response_model=schemas.ShoppingListRecipeIdsOut)
+def clear_shopping_list(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    db.query(models.ShoppingListRecipe).filter(
+        models.ShoppingListRecipe.user_id == current_user.id
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"recipe_ids": []}
+
+
 # --- POST /email — send current shopping list to user's registered email ---
 
 @router.post("/email")
@@ -142,7 +175,7 @@ def email_shopping_list(
     if not recipe_ids:
         raise HTTPException(status_code=400, detail="Shopping list is empty")
 
-    ingredients = _collect_ingredients(recipe_ids, current_user.id, db)
+    ingredients = _collect_ingredients(recipe_ids, current_user.id, db, user=current_user)
 
     try:
         items = categorize_ingredients(ingredients)
