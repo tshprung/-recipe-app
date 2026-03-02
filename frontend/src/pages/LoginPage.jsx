@@ -18,7 +18,8 @@ export default function LoginPage() {
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
 
-  // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register
+  // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register.
+  // Script is loaded synchronously in index.html (no defer) so window.turnstile is available; we poll briefly if needed.
   useEffect(() => {
     if (tab !== 'register' || !turnstileContainerRef.current) return
 
@@ -32,14 +33,14 @@ export default function LoginPage() {
     }
 
     if (window.turnstile) {
-      window.turnstile.ready(renderWidget)
+      renderWidget()
     } else {
       const check = setInterval(() => {
         if (window.turnstile) {
           clearInterval(check)
-          window.turnstile.ready(renderWidget)
+          renderWidget()
         }
-      }, 100)
+      }, 50)
       return () => clearInterval(check)
     }
 
