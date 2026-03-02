@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
@@ -15,12 +15,39 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, register } = useAuth()
+  const turnstileContainerRef = useRef(null)
+  const turnstileWidgetIdRef = useRef(null)
 
+  // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register
   useEffect(() => {
-    if (tab !== 'register') return
-    window.onTurnstileSuccess = (token) => setTurnstileToken(token)
+    if (tab !== 'register' || !turnstileContainerRef.current) return
+
+    const renderWidget = () => {
+      if (!window.turnstile || !turnstileContainerRef.current) return
+      if (turnstileWidgetIdRef.current != null) return // already rendered
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => setTurnstileToken(token),
+      })
+    }
+
+    if (window.turnstile) {
+      window.turnstile.ready(renderWidget)
+    } else {
+      const check = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(check)
+          window.turnstile.ready(renderWidget)
+        }
+      }, 100)
+      return () => clearInterval(check)
+    }
+
     return () => {
-      window.onTurnstileSuccess = undefined
+      if (window.turnstile && turnstileWidgetIdRef.current != null) {
+        window.turnstile.remove(turnstileWidgetIdRef.current)
+        turnstileWidgetIdRef.current = null
+      }
       setTurnstileToken('')
     }
   }, [tab])
@@ -134,9 +161,7 @@ export default function LoginPage() {
             </div>
           )}
           {tab === 'register' && (
-            <div className="cf-turnstile-wrapper flex justify-center" data-sitekey={TURNSTILE_SITE_KEY}>
-              <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-callback="onTurnstileSuccess" />
-            </div>
+            <div className="flex justify-center min-h-[65px]" ref={turnstileContainerRef} />
           )}
 
           {error && (
