@@ -1,4 +1,4 @@
-"""Tests for user registration and login."""
+"""Tests for user registration, login, and verification."""
 from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
@@ -156,3 +156,85 @@ def test_failed_logins_lead_to_lockout(client, registered_user):
     )
     assert r.status_code == 403
     assert "Konto zablokowane" in r.json()["detail"]
+
+
+def test_verify_email_marks_user_verified_and_clears_token(client):
+    # Register a new user so they get a token
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "verify-me@example.com", "password": "mypassword"},
+    )
+    assert r.status_code == 201
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "verify-me@example.com").first()
+        token = user.verification_token
+        assert token is not None
+    finally:
+        db.close()
+
+    # Call verify endpoint
+    r = client.post(f"/api/auth/verify?token={token}")
+    assert r.status_code == 200
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "verify-me@example.com").first()
+        assert user.is_verified is True
+        assert user.verification_token is None
+        assert user.verification_token_expires is None
+    finally:
+        db.close()
+
+
+def test_verify_email_handles_naive_expiry_datetime(client):
+    # Register user and then override expiry to a naive datetime in the future
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "naive-expiry@example.com", "password": "mypassword"},
+    )
+    assert r.status_code == 201
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "naive-expiry@example.com").first()
+        token = user.verification_token
+        # Set a naive (tzinfo=None) expiry to simulate legacy data
+        user.verification_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+    finally:
+        db.close()
+
+    # Verify should succeed and must not raise naive/aware TypeError
+    r = client.post(f"/api/auth/verify?token={token}")
+    assert r.status_code == 200
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "naive-expiry@example.com").first()
+        assert user.is_verified is True
+    finally:
+        db.close()
+
+
+def test_verify_email_rejects_expired_token(client):
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "expired@example.com", "password": "mypassword"},
+    )
+    assert r.status_code == 201
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "expired@example.com").first()
+        token = user.verification_token
+        # Set expiry in the past
+        user.verification_token_expires = datetime.utcnow() - timedelta(hours=1)
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.post(f"/api/auth/verify?token={token}")
+    assert r.status_code == 400
+    assert "Nieprawidłowy lub wygasły token" in r.json()["detail"]

@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import VerifyPage from './pages/VerifyPage'
 import Navbar from './components/Navbar'
 import ShoppingListPanel from './components/ShoppingListPanel'
 
@@ -69,6 +70,7 @@ function AppRoutes() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/verify" element={<VerifyPage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
     )
@@ -86,6 +88,7 @@ function AppRoutes() {
               <Route path="/"            element={<RecipeListPage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
               <Route path="/settings"    element={<SettingsPage />} />
+              <Route path="/verify"      element={<VerifyPage />} />
               <Route path="*"            element={<Navigate to="/" replace />} />
             </Routes>
           </main>

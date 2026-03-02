@@ -78,7 +78,18 @@ def verify_email(token: str, db: Session = Depends(get_db)):
         )
         .first()
     )
-    if not user or not user.verification_token_expires or user.verification_token_expires < now:
+    if not user or not user.verification_token_expires:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nieprawidłowy lub wygasły token weryfikacyjny.",
+        )
+
+    expires = user.verification_token_expires
+    # Normalise timezone to avoid naive/aware comparison issues
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+
+    if expires < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nieprawidłowy lub wygasły token weryfikacyjny.",

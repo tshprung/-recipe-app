@@ -16,16 +16,29 @@ Base.metadata.create_all(bind=engine)
 
 
 def _run_migrations(engine):
+    """Best-effort lightweight migrations for dev SQLite DB."""
     with engine.connect() as conn:
-        for col_sql in [
+        statements = [
+            # Ingredient substitutions (older migration)
             "ALTER TABLE ingredient_substitutions ADD COLUMN created_by_user_id INTEGER REFERENCES users(id)",
             "ALTER TABLE ingredient_substitutions ADD COLUMN created_at DATETIME",
-        ]:
+            # User quota / verification / security columns
+            "ALTER TABLE users ADD COLUMN transformations_used INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN transformations_limit INTEGER NOT NULL DEFAULT 5",
+            "ALTER TABLE users ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN verification_token VARCHAR(255)",
+            "ALTER TABLE users ADD COLUMN verification_token_expires DATETIME",
+            "ALTER TABLE users ADD COLUMN account_tier VARCHAR(50) NOT NULL DEFAULT 'free'",
+            "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN lockout_until DATETIME",
+        ]
+        for sql in statements:
             try:
-                conn.execute(text(col_sql))
+                conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                pass  # column already exists
+                # Column likely already exists; ignore for idempotency
+                pass
 
 
 _run_migrations(engine)
