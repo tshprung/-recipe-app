@@ -56,11 +56,11 @@ def test_substitution_applied_in_shopping_list(client, auth_headers, recipe):
     def fake_categorize(ingredients):
         captured["ingredients"] = ingredients
         return {
-            "Warzywa i owoce": ingredients,
-            "Nabiał": [],
-            "Mięso i ryby": [],
-            "Przyprawy i sosy": [],
-            "Inne": [],
+            "Vegetables and fruit": ingredients,
+            "Dairy": [],
+            "Meat and fish": [],
+            "Spices and sauces": [],
+            "Other": [],
         }
 
     with patch("app.routers.shopping_lists.categorize_ingredients", side_effect=fake_categorize):
@@ -74,14 +74,14 @@ def test_substitution_applied_in_shopping_list(client, auth_headers, recipe):
 
 
 def test_substitution_not_applied_for_wrong_country(client, auth_headers, recipe):
-    """Substitution with different source_country must NOT be applied."""
+    """Substitution with target_country different from user's must NOT be applied."""
     client.post(
         "/api/substitutions/report",
         json={
             "original_label": "2 ząbki czosnek",
             "better_substitution": "garlic powder",
-            "source_country": "US",   # different country
-            "target_country": "PL",
+            "source_country": "IL",
+            "target_country": "DE",  # user's target is PL; this substitution is for DE
         },
         headers=auth_headers,
     )
@@ -92,11 +92,17 @@ def test_substitution_not_applied_for_wrong_country(client, auth_headers, recipe
 
     def fake_categorize(ingredients):
         captured["ingredients"] = ingredients
-        return {"Warzywa i owoce": [], "Nabiał": [], "Mięso i ryby": [], "Przyprawy i sosy": [], "Inne": []}
+        return {
+            "Vegetables and fruit": ingredients,
+            "Dairy": [],
+            "Meat and fish": [],
+            "Spices and sauces": [],
+            "Other": [],
+        }
 
     with patch("app.routers.shopping_lists.categorize_ingredients", side_effect=fake_categorize):
         client.get("/api/shopping-list/", headers=auth_headers)
 
-    # Original label should remain unchanged
+    # Original label should remain (substitution targets DE, user is PL)
     assert "2 ząbki czosnek" in captured["ingredients"]
     assert "garlic powder" not in captured["ingredients"]

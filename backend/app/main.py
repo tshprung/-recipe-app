@@ -31,13 +31,26 @@ def _run_migrations(engine):
             "ALTER TABLE users ADD COLUMN account_tier VARCHAR(50) NOT NULL DEFAULT 'free'",
             "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE users ADD COLUMN lockout_until DATETIME",
+            # Remove source language; add detected_language on recipes (SQLite 3.35+ for DROP COLUMN)
+            "ALTER TABLE recipes ADD COLUMN detected_language VARCHAR(10)",
         ]
         for sql in statements:
             try:
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                # Column likely already exists; ignore for idempotency
+                pass
+        # Drop columns (SQLite 3.35+); ignore if not supported
+        for sql in [
+            "ALTER TABLE recipes DROP COLUMN source_language",
+            "ALTER TABLE recipes DROP COLUMN source_country",
+            "ALTER TABLE users DROP COLUMN source_language",
+            "ALTER TABLE users DROP COLUMN source_country",
+        ]:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
                 pass
 
 

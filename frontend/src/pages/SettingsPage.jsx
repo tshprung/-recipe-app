@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
 
 function Field({ label, hint, value, onChange }) {
@@ -36,10 +37,9 @@ function SettingsCard({ icon, title, children }) {
 
 export default function SettingsPage() {
   const { user, setUser, logout } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    source_language: user?.source_language ?? 'he',
-    source_country:  user?.source_country  ?? 'IL',
     target_language: user?.target_language ?? 'pl',
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
@@ -72,20 +72,15 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-stone-800">Ustawienia</h2>
-        <p className="text-stone-400 text-sm mt-1">Konfiguracja tłumaczenia i lokalizacji</p>
+        <h2 className="text-2xl font-bold text-stone-800">{t('settings')}</h2>
+        <p className="text-stone-400 text-sm mt-1">{t('translationAndLocation')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <SettingsCard icon="🇮🇱" title="Język źródłowy">
-          <Field label="Język" hint="np. he" value={form.source_language} onChange={set('source_language')} />
-          <Field label="Kraj"  hint="np. IL" value={form.source_country}  onChange={set('source_country')}  />
-        </SettingsCard>
-
-        <SettingsCard icon="🇵🇱" title="Język docelowy">
-          <Field label="Język"  hint="np. pl"      value={form.target_language} onChange={set('target_language')} />
-          <Field label="Kraj"   hint="np. PL"      value={form.target_country}  onChange={set('target_country')}  />
-          <Field label="Miasto" hint="np. Wrocław" value={form.target_city}     onChange={set('target_city')}     />
+        <SettingsCard icon="🌐" title={t('translateTo')}>
+          <Field label={t('language')} hint={t('hintLanguage')} value={form.target_language} onChange={set('target_language')} />
+          <Field label={t('country')}  hint={t('hintCountry')} value={form.target_country}  onChange={set('target_country')}  />
+          <Field label={t('city')}     hint={t('hintCity')} value={form.target_city}     onChange={set('target_city')}     />
         </SettingsCard>
 
         {error && (
@@ -103,13 +98,13 @@ export default function SettingsPage() {
             {saving ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Zapisywanie…
+                {t('saving')}
               </span>
-            ) : 'Zapisz ustawienia'}
+            ) : t('saveSettings')}
           </button>
           {saved && (
             <span className="text-sm text-emerald-600 font-semibold flex items-center gap-1">
-              ✓ Zapisano
+              ✓ {t('saved')}
             </span>
           )}
         </div>
@@ -117,7 +112,7 @@ export default function SettingsPage() {
 
       {/* Account info */}
       <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
-        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Konto</h3>
+        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">{t('account')}</h3>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
@@ -126,10 +121,10 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-semibold text-stone-700">{user?.email}</p>
               <p className="text-xs text-stone-400">
-                Zarejestrowano: {user?.created_at ? new Date(user.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                {t('joined')}: {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
               </p>
               <p className="text-xs text-stone-400 mt-1">
-                Status: {user?.is_verified ? 'zweryfikowany' : 'niezweryfikowany'}
+                {user?.is_verified ? t('verified') : t('unverified')}
               </p>
             </div>
           </div>
@@ -139,14 +134,14 @@ export default function SettingsPage() {
               onClick={async () => {
                 try {
                   await api.post('/auth/resend-verification')
-                  alert('Wysłano ponownie email weryfikacyjny.')
+                  alert(t('resendVerification'))
                 } catch (err) {
-                  alert(err.message || 'Nie udało się wysłać emaila weryfikacyjnego.')
+                  alert(err.message || t('verifyError'))
                 }
               }}
               className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl px-3 py-2 transition-colors"
             >
-              Wyślij ponownie email weryfikacyjny
+              {t('resendVerification')}
             </button>
           )}
         </div>
@@ -154,13 +149,13 @@ export default function SettingsPage() {
 
       {/* Delete account */}
       <div className="mt-8 bg-white rounded-2xl border border-red-100 shadow-sm p-5">
-        <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">Usuń konto</h3>
+        <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">{t('deleteAccount')}</h3>
         <p className="text-sm text-stone-600 mb-3">
-          Usunięcie konta jest nieodwracalne. Zostaną usunięte wszystkie Twoje przepisy i dane.
+          {t('deleteAccountConfirm')}
         </p>
         <div className="space-y-3">
           <p className="text-sm text-stone-600">
-            Wpisz <strong>DELETE</strong> poniżej, aby potwierdzić usunięcie konta.
+            {t('typeDelete')}
           </p>
           <input
             type="text"
@@ -184,7 +179,7 @@ export default function SettingsPage() {
                 logout()
                 navigate('/', { replace: true })
               } catch (err) {
-                setDeleteError(err.message || 'Nie udało się usunąć konta.')
+                setDeleteError(err.message || t('verifyError'))
               } finally {
                 setDeleting(false)
               }
@@ -194,9 +189,9 @@ export default function SettingsPage() {
             {deleting ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Usuwanie…
+                {t('deleting')}
               </span>
-            ) : 'Usuń konto'}
+            ) : t('deleteAccountButton')}
           </button>
         </div>
       </div>

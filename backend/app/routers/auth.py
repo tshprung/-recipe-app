@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+# Cloudflare test secret: always passes validation (use real key in production)
+TURNSTILE_TEST_SECRET = "1x0000000000000000000000000000000AA"
 
 
 def _verify_turnstile(token: str, remote_ip: str | None) -> bool:
-    secret = os.getenv("TURNSTILE_SECRET_KEY")
-    if not secret:
-        return True
+    secret = os.getenv("TURNSTILE_SECRET_KEY") or TURNSTILE_TEST_SECRET
     payload = {"secret": secret, "response": token}
     if remote_ip:
         payload["remoteip"] = remote_ip
@@ -40,19 +40,18 @@ def register(
     payload: schemas.UserRegister,
     db: Session = Depends(get_db),
 ):
-    secret = os.getenv("TURNSTILE_SECRET_KEY")
-    if secret:
-        if not payload.captcha_token or not payload.captcha_token.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Weryfikacja antybotowa jest wymagana. Odśwież stronę i spróbuj ponownie.",
-            )
-        client_host = request.client.host if request.client else None
-        if not _verify_turnstile(payload.captcha_token, client_host):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Weryfikacja antybotowa nie powiodła się. Odśwież stronę i spróbuj ponownie.",
-            )
+    # Always require captcha (widget uses test key when VITE_TURNSTILE_SITE_KEY not set)
+    if not payload.captcha_token or not payload.captcha_token.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete the verification challenge.",
+        )
+    client_host = request.client.host if request.client else None
+    if not _verify_turnstile(payload.captcha_token, client_host):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification failed. Refresh and try again.",
+        )
 
     if db.query(models.User).filter(models.User.email == payload.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")

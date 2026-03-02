@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import RecipeDetailPage from './RecipeDetailPage'
 import { api } from '../api/client'
+import { LanguageProvider } from '../context/LanguageContext'
 
 vi.mock('../api/client', () => ({
   api: {
@@ -31,8 +32,7 @@ const MOCK_RECIPE = {
   user_notes: null,
   is_favorite: false,
   raw_input: 'test',
-  source_language: 'he',
-  source_country: 'IL',
+  detected_language: 'he',
   target_language: 'pl',
   target_country: 'PL',
   created_at: '2024-01-01T00:00:00Z',
@@ -51,11 +51,13 @@ const MOCK_VEGAN_VARIANT = {
 
 function renderPage(id = '1') {
   return render(
-    <MemoryRouter initialEntries={[`/recipes/${id}`]}>
-      <Routes>
-        <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-      </Routes>
-    </MemoryRouter>
+    <LanguageProvider>
+      <MemoryRouter initialEntries={[`/recipes/${id}`]}>
+        <Routes>
+          <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </LanguageProvider>
   )
 }
 
@@ -67,14 +69,14 @@ describe('RecipeDetailPage — adaptation', () => {
     )
   })
 
-  it('shows Oryginał badge on the original recipe', async () => {
+  it('shows Original badge on the original recipe', async () => {
     renderPage()
     // Wait for the recipe to load
     await screen.findByText('Zupa Pomidorowa')
-    expect(screen.getByText('Oryginał')).toBeInTheDocument()
+    expect(screen.getByText('Original')).toBeInTheDocument()
   })
 
-  it('clicking Wegański triggers POST /recipes/1/adapt with variant_type: vegan', async () => {
+  it('clicking Vegan triggers POST /recipes/1/adapt with variant_type: vegan', async () => {
     api.post.mockResolvedValue({
       can_adapt: true,
       variant: MOCK_VEGAN_VARIANT,
@@ -84,14 +86,14 @@ describe('RecipeDetailPage — adaptation', () => {
     await screen.findByText('Zupa Pomidorowa')
 
     // Open the adapt dropdown
-    await userEvent.click(screen.getByText(/Dostosuj przepis/))
-    // Click the Wegański option
-    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
+    await userEvent.click(screen.getByText(/Adapt recipe/))
+    // Click the Vegan option
+    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
 
     expect(api.post).toHaveBeenCalledWith('/recipes/1/adapt', { variant_type: 'vegan' })
   })
 
-  it('after successful adaptation the variant tab and Wegański badge appear', async () => {
+  it('after successful adaptation the variant tab and Vegan badge appear', async () => {
     api.post.mockResolvedValue({
       can_adapt: true,
       variant: MOCK_VEGAN_VARIANT,
@@ -100,13 +102,13 @@ describe('RecipeDetailPage — adaptation', () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
 
-    await userEvent.click(screen.getByText(/Dostosuj przepis/))
-    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
+    await userEvent.click(screen.getByText(/Adapt recipe/))
+    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
 
-    // The tab bar and badge should now show Wegański
+    // The tab bar and badge should now show Vegan
     await waitFor(() => {
-      // At least one element with text "Wegański" must appear (tab button or hero badge)
-      const hits = screen.getAllByText('Wegański')
+      // At least one element with text "Vegan" must appear (tab button or hero badge)
+      const hits = screen.getAllByText('Vegan')
       expect(hits.length).toBeGreaterThanOrEqual(1)
     })
   })
@@ -120,8 +122,8 @@ describe('RecipeDetailPage — adaptation', () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
 
-    await userEvent.click(screen.getByText(/Dostosuj przepis/))
-    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
+    await userEvent.click(screen.getByText(/Adapt recipe/))
+    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
 
     await waitFor(() => {
       expect(screen.getByText('1 cebula bez masła')).toBeInTheDocument()
@@ -137,8 +139,8 @@ describe('RecipeDetailPage — adaptation', () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
 
-    await userEvent.click(screen.getByText(/Dostosuj przepis/))
-    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
+    await userEvent.click(screen.getByText(/Adapt recipe/))
+    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
 
     await waitFor(() => {
       expect(
@@ -169,10 +171,10 @@ describe('RecipeDetailPage — error handling', () => {
     await screen.findByText('Not Found')
   })
 
-  it('falls back to Polish message when the error has no message text', async () => {
+  it('falls back to default message when the error has no message text', async () => {
     api.get.mockRejectedValue(new Error(''))
     renderPage()
-    await screen.findByText('Nie znaleziono przepisu')
+    await screen.findByText('Recipe not found')
   })
 })
 
@@ -192,46 +194,46 @@ describe('RecipeDetailPage — return to original', () => {
   async function adaptToVegan() {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
-    await userEvent.click(screen.getByText(/Dostosuj przepis/))
-    await userEvent.click(screen.getByRole('button', { name: 'Wegański' }))
-    await waitFor(() => screen.getAllByText('Wegański'))
+    await userEvent.click(screen.getByText(/Adapt recipe/))
+    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await waitFor(() => screen.getAllByText('Vegan'))
   }
 
-  it('"Wróć do oryginału" button is visible when viewing a variant', async () => {
+  it('"Back to original" button is visible when viewing a variant', async () => {
     await adaptToVegan()
-    expect(screen.getByText(/Wróć do oryginału/)).toBeInTheDocument()
+    expect(screen.getByText(/Back to original/)).toBeInTheDocument()
   })
 
-  it('"Wróć do oryginału" is NOT shown when already on original tab', async () => {
+  it('"Back to original" is NOT shown when already on original tab', async () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
-    expect(screen.queryByText(/Wróć do oryginału/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Back to original/)).not.toBeInTheDocument()
   })
 
-  it('clicking "Wróć do oryginału" switches back to the original recipe', async () => {
+  it('clicking "Back to original" switches back to the original recipe', async () => {
     await adaptToVegan()
 
     // Currently on the vegan variant — variant ingredient is visible
     expect(screen.getByText('1 cebula bez masła')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByText(/Wróć do oryginału/))
+    await userEvent.click(screen.getByText(/Back to original/))
 
     // Back to original — original ingredient is visible again
     await waitFor(() => {
       expect(screen.queryByText('1 cebula bez masła')).not.toBeInTheDocument()
     })
-    // "Oryginał" appears in both the hero badge and the tab bar
-    expect(screen.getAllByText('Oryginał').length).toBeGreaterThanOrEqual(1)
+    // "Original" appears in both the hero badge and the tab bar
+    expect(screen.getAllByText('Original').length).toBeGreaterThanOrEqual(1)
   })
 
   it('tab bar highlights the active tab and allows switching', async () => {
     await adaptToVegan()
 
-    // The Oryginał tab button exists in the tab bar
-    const originalTab = screen.getByRole('button', { name: 'Oryginał' })
+    // The Original tab button exists in the tab bar
+    const originalTab = screen.getByRole('button', { name: 'Original' })
     expect(originalTab).toBeInTheDocument()
 
-    // Click the Oryginał tab
+    // Click the Original tab
     await userEvent.click(originalTab)
 
     // Should be back on original — variant-specific ingredient gone

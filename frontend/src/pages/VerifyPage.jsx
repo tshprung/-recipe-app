@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function VerifyPage() {
+  const { t } = useLanguage()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const [status, setStatus] = useState('pending') // 'pending' | 'success' | 'error'
@@ -15,7 +17,7 @@ export default function VerifyPage() {
   useEffect(() => {
     if (!token) {
       setStatus('error')
-      setMessage('Brak tokenu weryfikacyjnego.')
+      setMessage(t('missingToken'))
       return
     }
     // Prevent double execution (e.g. from setUser triggering re-run or Strict Mode)
@@ -26,7 +28,7 @@ export default function VerifyPage() {
       try {
         await api.post(`/auth/verify?token=${encodeURIComponent(token)}`)
         setStatus('success')
-        setMessage('Twój adres email został zweryfikowany. Możesz korzystać z aplikacji.')
+        setMessage(t('verifySuccess'))
 
         // If user is logged in, refresh their data so is_verified and quota update
         try {
@@ -37,12 +39,12 @@ export default function VerifyPage() {
         }
       } catch (err) {
         setStatus('error')
-        setMessage(err.message || 'Nie udało się zweryfikować adresu email.')
+        setMessage(err.message || t('verifyError'))
       }
     }
 
     run()
-  }, [token, setUser])
+  }, [token, setUser, t])
 
   const isSuccess = status === 'success'
   const isError = status === 'error'
@@ -54,10 +56,10 @@ export default function VerifyPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-400 to-amber-500 rounded-2xl shadow-lg text-3xl mb-4">
             {status === 'pending' ? '⏳' : isSuccess ? '✅' : '⚠️'}
           </div>
-          <h1 className="text-2xl font-bold text-stone-800 mb-1">Weryfikacja email</h1>
+          <h1 className="text-2xl font-bold text-stone-800 mb-1">{t('emailVerification')}</h1>
           <p className="text-sm text-stone-500">
             {status === 'pending'
-              ? 'Sprawdzamy Twój token weryfikacyjny…'
+              ? t('checkingToken')
               : message}
           </p>
         </div>
@@ -74,7 +76,7 @@ export default function VerifyPage() {
             onClick={() => navigate(user ? '/' : '/')}
             className="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 text-sm font-bold transition-colors"
           >
-            Przejdź do aplikacji
+            {t('goToApp')}
           </button>
         )}
 
@@ -84,7 +86,7 @@ export default function VerifyPage() {
             onClick={() => navigate('/')}
             className="mt-6 w-full bg-stone-800 hover:bg-stone-900 text-white rounded-xl py-3 text-sm font-bold transition-colors"
           >
-            Wróć do strony głównej
+            {t('backToHome')}
           </button>
         )}
       </div>

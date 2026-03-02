@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { LanguageProvider, useLanguage } from './context/LanguageContext'
 import { ShoppingListProvider } from './context/ShoppingListContext'
 import LoginPage from './pages/LoginPage'
 import RecipeListPage from './pages/RecipeListPage'
@@ -55,13 +56,14 @@ function FoodBackground() {
 
 function AppRoutes() {
   const { user, loading } = useAuth()
+  const { t } = useLanguage()
 
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-stone-400 text-sm font-medium">Ładowanie…</span>
+          <span className="text-stone-400 text-sm font-medium">{t('loading')}</span>
         </div>
       </div>
     )
@@ -102,9 +104,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   )
 }

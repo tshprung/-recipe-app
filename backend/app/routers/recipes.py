@@ -129,6 +129,8 @@ def create_recipe(
     try:
         translated = translate_recipe(
             raw_input=raw_input,
+            target_language=current_user.target_language,
+            target_country=current_user.target_country,
             target_city=current_user.target_city,
         )
     except RuntimeError as e:
@@ -138,7 +140,7 @@ def create_recipe(
 
     recipe = models.Recipe(
         user_id=current_user.id,
-        title_pl=translated.get("title_pl", "Brak tytułu"),
+        title_pl=translated.get("title_pl", "Untitled"),
         title_original=translated.get("title_original", (raw_input or "")[:100]),
         ingredients_pl=translated.get("ingredients_pl", []),
         ingredients_original=translated.get("ingredients_original", []),
@@ -147,8 +149,7 @@ def create_recipe(
         substitutions=translated.get("substitutions", {}),
         notes=translated.get("notes", {}),
         raw_input=raw_input,
-        source_language=current_user.source_language,
-        source_country=current_user.source_country,
+        detected_language=translated.get("detected_language"),
         target_language=current_user.target_language,
         target_country=current_user.target_country,
     )

@@ -1,7 +1,7 @@
 """Tests for recipe CRUD endpoints."""
 from unittest.mock import MagicMock, patch
 
-from tests.conftest import MOCK_TRANSLATED
+from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY
 from app import models
 from tests.conftest import TestSessionLocal
 
@@ -39,8 +39,13 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     _create_recipe(client, auth_headers)
 
     # Register and login as user B
-    with patch("app.routers.auth.send_verification_email"):
-        client.post("/api/auth/register", json={"email": "b@example.com", "password": "bpass1234"})
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
+        client.post(
+            "/api/auth/register",
+            json={"email": "b@example.com", "password": "bpass1234", "captcha_token": CAPTCHA_DUMMY},
+        )
     r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass1234"})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -62,8 +67,13 @@ def test_get_recipe_not_found(client, auth_headers):
 def test_get_recipe_other_user_returns_404(client, auth_headers):
     created = _create_recipe(client, auth_headers)
 
-    with patch("app.routers.auth.send_verification_email"):
-        client.post("/api/auth/register", json={"email": "other@example.com", "password": "opass1234"})
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
+        client.post(
+            "/api/auth/register",
+            json={"email": "other@example.com", "password": "opass1234", "captcha_token": CAPTCHA_DUMMY},
+        )
     r = client.post("/api/auth/login", json={"email": "other@example.com", "password": "opass1234"})
     other_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -225,3 +235,32 @@ def test_create_recipe_from_url_fetches_and_translates(client, auth_headers):
     # Fetched text should be sanitized (no script tags)
     assert "nope" not in data["raw_input"]
     assert "מרק" in data["raw_input"] or "pomidory" in data["raw_input"]
+
+
+def test_create_recipe_calls_translate_with_user_target_settings(client, auth_headers):
+    """Translation is called with user's target_language, target_country, target_city."""
+    with patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED) as mock_translate:
+        r = client.post(
+            "/api/recipes/",
+            json={"raw_input": "Hebrew recipe text"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 201
+    mock_translate.assert_called_once()
+    call_kwargs = mock_translate.call_args[1]
+    assert call_kwargs["target_language"] == "pl"
+    assert call_kwargs["target_country"] == "PL"
+    assert call_kwargs["target_city"] == "Wrocław"
+    assert call_kwargs["raw_input"] == "Hebrew recipe text"
+
+
+def test_create_recipe_saves_detected_language(client, auth_headers):
+    """Recipe is saved with detected_language from translation result."""
+    with patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED):
+        r = client.post(
+            "/api/recipes/",
+            json={"raw_input": "text"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 201
+    assert r.json().get("detected_language") == "he"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 
 const TAG_COLORS = [
   'bg-amber-100 text-amber-700',
@@ -12,35 +13,35 @@ const TAG_COLORS = [
 ]
 
 const NOTE_META = {
-  porcje:              { label: 'Porcje',         icon: '🍽' },
-  czas_przygotowania:  { label: 'Przygotowanie',  icon: '⏱' },
-  czas_gotowania:      { label: 'Gotowanie',      icon: '🔥' },
+  porcje:              { tKey: 'servings',     icon: '🍽' },
+  czas_przygotowania:  { tKey: 'prepTime',     icon: '⏱' },
+  czas_gotowania:      { tKey: 'cookTime',    icon: '🔥' },
 }
 
 const VARIANT_OPTIONS = [
-  { key: 'vegetarian', label: 'Wegetariański' },
-  { key: 'vegan',      label: 'Wegański' },
-  { key: 'dairy_free', label: 'Bez nabiału' },
-  { key: 'gluten_free',label: 'Bez glutenu' },
-  { key: 'kosher',     label: 'Koszerny' },
+  { key: 'vegetarian', label: 'Vegetarian' },
+  { key: 'vegan',      label: 'Vegan' },
+  { key: 'dairy_free', label: 'Dairy free' },
+  { key: 'gluten_free',label: 'Gluten free' },
+  { key: 'kosher',     label: 'Kosher' },
 ]
 
 // Badge shown on the recipe hero card for original and each variant
 const VARIANT_BADGE = {
-  original:    { label: 'Oryginał',      cls: 'bg-stone-100 text-stone-500' },
-  vegetarian:  { label: 'Wegetariański', cls: 'bg-emerald-100 text-emerald-700' },
-  vegan:       { label: 'Wegański',      cls: 'bg-emerald-100 text-emerald-700' },
-  dairy_free:  { label: 'Bez nabiału',   cls: 'bg-sky-100 text-sky-700' },
-  gluten_free: { label: 'Bez glutenu',   cls: 'bg-violet-100 text-violet-700' },
-  kosher:      { label: 'Koszerny',      cls: 'bg-blue-100 text-blue-700' },
+  original:    { label: 'Original',    cls: 'bg-stone-100 text-stone-500' },
+  vegetarian:  { label: 'Vegetarian', cls: 'bg-emerald-100 text-emerald-700' },
+  vegan:       { label: 'Vegan',      cls: 'bg-emerald-100 text-emerald-700' },
+  dairy_free:  { label: 'Dairy free', cls: 'bg-sky-100 text-sky-700' },
+  gluten_free: { label: 'Gluten free', cls: 'bg-violet-100 text-violet-700' },
+  kosher:      { label: 'Kosher',     cls: 'bg-blue-100 text-blue-700' },
 }
 
 // Keywords for auto-detecting ingredient content tags
 const CONTENT_KEYWORDS = [
-  { label: 'Zawiera mięso', icon: '🥩', words: ['mięso', 'kurczak', 'wołowina', 'wieprzowina', 'indyk', 'boczek', 'kiełbasa', 'wędlina', 'szynka', 'wątróbka', 'żeberka', 'mielone', 'kotlet', 'schab', 'cielęcina', 'kaczka', 'jagnięcina', 'baranina', 'rostbef'] },
-  { label: 'Zawiera nabiał', icon: '🧀', words: ['mleko', 'śmietana', 'śmietanka', 'ser', 'masło', 'jogurt', 'twaróg', 'ricotta', 'mozzarella', 'parmezan', 'kefir', 'maślanka', 'brie', 'camembert', 'feta', 'gouda', 'edam'] },
-  { label: 'Zawiera jajka', icon: '🥚', words: ['jajko', 'jajka', 'jaja', 'żółtko'] },
-  { label: 'Zawiera ryby', icon: '🐟', words: ['ryba', 'łosoś', 'tuńczyk', 'dorsz', 'śledź', 'makrela', 'sardynka', 'pstrąg', 'karp', 'halibut', 'flądra', 'mintaj', 'krewetki', 'kalmary'] },
+  { label: 'Contains meat', icon: '🥩', words: ['mięso', 'kurczak', 'wołowina', 'wieprzowina', 'indyk', 'boczek', 'kiełbasa', 'wędlina', 'szynka', 'wątróbka', 'żeberka', 'mielone', 'kotlet', 'schab', 'cielęcina', 'kaczka', 'jagnięcina', 'baranina', 'rostbef', 'meat', 'chicken', 'beef', 'pork'] },
+  { label: 'Contains dairy', icon: '🧀', words: ['mleko', 'śmietana', 'śmietanka', 'ser', 'masło', 'jogurt', 'twaróg', 'ricotta', 'mozzarella', 'parmezan', 'kefir', 'maślanka', 'brie', 'camembert', 'feta', 'gouda', 'edam', 'milk', 'cream', 'cheese', 'butter'] },
+  { label: 'Contains eggs', icon: '🥚', words: ['jajko', 'jajka', 'jaja', 'żółtko', 'egg'] },
+  { label: 'Contains fish', icon: '🐟', words: ['ryba', 'łosoś', 'tuńczyk', 'dorsz', 'śledź', 'makrela', 'sardynka', 'pstrąg', 'karp', 'halibut', 'flądra', 'mintaj', 'krewetki', 'kalmary', 'fish', 'salmon', 'tuna'] },
 ]
 
 function detectContentTags(ingredients) {
@@ -71,9 +72,16 @@ function Card({ children, className = '' }) {
   )
 }
 
+function variantLabelKey(key) {
+  if (key === 'dairy_free') return 'dairyFree'
+  if (key === 'gluten_free') return 'glutenFree'
+  return key
+}
+
 export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -102,9 +110,9 @@ export default function RecipeDetailPage() {
         setNotes(data.user_notes ?? '')
         setVariants(variantData)
       })
-      .catch(e => setError(e.message || 'Nie znaleziono przepisu'))
+      .catch(e => setError(e.message || t('recipeNotFound')))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, t])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -163,7 +171,7 @@ export default function RecipeDetailPage() {
       }
     } catch (e) {
       console.error('[handleAdapt] ERROR:', e)
-      setAdaptError(e.message || 'Nie udało się dostosować przepisu.')
+      setAdaptError(e.message || t('failedToAdapt'))
     } finally {
       setAdaptLoading(false)
     }
@@ -185,7 +193,7 @@ export default function RecipeDetailPage() {
       }
     } catch (e) {
       console.error('[handleAdaptAlternative] ERROR:', e)
-      setAdaptError(e.message || 'Nie udało się wygenerować wariantu.')
+      setAdaptError(e.message || t('failedToGenerateVariant'))
     } finally {
       setAdaptLoading(false)
     }
@@ -201,7 +209,7 @@ export default function RecipeDetailPage() {
     <div className="text-center py-20">
       <div className="text-5xl mb-4">😕</div>
       <p className="text-stone-500 mb-4">{error}</p>
-      <button onClick={() => navigate(-1)} className="text-sm text-amber-600 hover:underline font-medium">← Wróć</button>
+      <button onClick={() => navigate(-1)} className="text-sm text-amber-600 hover:underline font-medium">← {t('back')}</button>
     </div>
   )
 
@@ -222,7 +230,7 @@ export default function RecipeDetailPage() {
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 bg-white hover:bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-xl transition-colors flex-shrink-0"
         >
-          ← Wróć
+          ← {t('back')}
         </button>
 
         {/* Adapt dropdown */}
@@ -237,7 +245,7 @@ export default function RecipeDetailPage() {
             ) : (
               '✨'
             )}
-            Dostosuj przepis ▾
+            {t('adaptRecipe')} ▾
           </button>
           {adaptDropdownOpen && (
             <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-1.5 min-w-[180px]">
@@ -249,7 +257,7 @@ export default function RecipeDetailPage() {
                     onClick={() => handleAdapt(opt.key)}
                     className="w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-700 transition-colors flex items-center justify-between"
                   >
-                    {opt.label}
+                    {t(variantLabelKey(opt.key))}
                     {alreadyHas && <span className="text-xs text-emerald-500 font-medium">✓</span>}
                   </button>
                 )
@@ -261,7 +269,7 @@ export default function RecipeDetailPage() {
         <button
           onClick={handleToggleFavorite}
           className={`text-2xl transition-all hover:scale-110 flex-shrink-0 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
-          title={recipe.is_favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+          title={recipe.is_favorite ? t('removeFromFavorites') : t('addToFavorites')}
         >
           ★
         </button>
@@ -275,9 +283,9 @@ export default function RecipeDetailPage() {
             <div className="grid grid-cols-2 gap-6 mb-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">Polski</p>
+                  <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{t('translated')}</p>
                   <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${VARIANT_BADGE.original.cls}`}>
-                    {VARIANT_BADGE.original.label}
+                    {t('original')}
                   </span>
                 </div>
                 <h1 className="text-xl font-bold text-stone-800 leading-snug">{recipe.title_pl}</h1>
@@ -291,10 +299,10 @@ export default function RecipeDetailPage() {
             <div className="mb-4">
               {(() => {
                 const baseKey = activeTab.replace(/_alt\d+$/, '')
-                const badge = VARIANT_BADGE[baseKey] ?? { label: VARIANT_OPTIONS.find(o => o.key === baseKey)?.label ?? displayData?.title_pl, cls: 'bg-stone-100 text-stone-500' }
+                const badge = VARIANT_BADGE[baseKey] ?? { cls: 'bg-stone-100 text-stone-500' }
                 return (
                   <span className={`inline-block text-xs font-semibold rounded-full px-2.5 py-0.5 mb-2 ${badge.cls}`}>
-                    {badge.label}
+                    {t(variantLabelKey(baseKey))}
                   </span>
                 )
               })()}
@@ -304,7 +312,7 @@ export default function RecipeDetailPage() {
                   onClick={() => setActiveTab('original')}
                   className="mt-2 text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors"
                 >
-                  ← Wróć do oryginału
+                  ← {t('backToOriginal')}
                 </button>
               )}
             </div>
@@ -335,14 +343,14 @@ export default function RecipeDetailPage() {
           {/* Meta row */}
           <div className="flex items-center justify-between">
             <p className="text-xs text-stone-400">
-              {new Date(recipe.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {new Date(recipe.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
             {recipe.title_original && activeTab === 'original' && (
               <button
                 onClick={() => setShowOriginal(v => !v)}
                 className="text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors bg-stone-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg border border-stone-100"
               >
-                {showOriginal ? '✕ Ukryj oryginał' : '⇔ Pokaż oryginał'}
+                {showOriginal ? `✕ ${t('hideOriginal')}` : `⇔ ${t('showOriginal')}`}
               </button>
             )}
           </div>
@@ -360,7 +368,7 @@ export default function RecipeDetailPage() {
                 : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
             }`}
           >
-            Oryginał
+            {t('original')}
           </button>
           {variants.map(v => (
             <button
@@ -372,13 +380,13 @@ export default function RecipeDetailPage() {
                   : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
               }`}
             >
-              {VARIANT_OPTIONS.find(o => o.key === v.variant_type)?.label ?? v.title_pl}
+              {t(variantLabelKey(v.variant_type))}
             </button>
           ))}
           {adaptLoading && (
             <div className="px-3 py-1.5 flex items-center gap-1.5 text-sm text-stone-400 flex-shrink-0">
               <span className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-              Dostosowuję…
+              {t('adapting')}
             </div>
           )}
         </div>
@@ -400,10 +408,10 @@ export default function RecipeDetailPage() {
       {alternatives !== null && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
           <p className="font-semibold text-amber-800 mb-1">
-            Przepisu nie można w pełni dostosować w wersji{' '}
-            <span className="italic">{VARIANT_OPTIONS.find(o => o.key === pendingVariantType)?.label}</span>.
+            {t('cannotAdapt')}{' '}
+            <span className="italic">{t(variantLabelKey(pendingVariantType))}</span>.
           </p>
-          <p className="text-sm text-amber-700 mb-4">Wybierz jedną z dostępnych opcji:</p>
+          <p className="text-sm text-amber-700 mb-4">{t('chooseOption')}</p>
           <div className="space-y-3">
             {alternatives.map((alt, i) => (
               <div key={i} className="flex items-center justify-between gap-3 bg-white rounded-xl border border-amber-100 px-4 py-3">
@@ -415,7 +423,7 @@ export default function RecipeDetailPage() {
                   onClick={() => handleAdaptAlternative(alt)}
                   className="flex-shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors active:scale-95"
                 >
-                  Wygeneruj
+                  {t('generate')}
                 </button>
               </div>
             ))}
@@ -424,7 +432,7 @@ export default function RecipeDetailPage() {
             onClick={() => setAlternatives(null)}
             className="mt-3 text-xs text-stone-400 hover:text-stone-600"
           >
-            Zamknij
+            {t('close')}
           </button>
         </div>
       )}
@@ -433,7 +441,7 @@ export default function RecipeDetailPage() {
       {!hasIngredients && !hasSteps && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
           <span className="text-2xl">⏳</span>
-          <p className="text-sm text-amber-700 font-medium">Tłumaczenie w toku — treść pojawi się wkrótce.</p>
+          <p className="text-sm text-amber-700 font-medium">{t('translationInProgress')}</p>
         </div>
       )}
 
@@ -446,7 +454,7 @@ export default function RecipeDetailPage() {
               <div key={k} className="flex items-center gap-2 bg-white border border-stone-100 shadow-sm rounded-2xl px-4 py-2.5">
                 <span className="text-lg">{meta?.icon ?? '📝'}</span>
                 <div>
-                  <div className="text-xs text-stone-400 font-medium leading-none mb-0.5">{meta?.label ?? k}</div>
+                  <div className="text-xs text-stone-400 font-medium leading-none mb-0.5">{meta?.tKey ? t(meta.tKey) : k}</div>
                   <div className="text-sm font-bold text-stone-700">{v}</div>
                 </div>
               </div>
@@ -457,7 +465,7 @@ export default function RecipeDetailPage() {
 
       {/* Variant warnings (e.g. unsubstitutable ingredients flagged by the adaptation model) */}
       {variantWarnings.length > 0 && (
-        <Section title="Uwagi" icon="⚠️">
+        <Section title={t('notes')} icon="⚠️">
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
             {variantWarnings.map((msg, i) => (
               <p key={i} className="text-sm text-amber-800">{msg}</p>
@@ -468,12 +476,12 @@ export default function RecipeDetailPage() {
 
       {/* Ingredients */}
       {hasIngredients && (
-        <Section title="Składniki" icon="🧅">
+        <Section title={t('ingredients')} icon="🧅">
           <Card>
             {showOriginal && activeTab === 'original' ? (
               <div>
                 <div className="grid grid-cols-2 gap-4 pb-2 mb-1 border-b border-stone-100">
-                  <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">Polski</span>
+                  <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">Translated</span>
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wide text-right">עברית</span>
                 </div>
                 {recipe.ingredients_pl.map((ing, i) => {
@@ -509,7 +517,7 @@ export default function RecipeDetailPage() {
 
       {/* Steps */}
       {hasSteps && (
-        <Section title="Przygotowanie" icon="👨‍🍳">
+        <Section title={t('instructions')} icon="👨‍🍳">
           <Card>
             <ol className="space-y-5">
               {displayData.steps_pl.map((step, i) => (
@@ -527,7 +535,7 @@ export default function RecipeDetailPage() {
 
       {/* Substitutions — original recipe only */}
       {hasSubstitutions && (
-        <Section title="Zamienniki składników" icon="🔄">
+        <Section title={t('ingredientSubstitutions')} icon="🔄">
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-3">
             {Object.entries(recipe.substitutions).map(([orig, sub]) => (
               <div key={orig} className="flex gap-3 text-sm items-start">
@@ -541,13 +549,13 @@ export default function RecipeDetailPage() {
       )}
 
       {/* User notes */}
-      <Section title="Moje notatki" icon="📝">
+      <Section title={t('myNotes')} icon="📝">
         <Card>
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
             rows={4}
-            placeholder="Dodaj własne notatki, wskazówki lub modyfikacje…"
+            placeholder={t('notesPlaceholder')}
             className="w-full text-sm text-stone-700 placeholder-stone-300 resize-none focus:outline-none leading-relaxed"
           />
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-stone-100">
@@ -555,11 +563,11 @@ export default function RecipeDetailPage() {
               onClick={handleSaveNotes}
               className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2 text-sm font-bold transition-all hover:shadow-md hover:shadow-amber-200 active:scale-95"
             >
-              Zapisz notatki
+              {t('saveNotes')}
             </button>
             {notesSaved && (
               <span className="text-sm text-emerald-600 font-medium flex items-center gap-1">
-                <span>✓</span> Zapisano
+                <span>✓</span> {t('saved')}
               </span>
             )}
           </div>

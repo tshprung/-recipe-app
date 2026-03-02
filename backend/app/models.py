@@ -31,9 +31,7 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Translation settings
-    source_language: Mapped[str] = mapped_column(String(10), default="he", nullable=False)
-    source_country: Mapped[str] = mapped_column(String(10), default="IL", nullable=False)
+    # Translation settings (target only; source is auto-detected per recipe)
     target_language: Mapped[str] = mapped_column(String(10), default="pl", nullable=False)
     target_country: Mapped[str] = mapped_column(String(10), default="PL", nullable=False)
     target_city: Mapped[str] = mapped_column(String(100), default="Wrocław", nullable=False)
@@ -68,9 +66,8 @@ class Recipe(Base):
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     raw_input: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Translation context snapshot (may differ from user defaults at time of creation)
-    source_language: Mapped[str] = mapped_column(String(10), nullable=False)
-    source_country: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Target locale snapshot; source language is auto-detected
+    detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     target_language: Mapped[str] = mapped_column(String(10), nullable=False)
     target_country: Mapped[str] = mapped_column(String(10), nullable=False)
 

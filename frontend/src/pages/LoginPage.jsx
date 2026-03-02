@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+// Use Cloudflare test key so widget always shows when no real key is set
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
 export default function LoginPage() {
+  const { lang, setLang, t } = useLanguage()
   const [tab, setTab] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,7 +17,7 @@ export default function LoginPage() {
   const { login, register } = useAuth()
 
   useEffect(() => {
-    if (tab !== 'register' || !TURNSTILE_SITE_KEY) return
+    if (tab !== 'register') return
     window.onTurnstileSuccess = (token) => setTurnstileToken(token)
     return () => {
       window.onTurnstileSuccess = undefined
@@ -27,7 +30,7 @@ export default function LoginPage() {
     setError('')
     if (tab === 'register') {
       if (password !== passwordConfirm) {
-        setError('Hasła nie są takie same')
+        setError(t('passwordsMismatch'))
         return
       }
     }
@@ -36,7 +39,7 @@ export default function LoginPage() {
       if (tab === 'login') {
         await login(email, password)
       } else {
-        await register(email, password, TURNSTILE_SITE_KEY ? turnstileToken : null)
+        await register(email, password, turnstileToken || null)
       }
     } catch (err) {
       setError(err.message)
@@ -53,35 +56,49 @@ export default function LoginPage() {
       <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-rose-200/20 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative bg-white rounded-3xl shadow-2xl shadow-orange-100 w-full max-w-md p-8">
+        {/* Language switcher */}
+        <div className="absolute top-4 right-4 flex rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
+          {['en', 'he', 'pl'].map(l => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              className={`px-2 py-1 text-xs font-bold uppercase ${lang === l ? 'bg-amber-500 text-white' : 'text-stone-500 hover:bg-stone-100'}`}
+            >
+              {l === 'he' ? 'עב' : l.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-lg shadow-orange-200 text-3xl mb-4">
             🍳
           </div>
-          <h1 className="text-2xl font-bold text-stone-800">Recipe Translator</h1>
-          <p className="text-stone-400 text-sm mt-1">Tłumaczymy przepisy z hebrajskiego na polski</p>
+          <h1 className="text-2xl font-bold text-stone-800">{t('appTitle')}</h1>
+          <p className="text-stone-400 text-sm mt-1">{t('tagline')}</p>
         </div>
 
         {/* Tab switcher */}
         <div className="flex bg-stone-100 rounded-2xl p-1 mb-6">
-          {['login', 'register'].map(t => (
+          {['login', 'register'].map(tabKey => (
             <button
-              key={t}
-              onClick={() => { setTab(t); setError('') }}
+              key={tabKey}
+              onClick={() => { setTab(tabKey); setError('') }}
               className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all ${
-                tab === t
+                tab === tabKey
                   ? 'bg-white text-stone-800 shadow-sm'
                   : 'text-stone-400 hover:text-stone-600'
               }`}
             >
-              {t === 'login' ? 'Logowanie' : 'Rejestracja'}
+              {tabKey === 'login' ? t('login') : t('register')}
             </button>
           ))}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">Email</label>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('email')}</label>
             <input
               type="email"
               value={email}
@@ -93,7 +110,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">Hasło</label>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('password')}</label>
             <input
               type="password"
               value={password}
@@ -105,7 +122,7 @@ export default function LoginPage() {
           </div>
           {tab === 'register' && (
             <div>
-              <label className="block text-sm font-semibold text-stone-600 mb-1.5">Powtórz hasło</label>
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('confirmPassword')}</label>
               <input
                 type="password"
                 value={passwordConfirm}
@@ -116,7 +133,7 @@ export default function LoginPage() {
               />
             </div>
           )}
-          {tab === 'register' && TURNSTILE_SITE_KEY && (
+          {tab === 'register' && (
             <div className="cf-turnstile-wrapper flex justify-center" data-sitekey={TURNSTILE_SITE_KEY}>
               <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-callback="onTurnstileSuccess" />
             </div>
@@ -137,9 +154,9 @@ export default function LoginPage() {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Ładowanie…
+                {t('loading')}
               </span>
-            ) : tab === 'login' ? 'Zaloguj się →' : 'Utwórz konto →'}
+            ) : tab === 'login' ? t('logInButton') : t('createAccountButton')}
           </button>
         </form>
       </div>

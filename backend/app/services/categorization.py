@@ -3,7 +3,7 @@ import os
 
 from openai import APIError, OpenAI, RateLimitError
 
-CATEGORIES = ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]
+CATEGORIES = ["Vegetables and fruit", "Dairy", "Meat and fish", "Spices and sauces", "Other"]
 
 SYSTEM_PROMPT = (
     "You are a grocery shopping assistant. "
@@ -11,12 +11,12 @@ SYSTEM_PROMPT = (
 )
 
 USER_PROMPT_TEMPLATE = """\
-You will receive a list of ingredients from one or more recipes (all in Polish).
+You will receive a list of ingredients from one or more recipes.
 
 Your tasks:
 1. Merge similar ingredients and sum their quantities where possible.
-   Examples: "2 ząbki czosnku" + "3 ząbki czosnku" → "5 ząbków czosnku"
-             "1 cebula" + "1 cebula" → "2 cebule"
+   Examples: "2 cloves garlic" + "3 cloves garlic" → "5 cloves garlic"
+             "1 onion" + "1 onion" → "2 onions"
    If quantities cannot be summed (different units, vague amounts), keep both or list together sensibly.
 2. Classify each merged ingredient into exactly one of these categories:
    {categories}
@@ -30,7 +30,7 @@ Ingredients:
 
 
 def categorize_ingredients(ingredients: list[str]) -> dict:
-    """Merge similar ingredients, sum quantities, and categorize into Polish grocery categories.
+    """Merge similar ingredients, sum quantities, and categorize into grocery categories.
 
     Returns a dict with all five category keys, each mapping to a list of strings.
     Raises RuntimeError if OPENAI_API_KEY missing, ValueError on bad JSON.

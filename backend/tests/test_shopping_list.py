@@ -1,14 +1,14 @@
 """Tests for the shopping list endpoints."""
 from unittest.mock import patch
 
-from tests.conftest import MOCK_TRANSLATED
+from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY
 
 MOCK_CATEGORIES = {
-    "Warzywa i owoce": ["500g pomidory", "1 sztuka cebula"],
-    "Nabiał": [],
-    "Mięso i ryby": [],
-    "Przyprawy i sosy": ["2 ząbki czosnek"],
-    "Inne": [],
+    "Vegetables and fruit": ["500g pomidory", "1 sztuka cebula"],
+    "Dairy": [],
+    "Meat and fish": [],
+    "Spices and sauces": ["2 ząbki czosnek"],
+    "Other": [],
 }
 
 
@@ -54,7 +54,7 @@ def test_get_shopping_list_merged_ingredients(client, auth_headers, recipe):
     assert r.status_code == 200
     data = r.json()
     assert "items" in data
-    assert "Warzywa i owoce" in data["items"]
+    assert "Vegetables and fruit" in data["items"]
     assert recipe["id"] in data["recipe_ids"]
 
 
@@ -70,8 +70,13 @@ def test_shopping_list_is_per_user(client, auth_headers, recipe):
     client.post("/api/shopping-list/add", json={"recipe_id": recipe["id"]}, headers=auth_headers)
 
     # User B registers and checks their list
-    with patch("app.routers.auth.send_verification_email"):
-        client.post("/api/auth/register", json={"email": "b@example.com", "password": "bpass1234"})
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
+        client.post(
+            "/api/auth/register",
+            json={"email": "b@example.com", "password": "bpass1234", "captcha_token": CAPTCHA_DUMMY},
+        )
     r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass1234"})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 

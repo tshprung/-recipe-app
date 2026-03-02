@@ -77,12 +77,22 @@ SAMPLE_EMAIL = "tester@example.com"
 SAMPLE_PASSWORD = "securepassword"
 
 
+# Dummy captcha token for tests (auth router requires it; we mock verification)
+CAPTCHA_DUMMY = "test-captcha-token"
+
+
 @pytest.fixture
 def registered_user(client):
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": SAMPLE_EMAIL, "password": SAMPLE_PASSWORD},
+            json={
+                "email": SAMPLE_EMAIL,
+                "password": SAMPLE_PASSWORD,
+                "captcha_token": CAPTCHA_DUMMY,
+            },
         )
     assert r.status_code == 201
     user_data = r.json()
@@ -131,6 +141,7 @@ MOCK_TRANSLATED = {
     "tags": ["zupa", "wegetariańska"],
     "substitutions": {"świeże pomidory": "passata pomidorowa"},
     "notes": {"porcje": "4", "czas_gotowania": "30 min"},
+    "detected_language": "he",
 }
 
 

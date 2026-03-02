@@ -3,14 +3,16 @@ from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from app import models
-from tests.conftest import TestSessionLocal, MOCK_TRANSLATED
+from tests.conftest import TestSessionLocal, MOCK_TRANSLATED, CAPTCHA_DUMMY
 
 
 def test_register_success(client):
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "new@example.com", "password": "mypassword"},
+            json={"email": "new@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
     data = r.json()
@@ -20,10 +22,12 @@ def test_register_success(client):
 
 
 def test_register_sends_verification_email(client):
-    with patch("app.routers.auth.send_verification_email") as mock_send:
+    with patch("app.routers.auth.send_verification_email") as mock_send, patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify@example.com", "password": "mypassword"},
+            json={"email": "verify@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
     data = r.json()
@@ -35,8 +39,10 @@ def test_register_sends_verification_email(client):
 
 
 def test_register_duplicate_email(client):
-    payload = {"email": "dup@example.com", "password": "password8"}
-    with patch("app.routers.auth.send_verification_email"):
+    payload = {"email": "dup@example.com", "password": "password8", "captcha_token": CAPTCHA_DUMMY}
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         client.post("/api/auth/register", json=payload)
         r = client.post("/api/auth/register", json=payload)
     assert r.status_code == 409
@@ -81,10 +87,12 @@ def test_jwt_token_is_usable(client, registered_user, auth_headers):
 
 def test_unverified_user_cannot_transform_recipe(client):
     # Register a fresh, unverified user (fixture auto-verifies only SAMPLE_EMAIL)
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "unverified@example.com", "password": "mypassword"},
+            json={"email": "unverified@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -164,10 +172,12 @@ def test_failed_logins_lead_to_lockout(client, registered_user):
 
 def test_verify_email_marks_user_verified_and_clears_token(client):
     # Register a new user so they get a token
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify-me@example.com", "password": "mypassword"},
+            json={"email": "verify-me@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -195,10 +205,12 @@ def test_verify_email_marks_user_verified_and_clears_token(client):
 
 def test_verify_email_handles_naive_expiry_datetime(client):
     # Register user and then override expiry to a naive datetime in the future
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "naive-expiry@example.com", "password": "mypassword"},
+            json={"email": "naive-expiry@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -225,10 +237,12 @@ def test_verify_email_handles_naive_expiry_datetime(client):
 
 
 def test_verify_email_rejects_expired_token(client):
-    with patch("app.routers.auth.send_verification_email"):
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "expired@example.com", "password": "mypassword"},
+            json={"email": "expired@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -248,11 +262,13 @@ def test_verify_email_rejects_expired_token(client):
 
 
 def test_register_returns_503_when_verification_email_fails(client):
-    with patch("app.routers.auth.send_verification_email") as mock_send:
+    with patch("app.routers.auth.send_verification_email") as mock_send, patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
         mock_send.side_effect = RuntimeError("Resend unavailable")
         r = client.post(
             "/api/auth/register",
-            json={"email": "fail-email@example.com", "password": "mypassword"},
+            json={"email": "fail-email@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
         )
     # User is created then we try to send email; send fails -> 503
     assert r.status_code == 503

@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 
-const CATEGORIES = ['Warzywa i owoce', 'Nabiał', 'Mięso i ryby', 'Przyprawy i sosy', 'Inne']
+const CATEGORIES = ['Vegetables and fruit', 'Dairy', 'Meat and fish', 'Spices and sauces', 'Other']
 
 const CATEGORY_ICONS = {
-  'Warzywa i owoce': '🥦',
-  'Nabiał': '🧀',
-  'Mięso i ryby': '🥩',
-  'Przyprawy i sosy': '🫙',
-  'Inne': '🛒',
+  'Vegetables and fruit': '🥦',
+  'Dairy': '🧀',
+  'Meat and fish': '🥩',
+  'Spices and sauces': '🫙',
+  'Other': '🛒',
 }
 
 export default function ShoppingListPanel() {
+  const { t } = useLanguage()
   const { isOpen, closePanel, recipeIds, clearList } = useShoppingList()
   const [clearError, setClearError] = useState('')
 
@@ -74,7 +76,7 @@ export default function ShoppingListPanel() {
       setEmailStatus('sent')
       setTimeout(() => setEmailStatus(null), 3000)
     } catch (e) {
-      setEmailError(e.message || 'Błąd wysyłki')
+      setEmailError(e.message || t('sendFailed'))
       setEmailStatus('error')
       setTimeout(() => setEmailStatus(null), 4000)
     }
@@ -108,10 +110,10 @@ export default function ShoppingListPanel() {
               🛒
             </div>
             <div>
-              <h2 className="font-bold text-stone-800 text-base">Lista zakupów</h2>
+              <h2 className="font-bold text-stone-800 text-base">{t('shoppingList')}</h2>
               {recipeIds.size > 0 && (
                 <p className="text-xs text-stone-400 mt-0.5">
-                  {recipeIds.size} {recipeIds.size === 1 ? 'przepis' : 'przepisów'}
+                  {recipeIds.size} {recipeIds.size === 1 ? t('recipe') : t('recipesCount')}
                 </p>
               )}
             </div>
@@ -126,14 +128,14 @@ export default function ShoppingListPanel() {
 
         {/* Print header (only visible when printing) */}
         <div className="hidden print:block px-6 pt-6 pb-4 border-b border-stone-200">
-          <h1 className="text-2xl font-bold text-stone-800">Lista zakupów</h1>
+          <h1 className="text-2xl font-bold text-stone-800">{t('shoppingList')}</h1>
         </div>
 
         {/* Progress bar */}
         {!isEmpty && !itemsLoading && totalCount > 0 && (
           <div className="px-6 pt-4 pb-2 flex-shrink-0 print:hidden">
             <div className="flex justify-between text-xs text-stone-400 mb-1.5">
-              <span>{doneCount} z {totalCount}</span>
+              <span>{doneCount} {t('of')} {totalCount}</span>
               <span className="font-medium text-amber-600">{progress}%</span>
             </div>
             <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -150,13 +152,13 @@ export default function ShoppingListPanel() {
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-16">
               <div className="text-6xl mb-4">🧺</div>
-              <p className="font-semibold text-stone-600 mb-1">Lista jest pusta</p>
-              <p className="text-sm text-stone-400">Dodaj przepisy, aby zobaczyć składniki</p>
+              <p className="font-semibold text-stone-600 mb-1">{t('listEmpty')}</p>
+              <p className="text-sm text-stone-400">{t('addRecipesToSeeIngredients')}</p>
             </div>
           ) : itemsLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-stone-400">Łączę składniki…</p>
+              <p className="text-sm text-stone-400">{t('loadingIngredients')}</p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -208,14 +210,14 @@ export default function ShoppingListPanel() {
                                     value={reportInput}
                                     onChange={e => setReportInput(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter' && reportInput.trim()) handleReport(key, label) }}
-                                    placeholder="Lepszy zamiennik…"
+                                    placeholder={t('betterSubstitute')}
                                     className="text-xs border border-stone-200 rounded-lg px-2 py-1 w-32 focus:outline-none focus:border-amber-400"
                                   />
                                   <button
                                     onClick={() => reportInput.trim() && handleReport(key, label)}
                                     className="text-xs bg-amber-500 text-white rounded-lg px-2 py-1 hover:bg-amber-600 transition-colors"
                                   >
-                                    Zapisz
+                                    {t('save')}
                                   </button>
                                   <button
                                     onClick={() => setReportingKey(null)}
@@ -228,7 +230,7 @@ export default function ShoppingListPanel() {
                                 <button
                                   onClick={e => { e.stopPropagation(); setReportingKey(key); setReportInput('') }}
                                   className="ml-auto text-stone-300 hover:text-amber-500 text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
-                                  title="Zgłoś lepszy zamiennik"
+                                  title={t('suggestSubstitute')}
                                 >
                                   ⚠
                                 </button>
@@ -263,12 +265,12 @@ export default function ShoppingListPanel() {
                   await clearList()
                   setItems(null)
                 } catch (e) {
-                  setClearError(e.message || 'Błąd czyszczenia listy')
+                  setClearError(e.message || t('failedToClearList'))
                 }
               }}
               className="w-full text-xs text-stone-400 hover:text-red-500 transition-colors py-1"
             >
-              Wyczyść listę
+              {t('clearList')}
             </button>
             <div className="flex gap-2">
               <button
@@ -279,7 +281,7 @@ export default function ShoppingListPanel() {
                 {itemsLoading ? (
                   <span className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  '🖨 Drukuj'
+                  `🖨 ${t('print')}`
                 )}
               </button>
               <button
@@ -290,9 +292,9 @@ export default function ShoppingListPanel() {
                 {itemsLoading || emailStatus === 'loading' ? (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : emailStatus === 'sent' ? (
-                  '✓ Wysłano!'
+                  `✓ ${t('sent')}`
                 ) : (
-                  <>✉ Wyślij na email</>
+                  <>✉ {t('sendToEmail')}</>
                 )}
               </button>
             </div>

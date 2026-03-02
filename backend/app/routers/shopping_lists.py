@@ -32,7 +32,6 @@ def _apply_substitutions(label: str, user: models.User, db: Session) -> str:
     row = (
         db.query(models.IngredientSubstitution)
         .filter(
-            models.IngredientSubstitution.source_country == user.source_country,
             models.IngredientSubstitution.target_country == user.target_country,
             func.lower(models.IngredientSubstitution.ingredient_name) == label.lower(),
         )

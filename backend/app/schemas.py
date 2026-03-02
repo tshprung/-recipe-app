@@ -23,8 +23,6 @@ class Token(BaseModel):
 # --- User ---
 
 class UserSettings(BaseModel):
-    source_language: str
-    source_country: str
     target_language: str
     target_country: str
     target_city: str
@@ -33,8 +31,6 @@ class UserSettings(BaseModel):
 class UserOut(BaseModel):
     id: int
     email: str
-    source_language: str
-    source_country: str
     target_language: str
     target_country: str
     target_city: str
@@ -78,8 +74,7 @@ class RecipeOut(BaseModel):
     user_notes: str | None
     is_favorite: bool
     raw_input: str
-    source_language: str
-    source_country: str
+    detected_language: str | None
     target_language: str
     target_country: str
     created_at: datetime

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 import AddRecipeModal from '../components/AddRecipeModal'
 
@@ -26,6 +27,7 @@ const TAG_COLORS = [
 
 function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveFromList }) {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const { isInList, actionLoadingId } = useShoppingList()
   const accent = CARD_ACCENTS[recipe.id % CARD_ACCENTS.length]
   const inList = isInList(recipe.id)
@@ -82,9 +84,9 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
             {isActioning ? (
               <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : inList ? (
-              <>✓ Na liście zakupów</>
+              <>✓ {t('onShoppingList')}</>
             ) : (
-              <>+ Dodaj do listy</>
+              <>+ {t('addToList')}</>
             )}
           </button>
 
@@ -93,14 +95,14 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
             <button
               onClick={e => { e.stopPropagation(); onToggleFavorite(recipe) }}
               className={`text-xl transition-all hover:scale-110 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
-              title={recipe.is_favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+              title={recipe.is_favorite ? t('removeFromFavorites') : t('addToFavorites')}
             >
               ★
             </button>
             <button
               onClick={e => { e.stopPropagation(); onDelete(recipe) }}
               className="text-stone-300 hover:text-red-400 transition-colors text-sm p-1 rounded-lg hover:bg-red-50"
-              title="Usuń przepis"
+              title={t('deleteRecipe')}
             >
               🗑
             </button>
@@ -112,28 +114,29 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
 }
 
 function EmptyState({ onAdd }) {
+  const { t } = useLanguage()
   return (
     <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
       <div className="text-7xl mb-6 select-none">🥘</div>
       <h3 className="text-xl font-bold text-stone-700 mb-2">
-        Twoja książka kulinarna jest pusta
+        {t('emptyCookbookTitle')}
       </h3>
       <p className="text-stone-400 max-w-sm mb-8 leading-relaxed">
-        Wklej przepis w języku hebrajskim, a my przetłumaczymy go na polski
-        i dostosujemy składniki do polskiego rynku.
+        {t('emptyCookbookSubtitle')}
       </p>
       <button
         onClick={onAdd}
         className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center gap-2"
       >
         <span className="text-lg">+</span>
-        Dodaj pierwszy przepis
+        {t('addYourFirstRecipe')}
       </button>
     </div>
   )
 }
 
 export default function RecipeListPage() {
+  const { t } = useLanguage()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -172,7 +175,7 @@ export default function RecipeListPage() {
   }
 
   async function handleDelete(recipe) {
-    if (!confirm(`Usunąć przepis "${recipe.title_pl}"?`)) return
+    if (!confirm(`${t('deleteRecipe')} "${recipe.title_pl}"?`)) return
     try {
       await api.delete(`/recipes/${recipe.id}`)
       setRecipes(rs => rs.filter(r => r.id !== recipe.id))
@@ -184,7 +187,7 @@ export default function RecipeListPage() {
 
   function handleAddToList(id) {
     if (isInList(id)) {
-      showToast('Przepis już jest na liście zakupów')
+      showToast(t('alreadyOnList'))
       return
     }
     addRecipe(id)
@@ -209,9 +212,9 @@ export default function RecipeListPage() {
       {/* Header */}
       <div className="flex flex-wrap gap-4 justify-between items-start mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-stone-800">Moje Przepisy</h2>
+          <h2 className="text-2xl font-bold text-stone-800">{t('myRecipes')}</h2>
           <p className="text-stone-400 text-sm mt-0.5">
-            {recipes.length === 0 ? 'Brak przepisów' : `${recipes.length} ${recipes.length === 1 ? 'przepis' : 'przepisów'}`}
+            {recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`}
           </p>
         </div>
 
@@ -226,7 +229,7 @@ export default function RecipeListPage() {
                   : 'text-stone-500 hover:bg-stone-50'
               }`}
             >
-              Wszystkie
+              {t('all')}
             </button>
             <button
               onClick={() => setFilter('favorites')}
@@ -237,7 +240,7 @@ export default function RecipeListPage() {
               }`}
             >
               <span>★</span>
-              <span>Ulubione</span>
+              <span>{t('favoritesTab')}</span>
               {favCount > 0 && (
                 <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${
                   filter === 'favorites' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
@@ -253,7 +256,7 @@ export default function RecipeListPage() {
             className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
-            <span>Dodaj</span>
+            <span>{t('add')}</span>
           </button>
         </div>
       </div>
@@ -268,8 +271,8 @@ export default function RecipeListPage() {
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-5xl mb-4">⭐</div>
-          <p className="text-stone-500 font-medium mb-1">Brak ulubionych</p>
-          <p className="text-sm text-stone-400">Oznacz przepis gwiazdką, aby go tu zobaczyć</p>
+          <p className="text-stone-500 font-medium mb-1">{t('noFavorites')}</p>
+          <p className="text-sm text-stone-400">{t('noFavoritesHint')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

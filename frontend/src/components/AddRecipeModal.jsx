@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 
 const INPUT_MODE = { PASTE: 'paste', URL: 'url' }
 
@@ -9,6 +10,7 @@ function isValidHttpUrl(s) {
 }
 
 export default function AddRecipeModal({ onClose, onCreated }) {
+  const { t } = useLanguage()
   const [mode, setMode] = useState(INPUT_MODE.PASTE)
   const [text, setText] = useState('')
   const [url, setUrl] = useState('')
@@ -21,7 +23,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
     if (mode === INPUT_MODE.URL) {
       if (!url.trim()) return
       if (!isValidHttpUrl(url)) {
-        setError('Podaj prawidłowy adres (http:// lub https://)')
+        setError(t('urlInvalid'))
         return
       }
     } else {
@@ -35,7 +37,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       const recipe = await api.post('/recipes/', body)
       onCreated(recipe)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || t('urlError'))
     } finally {
       setLoading(false)
     }
@@ -56,9 +58,9 @@ export default function AddRecipeModal({ onClose, onCreated }) {
               📋
             </div>
             <div>
-              <h2 className="text-lg font-bold text-stone-800">Dodaj przepis</h2>
+              <h2 className="text-lg font-bold text-stone-800">{t('addRecipe')}</h2>
               <p className="text-sm text-stone-400">
-                {mode === INPUT_MODE.URL ? 'Podaj link do przepisu' : 'Wklej tekst po hebrajsku'}
+                {mode === INPUT_MODE.URL ? t('pasteUrl') : t('pasteText')}
               </p>
             </div>
           </div>
@@ -77,14 +79,14 @@ export default function AddRecipeModal({ onClose, onCreated }) {
               onClick={() => { setMode(INPUT_MODE.PASTE); setError('') }}
               className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.PASTE ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
-              Wklej tekst
+              {t('pasteText')}
             </button>
             <button
               type="button"
               onClick={() => { setMode(INPUT_MODE.URL); setError('') }}
               className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.URL ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
-              Podaj link
+              {t('pasteUrl')}
             </button>
           </div>
 
@@ -103,7 +105,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
               value={text}
               onChange={e => setText(e.target.value)}
               rows={10}
-              placeholder="הדביק את המתכון כאן..."
+              placeholder={t('placeholderRecipe')}
               className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white resize-none leading-relaxed transition-colors"
               autoFocus
             />
@@ -118,7 +120,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
           {loading && (
             <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mt-3">
               <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-              <p className="text-sm text-amber-700 font-medium">Tłumaczenie przez AI… może potrwać kilka sekund.</p>
+              <p className="text-sm text-amber-700 font-medium">{t('translatingNote')}</p>
             </div>
           )}
 
@@ -128,14 +130,14 @@ export default function AddRecipeModal({ onClose, onCreated }) {
               onClick={onClose}
               className="flex-1 border border-stone-200 text-stone-600 rounded-xl py-3 text-sm font-semibold hover:bg-stone-50 transition-colors"
             >
-              Anuluj
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || !canSubmit}
               className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-amber-200 active:scale-[0.98]"
             >
-              {loading ? 'Tłumaczenie…' : 'Przetłumacz →'}
+              {loading ? t('translating') : t('translateButton')}
             </button>
           </div>
         </form>

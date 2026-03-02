@@ -3,88 +3,99 @@ import os
 
 from openai import APIError, OpenAI, RateLimitError
 
+DETECT_PROMPT = """\
+Detect the language of this recipe text. Reply with ONLY the ISO 639-1 two-letter code (e.g. he, pl, en, ar, es). Nothing else."""
+
 SYSTEM_PROMPT = (
-    "You are a professional recipe translator specialising in Hebrew → Polish translation. "
-    "You have deep knowledge of Israeli cuisine, Polish supermarkets (Biedronka, Lidl, Kaufland, "
-    "Carrefour, local bazaars), and how to adapt Middle-Eastern recipes for a Polish home cook. "
-    "Your most important job is ingredient localisation: every ingredient in the Polish output "
-    "MUST be something a home cook can buy in a Polish supermarket. "
-    "Israeli brand names (Osem, Telma, Elite, Tnuva, Yacobs, Strauss, Tara, and all others) must NEVER "
-    "appear anywhere in the output — replace every brand with the generic Polish product name. "
-    "If you are unsure whether an ingredient is available in Polish supermarkets, substitute it or flag it — "
-    "never leave an uncertain or Israeli-specific item unchanged. "
+    "You are a professional recipe translator. "
+    "You translate recipes between any languages and adapt ingredients for the target market. "
+    "Your most important job is ingredient localisation: every ingredient in the output "
+    "MUST be something a home cook can buy in the target market. "
+    "Never leave brand names or unavailable ingredients unchanged — replace with generic or local equivalents. "
     "Always respond with valid JSON only — no markdown, no prose outside the JSON."
 )
 
 USER_PROMPT_TEMPLATE = """\
-Translate the following Hebrew recipe to Polish and return a single JSON object with EXACTLY these keys:
+Translate this recipe from {source_lang} to {target_lang} for a cook in {city}, {target_country}.
+Apply localisation rules for that market (ingredient names, brands, units).
+
+Return a single JSON object with EXACTLY these keys:
 
 {{
-  "title_pl": "<Polish recipe title>",
-  "title_original": "<Original Hebrew title extracted from the text>",
+  "title_pl": "<recipe title in the target language>",
+  "title_original": "<original recipe title as it appears in the source>",
   "ingredients_pl": [
-    "<quantity + Polish ingredient name, e.g. '2 łyżki tahiny'>",
+    "<quantity + ingredient name in target language>",
     ...
   ],
   "ingredients_original": [
-    "<exact Hebrew ingredient line copied verbatim from the recipe>",
+    "<exact ingredient line from the source recipe>",
     ...
   ],
   "steps_pl": [
-    "<step 1 in Polish — clear, complete sentence>",
+    "<step 1 in target language — clear, complete sentence>",
     ...
   ],
-  "tags": ["<short Polish tag>", ...],
+  "tags": ["<short tag in target language>", ...],
   "substitutions": {{
-    "<Hebrew or Israeli ingredient>": "<Polish equivalent + where to buy in {city}>"
+    "<source ingredient>": "<target market equivalent + where to buy in {city}>"
   }},
   "notes": {{
-    "porcje": "<servings — include only if stated in the recipe>",
-    "czas_przygotowania": "<prep time — include only if stated>",
-    "czas_gotowania": "<cook time — include only if stated>"
+    "porcje": "<servings — only if stated>",
+    "czas_przygotowania": "<prep time — only if stated>",
+    "czas_gotowania": "<cook time — only if stated>"
   }}
 }}
 
 Rules:
-- ingredients_pl: one string per ingredient, with quantity, fully in Polish.
-  LOCALISATION IS MANDATORY — apply these rules to every ingredient before writing it:
-  1. Israeli brand names — ZERO TOLERANCE. Brands such as Osem, Telma, Elite, Tnuva, Yacobs,
-     Strauss, Tara, Angel Bakeries, or any other Israeli brand MUST NEVER appear anywhere in the
-     output. Always replace with the generic Polish product name.
-  2. Sheep/goat feta or any Israeli white cheese (גבינה לבנה, גבינת צאן, etc.) → "ser feta"
-     (available in every Polish supermarket; no further note needed).
-  3. Products unavailable in Polish supermarkets → replace with the closest widely-available Polish
-     equivalent. When in doubt whether something is available in Poland, substitute it or flag it
-     in the substitutions field — never leave an uncertain ingredient as-is.
-  4. Default rule: if an ingredient sounds Israeli-specific or you are not confident a Polish shopper
-     can find it in a standard supermarket, find the Polish supermarket equivalent.
-  5. Middle-Eastern staples that DO exist in Poland (tahini, za'atar, ras el hanout, harissa, sumac,
-     halva, date syrup, pomegranate molasses, labneh, bulgur, freekeh, etc.) → keep them by their
-     Polish/international name; they are sold in Biedronka, Lidl, or ethnic shops.
-  6. Never write an ingredient in ingredients_pl that a Polish shopper cannot buy. If there is truly
-     no equivalent, describe what it is generically (e.g. "ser biały kremowy" instead of a brand).
-- ingredients_original: copy each ingredient line exactly as it appears in the Hebrew.
-- steps_pl: each cooking step as a separate string, translated fully into Polish.
-  In the steps, also replace any brand names or unavailable items with their Polish equivalents.
-- tags: 3–5 short Polish tags (e.g. "wegetariański", "kuchnia bliskowschodnia", "szybkie", "bez glutenu").
-- substitutions: document every substitution you made (Israeli/unavailable → Polish equivalent),
-  including where to find it in {city}. Omit only truly universal ingredients (eggs, flour, oil, salt, sugar).
-- notes: include ONLY keys that are explicitly mentioned in the source recipe. Omit the rest.
-- If the input is not a recipe, do your best to extract what you can.
+- ingredients_pl: one string per ingredient, fully in the target language; localise for {target_country}.
+- ingredients_original: copy each ingredient line exactly as in the source.
+- steps_pl: each step translated into the target language.
+- tags: 3–5 short tags in the target language.
+- substitutions: document substitutions (unavailable/brand → local equivalent). Omit universal ingredients.
+- notes: include ONLY keys explicitly mentioned in the source. Omit the rest.
+- If the input is not a recipe, extract what you can.
 
-Hebrew recipe:
+Recipe in {source_lang}:
 ---
 {raw_input}
 ---
 """
 
 
-def translate_recipe(raw_input: str, target_city: str = "Wrocław") -> dict:
+def detect_language(raw_input: str, client: OpenAI) -> str:
+    """Detect recipe language; returns ISO 639-1 code (e.g. he, pl, en)."""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "user", "content": DETECT_PROMPT + "\n\n" + (raw_input[:2000] or " ")},
+        ],
+        temperature=0,
+    )
+    code = (response.choices[0].message.content or "").strip().lower()[:10]
+    # Normalise to ISO 639-1
+    if not code or not code.isalpha():
+        return "en"
+    return code[:2] if len(code) >= 2 else code
+
+
+def translate_recipe(
+    raw_input: str,
+    target_language: str,
+    target_country: str,
+    target_city: str,
+) -> dict:
+    """
+    Detect source language, then translate recipe to target language with localisation.
+    Returns the same JSON shape as before; callers can read detected_language from the result
+    if we add it to the response, or we detect inside and pass it to the translate prompt.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
     client = OpenAI(api_key=api_key)
+    source_lang = detect_language(raw_input, client)
 
     try:
         response = client.chat.completions.create(
@@ -94,6 +105,9 @@ def translate_recipe(raw_input: str, target_city: str = "Wrocław") -> dict:
                 {
                     "role": "user",
                     "content": USER_PROMPT_TEMPLATE.format(
+                        source_lang=source_lang,
+                        target_lang=target_language,
+                        target_country=target_country,
                         city=target_city,
                         raw_input=raw_input,
                     ),
@@ -114,6 +128,9 @@ def translate_recipe(raw_input: str, target_city: str = "Wrocław") -> dict:
 
     content = response.choices[0].message.content
     try:
-        return json.loads(content)
+        result = json.loads(content)
     except json.JSONDecodeError as e:
         raise ValueError(f"Model returned invalid JSON: {e}") from e
+
+    result["detected_language"] = source_lang
+    return result
