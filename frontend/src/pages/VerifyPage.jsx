@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -10,6 +10,7 @@ export default function VerifyPage() {
   const [message, setMessage] = useState('')
   const navigate = useNavigate()
   const { user, setUser } = useAuth()
+  const hasRun = useRef(false)
 
   useEffect(() => {
     if (!token) {
@@ -17,6 +18,9 @@ export default function VerifyPage() {
       setMessage('Brak tokenu weryfikacyjnego.')
       return
     }
+    // Prevent double execution (e.g. from setUser triggering re-run or Strict Mode)
+    if (hasRun.current) return
+    hasRun.current = true
 
     async function run() {
       try {
@@ -25,13 +29,11 @@ export default function VerifyPage() {
         setMessage('Twój adres email został zweryfikowany. Możesz korzystać z aplikacji.')
 
         // If user is logged in, refresh their data so is_verified and quota update
-        if (user) {
-          try {
-            const me = await api.get('/users/me')
-            setUser(me)
-          } catch {
-            // ignore refresh errors
-          }
+        try {
+          const me = await api.get('/users/me')
+          setUser(me)
+        } catch {
+          // ignore refresh errors (e.g. not logged in)
         }
       } catch (err) {
         setStatus('error')
@@ -40,7 +42,7 @@ export default function VerifyPage() {
     }
 
     run()
-  }, [token, user, setUser])
+  }, [token, setUser])
 
   const isSuccess = status === 'success'
   const isError = status === 'error'
