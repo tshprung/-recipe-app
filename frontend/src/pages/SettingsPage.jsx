@@ -113,16 +113,37 @@ export default function SettingsPage() {
       {/* Account info */}
       <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
         <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Konto</h3>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
-            {user?.email?.[0]?.toUpperCase()}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
+              {user?.email?.[0]?.toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-stone-700">{user?.email}</p>
+              <p className="text-xs text-stone-400">
+                Zarejestrowano: {user?.created_at ? new Date(user.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+              </p>
+              <p className="text-xs text-stone-400 mt-1">
+                Status: {user?.is_verified ? 'zweryfikowany' : 'niezweryfikowany'}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-stone-700">{user?.email}</p>
-            <p className="text-xs text-stone-400">
-              Zarejestrowano: {user?.created_at ? new Date(user.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-            </p>
-          </div>
+          {!user?.is_verified && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await api.post('/auth/resend-verification')
+                  alert('Wysłano ponownie email weryfikacyjny.')
+                } catch (err) {
+                  alert(err.message || 'Nie udało się wysłać emaila weryfikacyjnego.')
+                }
+              }}
+              className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl px-3 py-2 transition-colors"
+            >
+              Wyślij ponownie email weryfikacyjny
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,9 +1,15 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from .database import engine, Base
-from .routers import auth, users, recipes, shopping_lists, substitutions
+from .routers import auth, users, recipes, shopping_lists, substitutions, admin
 
 # Create tables on startup (dev convenience; use Alembic for production)
 Base.metadata.create_all(bind=engine)
@@ -24,7 +30,17 @@ def _run_migrations(engine):
 
 _run_migrations(engine)
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
+
 app = FastAPI(title="Recipe Translator API", version="0.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda request, exc: JSONResponse(
+        status_code=429,
+        content={"detail": "Zbyt wiele żądań. Spróbuj ponownie później."},
+    ),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,11 +50,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(SlowAPIMiddleware)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(recipes.router)
 app.include_router(shopping_lists.router)
 app.include_router(substitutions.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

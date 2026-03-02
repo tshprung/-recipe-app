@@ -1,12 +1,12 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # --- Auth ---
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8)
 
 
 class UserLogin(BaseModel):
@@ -37,6 +37,10 @@ class UserOut(BaseModel):
     target_language: str
     target_country: str
     target_city: str
+    transformations_used: int
+    transformations_limit: int
+    is_verified: bool
+    account_tier: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -134,3 +138,8 @@ class SubstitutionReportRequest(BaseModel):
     better_substitution: str
     source_country: str = "IL"
     target_country: str = "PL"
+
+
+class AdminUpgradeUserRequest(BaseModel):
+    email: EmailStr
+    new_limit: int

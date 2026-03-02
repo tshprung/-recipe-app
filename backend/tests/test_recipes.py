@@ -2,6 +2,8 @@
 from unittest.mock import patch
 
 from tests.conftest import MOCK_TRANSLATED
+from app import models
+from tests.conftest import TestSessionLocal
 
 
 def _create_recipe(client, auth_headers, raw_input="מרק עגבניות"):
@@ -152,3 +154,18 @@ def test_create_recipe_without_openai_key_returns_503(client, auth_headers):
         )
     assert r.status_code == 503
     assert "OPENAI_API_KEY" in r.json()["detail"]
+
+
+def test_recipe_input_sanitization_strips_html_and_limits_length(client, auth_headers):
+    raw = "<script>alert('x')</script> " + "a" * 20000
+    with patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED):
+        r = client.post(
+            "/api/recipes/",
+            json={"raw_input": raw},
+            headers=auth_headers,
+        )
+    assert r.status_code == 201
+    data = r.json()
+    # Ensure raw_input stored on recipe is at most 10000 chars and has no HTML tags
+    assert len(data["raw_input"]) <= 10000
+    assert "<script>" not in data["raw_input"]

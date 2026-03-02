@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+import re
 
 from .. import models, schemas
 from ..auth import get_current_user
@@ -10,15 +12,49 @@ from ..services.translation import translate_recipe
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _sanitize_text(text: str, max_len: int | None = None) -> str:
+    cleaned = _TAG_RE.sub("", text or "")
+    cleaned = cleaned.strip()
+    if max_len is not None:
+        cleaned = cleaned[:max_len]
+    return cleaned
+
+
 @router.post("/", response_model=schemas.RecipeOut, status_code=status.HTTP_201_CREATED)
 def create_recipe(
     payload: schemas.RecipeCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Zweryfikuj swój email przed użyciem aplikacji",
+        )
+
+    # Quota check (before OpenAI)
+    user_for_update = (
+        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    )
+    if user_for_update.transformations_limit != -1 and (
+        user_for_update.transformations_used >= user_for_update.transformations_limit
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Wykorzystałeś limit darmowych przepisów. Skontaktuj się z administratorem.",
+        )
+
+    user_for_update.transformations_used += 1
+    db.commit()
+
+    raw_input = _sanitize_text(payload.raw_input, max_len=10000)
+
     try:
         translated = translate_recipe(
-            raw_input=payload.raw_input,
+            raw_input=raw_input,
             target_city=current_user.target_city,
         )
     except RuntimeError as e:
@@ -36,7 +72,7 @@ def create_recipe(
         tags=translated.get("tags", []),
         substitutions=translated.get("substitutions", {}),
         notes=translated.get("notes", {}),
-        raw_input=payload.raw_input,
+        raw_input=raw_input,
         source_language=current_user.source_language,
         source_country=current_user.source_country,
         target_language=current_user.target_language,
@@ -123,6 +159,27 @@ def adapt_recipe_endpoint(
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
 
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Zweryfikuj swój email przed użyciem aplikacji",
+        )
+
+    # Quota check (before OpenAI)
+    user_for_update = (
+        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    )
+    if user_for_update.transformations_limit != -1 and (
+        user_for_update.transformations_used >= user_for_update.transformations_limit
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Wykorzystałeś limit darmowych przepisów. Skontaktuj się z administratorem.",
+        )
+
+    user_for_update.transformations_used += 1
+    db.commit()
+
     # For standard (non-custom) adaptations, check cache first
     if not payload.custom_instruction:
         existing = (
@@ -137,8 +194,14 @@ def adapt_recipe_endpoint(
                 "alternatives": [],
             }
 
+    custom_instruction = (
+        _sanitize_text(payload.custom_instruction, max_len=1000)
+        if payload.custom_instruction is not None
+        else None
+    )
+
     try:
-        result = adapt_recipe(recipe, payload.variant_type, payload.custom_instruction)
+        result = adapt_recipe(recipe, payload.variant_type, custom_instruction)
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:

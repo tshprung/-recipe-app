@@ -17,6 +17,13 @@ export default function Navbar() {
   const isSettings = location.pathname === '/settings'
   const listCount = recipeIds.size
 
+  const used = user?.transformations_used ?? 0
+  const limit = user?.transformations_limit
+  const quotaLabel =
+    limit === -1
+      ? 'Przepisy: ∞'
+      : `Przepisy: ${used}/${limit ?? 0}`
+
   return (
     <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10 print:hidden">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -51,6 +58,12 @@ export default function Navbar() {
           </button>
 
           <div className="w-px h-5 bg-stone-200 mx-1" />
+
+          {user && (
+            <span className="text-xs font-medium text-stone-500 mr-1">
+              {quotaLabel}
+            </span>
+          )}
 
           <Link
             to="/settings"

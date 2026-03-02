@@ -15,6 +15,22 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
+    # Quota & verification
+    transformations_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    transformations_limit: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verification_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    verification_token_expires: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    account_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
+
+    # Login security
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lockout_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Translation settings
     source_language: Mapped[str] = mapped_column(String(10), default="he", nullable=False)
     source_country: Mapped[str] = mapped_column(String(10), default="IL", nullable=False)

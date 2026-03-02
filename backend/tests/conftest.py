@@ -10,6 +10,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite:///./test_recipe_app.db"
 os.environ["SECRET_KEY"] = "test-secret-for-tests-only"
 os.environ["OPENAI_API_KEY"] = "test-openai-key"
+os.environ["ADMIN_TOKEN"] = "test-admin-token"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.main import app
+from app import models
 
 TEST_DATABASE_URL = "sqlite:///./test_recipe_app.db"
 
@@ -80,7 +82,20 @@ def registered_user(client):
         json={"email": SAMPLE_EMAIL, "password": SAMPLE_PASSWORD},
     )
     assert r.status_code == 201
-    return r.json()
+    user_data = r.json()
+
+    # Mark the test user as verified with a generous quota
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.id == user_data["id"]).first()
+        user.is_verified = True
+        user.transformations_limit = 100
+        user.transformations_used = 0
+        db.commit()
+    finally:
+        db.close()
+
+    return user_data
 
 
 @pytest.fixture
