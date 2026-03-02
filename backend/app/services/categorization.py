@@ -1,7 +1,7 @@
 import json
 import os
 
-from openai import OpenAI
+from openai import APIError, OpenAI, RateLimitError
 
 CATEGORIES = ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]
 
@@ -44,21 +44,31 @@ def categorize_ingredients(ingredients: list[str]) -> dict:
 
     client = OpenAI(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": USER_PROMPT_TEMPLATE.format(
-                    categories=", ".join(f'"{c}"' for c in CATEGORIES),
-                    ingredients="\n".join(f"- {i}" for i in ingredients),
-                ),
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": USER_PROMPT_TEMPLATE.format(
+                        categories=", ".join(f'"{c}"' for c in CATEGORIES),
+                        ingredients="\n".join(f"- {i}" for i in ingredients),
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+    except RateLimitError as e:
+        raise RuntimeError("OpenAI rate limit exceeded, please try again later.") from e
+    except APIError as e:
+        message = str(e)
+        if "insufficient_quota" in message or "exceeded your current quota" in message:
+            raise RuntimeError(
+                "OpenAI quota exceeded, please check your plan and billing."
+            ) from e
+        raise
 
     content = response.choices[0].message.content
     try:

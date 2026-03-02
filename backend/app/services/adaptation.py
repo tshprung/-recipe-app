@@ -2,7 +2,7 @@ import json
 import os
 from string import Template
 
-import anthropic
+from openai import APIError, OpenAI, RateLimitError
 
 DIET_LABELS = {
     "vegetarian": "wegetariańskim (bez mięsa i ryb)",
@@ -114,9 +114,9 @@ def _build_recipe_text(recipe) -> tuple[str, str]:
 
 
 def adapt_recipe(recipe, variant_type: str, custom_instruction: str | None = None) -> dict:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not configured on the server.")
+        raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
     ingredients_text, steps_text = _build_recipe_text(recipe)
 
@@ -136,15 +136,31 @@ def adapt_recipe(recipe, variant_type: str, custom_instruction: str | None = Non
             steps=steps_text,
         )
 
-    client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2048,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    client = OpenAI(api_key=api_key)
 
-    content = response.content[0].text
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=2048,
+            temperature=0,
+        )
+    except RateLimitError as e:
+        raise RuntimeError("OpenAI rate limit exceeded, please try again later.") from e
+    except APIError as e:
+        message = str(e)
+        if "insufficient_quota" in message or "exceeded your current quota" in message:
+            raise RuntimeError(
+                "OpenAI quota exceeded, please check your plan and billing."
+            ) from e
+        raise
+
+    content = response.choices[0].message.content
+
     # Strip markdown code fences if model wrapped response anyway
     if content.startswith("```"):
         content = content.split("```")[1]

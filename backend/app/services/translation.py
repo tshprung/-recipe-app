@@ -1,7 +1,7 @@
 import json
 import os
 
-from openai import OpenAI
+from openai import APIError, OpenAI, RateLimitError
 
 SYSTEM_PROMPT = (
     "You are a professional recipe translator specialising in Hebrew → Polish translation. "
@@ -86,21 +86,31 @@ def translate_recipe(raw_input: str, target_city: str = "Wrocław") -> dict:
 
     client = OpenAI(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": USER_PROMPT_TEMPLATE.format(
-                    city=target_city,
-                    raw_input=raw_input,
-                ),
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.2,
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": USER_PROMPT_TEMPLATE.format(
+                        city=target_city,
+                        raw_input=raw_input,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+    except RateLimitError as e:
+        raise RuntimeError("OpenAI rate limit exceeded, please try again later.") from e
+    except APIError as e:
+        message = str(e)
+        if "insufficient_quota" in message or "exceeded your current quota" in message:
+            raise RuntimeError(
+                "OpenAI quota exceeded, please check your plan and billing."
+            ) from e
+        raise
 
     content = response.choices[0].message.content
     try:
