@@ -70,8 +70,9 @@ def test_shopping_list_is_per_user(client, auth_headers, recipe):
     client.post("/api/shopping-list/add", json={"recipe_id": recipe["id"]}, headers=auth_headers)
 
     # User B registers and checks their list
-    client.post("/api/auth/register", json={"email": "b@example.com", "password": "bpass"})
-    r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass"})
+    with patch("app.routers.auth.send_verification_email"):
+        client.post("/api/auth/register", json={"email": "b@example.com", "password": "bpass1234"})
+    r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass1234"})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     r = client.get("/api/shopping-list/recipes", headers=b_headers)

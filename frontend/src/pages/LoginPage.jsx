@@ -1,20 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 export default function LoginPage() {
   const [tab, setTab] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, register } = useAuth()
 
+  useEffect(() => {
+    if (tab !== 'register' || !TURNSTILE_SITE_KEY) return
+    window.onTurnstileSuccess = (token) => setTurnstileToken(token)
+    return () => {
+      window.onTurnstileSuccess = undefined
+      setTurnstileToken('')
+    }
+  }, [tab])
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    if (tab === 'register') {
+      if (password !== passwordConfirm) {
+        setError('Hasła nie są takie same')
+        return
+      }
+    }
     setLoading(true)
     try {
-      tab === 'login' ? await login(email, password) : await register(email, password)
+      if (tab === 'login') {
+        await login(email, password)
+      } else {
+        await register(email, password, TURNSTILE_SITE_KEY ? turnstileToken : null)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -80,6 +103,24 @@ export default function LoginPage() {
               className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
             />
           </div>
+          {tab === 'register' && (
+            <div>
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">Powtórz hasło</label>
+              <input
+                type="password"
+                value={passwordConfirm}
+                onChange={e => setPasswordConfirm(e.target.value)}
+                required={tab === 'register'}
+                placeholder="••••••••"
+                className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+              />
+            </div>
+          )}
+          {tab === 'register' && TURNSTILE_SITE_KEY && (
+            <div className="cf-turnstile-wrapper flex justify-center" data-sitekey={TURNSTILE_SITE_KEY}>
+              <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-callback="onTurnstileSuccess" />
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">

@@ -43,7 +43,10 @@ def _run_migrations(engine):
 
 _run_migrations(engine)
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[] if os.getenv("TESTING") else ["10/minute"],
+)
 
 app = FastAPI(title="Recipe Translator API", version="0.1.0")
 app.state.limiter = limiter

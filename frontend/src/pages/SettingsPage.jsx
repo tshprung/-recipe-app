@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../api/client'
 
@@ -34,7 +35,8 @@ function SettingsCard({ icon, title, children }) {
 }
 
 export default function SettingsPage() {
-  const { user, setUser } = useAuth()
+  const { user, setUser, logout } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     source_language: user?.source_language ?? 'he',
     source_country:  user?.source_country  ?? 'IL',
@@ -45,6 +47,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
   const [error, setError]   = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const set = key => v => setForm(f => ({ ...f, [key]: v }))
 
@@ -144,6 +149,55 @@ export default function SettingsPage() {
               Wyślij ponownie email weryfikacyjny
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Delete account */}
+      <div className="mt-8 bg-white rounded-2xl border border-red-100 shadow-sm p-5">
+        <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">Usuń konto</h3>
+        <p className="text-sm text-stone-600 mb-3">
+          Usunięcie konta jest nieodwracalne. Zostaną usunięte wszystkie Twoje przepisy i dane.
+        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-stone-600">
+            Wpisz <strong>DELETE</strong> poniżej, aby potwierdzić usunięcie konta.
+          </p>
+          <input
+            type="text"
+            value={deleteConfirm}
+            onChange={e => setDeleteConfirm(e.target.value)}
+            placeholder="DELETE"
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+          />
+          {deleteError && (
+            <p className="text-sm text-red-600">{deleteError}</p>
+          )}
+          <button
+            type="button"
+            disabled={deleteConfirm !== 'DELETE' || deleting}
+            onClick={async () => {
+              if (deleteConfirm !== 'DELETE') return
+              setDeleting(true)
+              setDeleteError('')
+              try {
+                await api.delete('/users/me')
+                logout()
+                navigate('/', { replace: true })
+              } catch (err) {
+                setDeleteError(err.message || 'Nie udało się usunąć konta.')
+              } finally {
+                setDeleting(false)
+              }
+            }}
+            className="bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-6 py-2.5 text-sm font-bold transition-all hover:shadow-lg hover:shadow-red-200 active:scale-95"
+          >
+            {deleting ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Usuwanie…
+              </span>
+            ) : 'Usuń konto'}
+          </button>
         </div>
       </div>
     </div>

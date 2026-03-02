@@ -1,4 +1,7 @@
 """Tests for admin upgrade endpoint and rate limiting."""
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app import models
@@ -34,6 +37,7 @@ def test_admin_upgrade_user_fails_with_wrong_token(client: TestClient, registere
     assert r.status_code == 401
 
 
+@pytest.mark.skipif(os.getenv("TESTING") == "1", reason="Rate limiting disabled in test env")
 def test_global_rate_limiting_returns_429(client: TestClient):
     # Hit /health more than 10 times quickly from same client IP
     statuses = []

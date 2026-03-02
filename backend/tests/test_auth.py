@@ -3,14 +3,15 @@ from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from app import models
-from tests.conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal, MOCK_TRANSLATED
 
 
 def test_register_success(client):
-    r = client.post(
-        "/api/auth/register",
-        json={"email": "new@example.com", "password": "mypassword"},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "new@example.com", "password": "mypassword"},
+        )
     assert r.status_code == 201
     data = r.json()
     assert data["email"] == "new@example.com"
@@ -34,9 +35,10 @@ def test_register_sends_verification_email(client):
 
 
 def test_register_duplicate_email(client):
-    payload = {"email": "dup@example.com", "password": "pass"}
-    client.post("/api/auth/register", json=payload)
-    r = client.post("/api/auth/register", json=payload)
+    payload = {"email": "dup@example.com", "password": "password8"}
+    with patch("app.routers.auth.send_verification_email"):
+        client.post("/api/auth/register", json=payload)
+        r = client.post("/api/auth/register", json=payload)
     assert r.status_code == 409
 
 
@@ -79,10 +81,11 @@ def test_jwt_token_is_usable(client, registered_user, auth_headers):
 
 def test_unverified_user_cannot_transform_recipe(client):
     # Register a fresh, unverified user (fixture auto-verifies only SAMPLE_EMAIL)
-    r = client.post(
-        "/api/auth/register",
-        json={"email": "unverified@example.com", "password": "mypassword"},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "unverified@example.com", "password": "mypassword"},
+        )
     assert r.status_code == 201
 
     # Login as that user
@@ -114,14 +117,15 @@ def test_verified_user_can_transform_up_to_limit(client, auth_headers, registere
     finally:
         db.close()
 
-    # First two transformations succeed
-    for _ in range(2):
-        r = client.post(
-            "/api/recipes/",
-            json={"raw_input": "מרק"},
-            headers=auth_headers,
-        )
-        assert r.status_code == 201
+    # First two transformations succeed (mock translation so we don't call OpenAI)
+    with patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED):
+        for _ in range(2):
+            r = client.post(
+                "/api/recipes/",
+                json={"raw_input": "מרק"},
+                headers=auth_headers,
+            )
+            assert r.status_code == 201
 
     # Third transformation hits the quota
     r = client.post(
@@ -160,10 +164,11 @@ def test_failed_logins_lead_to_lockout(client, registered_user):
 
 def test_verify_email_marks_user_verified_and_clears_token(client):
     # Register a new user so they get a token
-    r = client.post(
-        "/api/auth/register",
-        json={"email": "verify-me@example.com", "password": "mypassword"},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "verify-me@example.com", "password": "mypassword"},
+        )
     assert r.status_code == 201
 
     db = TestSessionLocal()
@@ -190,10 +195,11 @@ def test_verify_email_marks_user_verified_and_clears_token(client):
 
 def test_verify_email_handles_naive_expiry_datetime(client):
     # Register user and then override expiry to a naive datetime in the future
-    r = client.post(
-        "/api/auth/register",
-        json={"email": "naive-expiry@example.com", "password": "mypassword"},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "naive-expiry@example.com", "password": "mypassword"},
+        )
     assert r.status_code == 201
 
     db = TestSessionLocal()
@@ -219,10 +225,11 @@ def test_verify_email_handles_naive_expiry_datetime(client):
 
 
 def test_verify_email_rejects_expired_token(client):
-    r = client.post(
-        "/api/auth/register",
-        json={"email": "expired@example.com", "password": "mypassword"},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "expired@example.com", "password": "mypassword"},
+        )
     assert r.status_code == 201
 
     db = TestSessionLocal()
@@ -238,3 +245,51 @@ def test_verify_email_rejects_expired_token(client):
     r = client.post(f"/api/auth/verify?token={token}")
     assert r.status_code == 400
     assert "Nieprawidłowy lub wygasły token" in r.json()["detail"]
+
+
+def test_register_returns_503_when_verification_email_fails(client):
+    with patch("app.routers.auth.send_verification_email") as mock_send:
+        mock_send.side_effect = RuntimeError("Resend unavailable")
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "fail-email@example.com", "password": "mypassword"},
+        )
+    # User is created then we try to send email; send fails -> 503
+    assert r.status_code == 503
+    assert "email" in r.json().get("detail", "").lower() or "weryfikacyjn" in r.json().get("detail", "")
+
+
+def test_resend_verification_returns_503_when_email_fails(client, registered_user, auth_headers):
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        user.is_verified = False
+        db.commit()
+    finally:
+        db.close()
+
+    with patch("app.routers.auth.send_verification_email") as mock_send:
+        mock_send.side_effect = RuntimeError("Resend error")
+        r = client.post("/api/auth/resend-verification", headers=auth_headers)
+    assert r.status_code == 503
+
+
+def test_delete_me_requires_auth(client):
+    r = client.delete("/api/users/me")
+    assert r.status_code == 401
+
+
+def test_delete_me_removes_user_and_recipes(client, auth_headers, recipe):
+    """DELETE /api/users/me returns 204 and removes user and their recipes."""
+    r = client.delete("/api/users/me", headers=auth_headers)
+    assert r.status_code == 204
+
+    # User and their recipes should be gone
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "tester@example.com").first()
+        assert user is None
+        recipe_count = db.query(models.Recipe).count()
+        assert recipe_count == 0
+    finally:
+        db.close()

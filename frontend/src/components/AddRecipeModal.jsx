@@ -1,18 +1,38 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 
+const INPUT_MODE = { PASTE: 'paste', URL: 'url' }
+
+function isValidHttpUrl(s) {
+  const trimmed = (s || '').trim()
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+}
+
 export default function AddRecipeModal({ onClose, onCreated }) {
+  const [mode, setMode] = useState(INPUT_MODE.PASTE)
   const [text, setText] = useState('')
+  const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!text.trim()) return
     setError('')
+    if (mode === INPUT_MODE.URL) {
+      if (!url.trim()) return
+      if (!isValidHttpUrl(url)) {
+        setError('Podaj prawidłowy adres (http:// lub https://)')
+        return
+      }
+    } else {
+      if (!text.trim()) return
+    }
     setLoading(true)
     try {
-      const recipe = await api.post('/recipes/', { raw_input: text.trim() })
+      const body = mode === INPUT_MODE.URL
+        ? { source_url: url.trim() }
+        : { raw_input: text.trim() }
+      const recipe = await api.post('/recipes/', body)
       onCreated(recipe)
     } catch (err) {
       setError(err.message)
@@ -20,6 +40,8 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       setLoading(false)
     }
   }
+
+  const canSubmit = mode === INPUT_MODE.URL ? url.trim() && isValidHttpUrl(url) : text.trim()
 
   return (
     <div
@@ -35,7 +57,9 @@ export default function AddRecipeModal({ onClose, onCreated }) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-stone-800">Dodaj przepis</h2>
-              <p className="text-sm text-stone-400">Wklej tekst po hebrajsku</p>
+              <p className="text-sm text-stone-400">
+                {mode === INPUT_MODE.URL ? 'Podaj link do przepisu' : 'Wklej tekst po hebrajsku'}
+              </p>
             </div>
           </div>
           <button
@@ -47,16 +71,43 @@ export default function AddRecipeModal({ onClose, onCreated }) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 pb-6">
-          <textarea
-            dir="rtl"
-            value={text}
-            onChange={e => setText(e.target.value)}
-            rows={10}
-            placeholder="הדביק את המתכון כאן..."
-            className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white resize-none leading-relaxed transition-colors"
-            autoFocus
-            required
-          />
+          <div className="flex bg-stone-100 rounded-xl p-1 mb-4">
+            <button
+              type="button"
+              onClick={() => { setMode(INPUT_MODE.PASTE); setError('') }}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.PASTE ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+            >
+              Wklej tekst
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode(INPUT_MODE.URL); setError('') }}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.URL ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+            >
+              Podaj link
+            </button>
+          </div>
+
+          {mode === INPUT_MODE.URL ? (
+            <input
+              type="url"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+              autoFocus
+            />
+          ) : (
+            <textarea
+              dir="rtl"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              rows={10}
+              placeholder="הדביק את המתכון כאן..."
+              className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white resize-none leading-relaxed transition-colors"
+              autoFocus
+            />
+          )}
 
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mt-3">
@@ -81,7 +132,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
             </button>
             <button
               type="submit"
-              disabled={loading || !text.trim()}
+              disabled={loading || !canSubmit}
               className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-amber-200 active:scale-[0.98]"
             >
               {loading ? 'Tłumaczenie…' : 'Przetłumacz →'}

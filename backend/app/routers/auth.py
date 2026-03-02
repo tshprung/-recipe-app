@@ -1,7 +1,10 @@
+import logging
+import os
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -9,11 +12,48 @@ from ..auth import hash_password, verify_password, create_access_token, get_curr
 from ..database import get_db
 from ..services.email import send_verification_email
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+
+def _verify_turnstile(token: str, remote_ip: str | None) -> bool:
+    secret = os.getenv("TURNSTILE_SECRET_KEY")
+    if not secret:
+        return True
+    payload = {"secret": secret, "response": token}
+    if remote_ip:
+        payload["remoteip"] = remote_ip
+    try:
+        resp = httpx.post(TURNSTILE_VERIFY_URL, json=payload, timeout=10.0)
+        data = resp.json()
+        return data.get("success") is True
+    except Exception as e:
+        logger.warning("Turnstile verification failed: %s", e)
+        return False
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
+def register(
+    request: Request,
+    payload: schemas.UserRegister,
+    db: Session = Depends(get_db),
+):
+    secret = os.getenv("TURNSTILE_SECRET_KEY")
+    if secret:
+        if not payload.captcha_token or not payload.captcha_token.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Weryfikacja antybotowa jest wymagana. Odśwież stronę i spróbuj ponownie.",
+            )
+        client_host = request.client.host if request.client else None
+        if not _verify_turnstile(payload.captcha_token, client_host):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Weryfikacja antybotowa nie powiodła się. Odśwież stronę i spróbuj ponownie.",
+            )
+
     if db.query(models.User).filter(models.User.email == payload.email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
@@ -33,9 +73,12 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
 
     try:
         send_verification_email(user.email, token)
-    except Exception:
-        # User is created even if email sending fails; frontend can trigger resend.
-        pass
+    except Exception as e:
+        logger.exception("Failed to send verification email to %s", user.email)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nie udało się wysłać emaila weryfikacyjnego. Użyj opcji „Wyślij ponownie” w ustawieniach.",
+        ) from e
 
     return user
 
@@ -44,12 +87,17 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
 def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == payload.email).first()
 
-    # If user exists, check for lockout first
-    if user and user.lockout_until and user.lockout_until > datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Konto zablokowane. Spróbuj ponownie za 15 minut.",
-        )
+    # If user exists, check for lockout first (normalise tz for SQLite naive datetimes)
+    now = datetime.now(timezone.utc)
+    if user and user.lockout_until:
+        lockout = user.lockout_until
+        if lockout.tzinfo is None:
+            lockout = lockout.replace(tzinfo=timezone.utc)
+        if lockout > now:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Konto zablokowane. Spróbuj ponownie za 15 minut.",
+            )
 
     if not user or not verify_password(payload.password, user.password_hash):
         if user:
@@ -121,7 +169,11 @@ def resend_verification(
 
     try:
         send_verification_email(current_user.email, token)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Failed to resend verification email to %s", current_user.email)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nie udało się wysłać emaila weryfikacyjnego. Sprawdź konfigurację RESEND na serwerze.",
+        ) from e
 
     return {"detail": "Wiadomość weryfikacyjna została ponownie wysłana."}

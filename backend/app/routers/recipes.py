@@ -1,7 +1,11 @@
+import ipaddress
+import re
+from urllib.parse import urlparse
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-import re
 
 from .. import models, schemas
 from ..auth import get_current_user
@@ -11,8 +15,9 @@ from ..services.translation import translate_recipe
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
-
 _TAG_RE = re.compile(r"<[^>]+>")
+_MAX_FETCH_BYTES = 500 * 1024  # 500 KB
+_MIN_EXTRACTED_LEN = 10
 
 
 def _sanitize_text(text: str, max_len: int | None = None) -> str:
@@ -21,6 +26,72 @@ def _sanitize_text(text: str, max_len: int | None = None) -> str:
     if max_len is not None:
         cleaned = cleaned[:max_len]
     return cleaned
+
+
+def _is_safe_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = (parsed.hostname or "").strip().lower()
+    if host in ("localhost", "127.0.0.1", "::1", ""):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_private or ip.is_loopback or ip.is_reserved:
+            return False
+    except ValueError:
+        pass
+    return True
+
+
+def _fetch_and_extract_text(url: str) -> str:
+    if not _is_safe_url(url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nieprawidłowy lub niedozwolony adres URL. Dozwolone są tylko adresy http(s) do stron publicznych.",
+        )
+    try:
+        resp = httpx.get(
+            url,
+            timeout=10.0,
+            follow_redirects=True,
+            headers={"User-Agent": "RecipeApp/1.0"},
+        )
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Nie udało się pobrać strony: {e.response.status_code}",
+        ) from e
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie udało się połączyć z podanym adresem.",
+        ) from e
+
+    content = resp.content
+    if len(content) > _MAX_FETCH_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Strona jest zbyt duża do przetworzenia.",
+        )
+
+    text = resp.text
+    # Strip script/style and get visible text (simple approach)
+    text = re.sub(r"<script[^>]*>[\s\S]*?</script>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<style[^>]*>[\s\S]*?</style>", " ", text, flags=re.IGNORECASE)
+    text = _TAG_RE.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = _sanitize_text(text, max_len=10000)
+    if len(text) < _MIN_EXTRACTED_LEN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie udało się wyodrębnić tekstu przepisu z podanego adresu.",
+        )
+    return text
 
 
 @router.post("/", response_model=schemas.RecipeOut, status_code=status.HTTP_201_CREATED)
@@ -50,7 +121,10 @@ def create_recipe(
     user_for_update.transformations_used += 1
     db.commit()
 
-    raw_input = _sanitize_text(payload.raw_input, max_len=10000)
+    if (payload.source_url or "").strip():
+        raw_input = _fetch_and_extract_text(payload.source_url.strip())
+    else:
+        raw_input = _sanitize_text(payload.raw_input or "", max_len=10000)
 
     try:
         translated = translate_recipe(
@@ -65,7 +139,7 @@ def create_recipe(
     recipe = models.Recipe(
         user_id=current_user.id,
         title_pl=translated.get("title_pl", "Brak tytułu"),
-        title_original=translated.get("title_original", payload.raw_input[:100]),
+        title_original=translated.get("title_original", (raw_input or "")[:100]),
         ingredients_pl=translated.get("ingredients_pl", []),
         ingredients_original=translated.get("ingredients_original", []),
         steps_pl=translated.get("steps_pl", []),

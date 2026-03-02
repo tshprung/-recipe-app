@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -11,6 +11,31 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 @router.get("/me", response_model=schemas.UserOut)
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Delete the current user and all their data (recipes, shopping list entries)."""
+    user_id = current_user.id
+
+    # 1. Remove user's shopping list entries
+    db.query(models.ShoppingListRecipe).filter(models.ShoppingListRecipe.user_id == user_id).delete()
+
+    # 2. Delete user's recipes (RecipeVariant cascades via relationship)
+    db.query(models.Recipe).filter(models.Recipe.user_id == user_id).delete()
+
+    # 3. Unlink ingredient substitutions created by this user
+    db.query(models.IngredientSubstitution).filter(
+        models.IngredientSubstitution.created_by_user_id == user_id
+    ).update({models.IngredientSubstitution.created_by_user_id: None})
+
+    # 4. Delete the user
+    db.delete(current_user)
+    db.commit()
+    return None
 
 
 @router.patch("/me/settings", response_model=schemas.UserOut)

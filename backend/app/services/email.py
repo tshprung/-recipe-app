@@ -1,7 +1,10 @@
+import logging
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import httpx
+
+logger = logging.getLogger(__name__)
 
 CATEGORY_ICONS = {
     "Warzywa i owoce": "🥦",
@@ -61,6 +64,7 @@ def send_verification_email(to_email: str, token: str) -> None:
         ),
     }
 
+    logger.info("Sending verification email to %s", to_email)
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = httpx.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10.0)
     resp.raise_for_status()

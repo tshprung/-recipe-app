@@ -5,12 +5,14 @@ Sets DATABASE_URL to a dedicated test SQLite file BEFORE importing any app
 modules, so the app engine is created against the test DB.
 """
 import os
+from unittest.mock import patch
 
 # --- must happen before any app import ---
 os.environ["DATABASE_URL"] = "sqlite:///./test_recipe_app.db"
 os.environ["SECRET_KEY"] = "test-secret-for-tests-only"
 os.environ["OPENAI_API_KEY"] = "test-openai-key"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
+os.environ["TESTING"] = "1"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -77,10 +79,11 @@ SAMPLE_PASSWORD = "securepassword"
 
 @pytest.fixture
 def registered_user(client):
-    r = client.post(
-        "/api/auth/register",
-        json={"email": SAMPLE_EMAIL, "password": SAMPLE_PASSWORD},
-    )
+    with patch("app.routers.auth.send_verification_email"):
+        r = client.post(
+            "/api/auth/register",
+            json={"email": SAMPLE_EMAIL, "password": SAMPLE_PASSWORD},
+        )
     assert r.status_code == 201
     user_data = r.json()
 

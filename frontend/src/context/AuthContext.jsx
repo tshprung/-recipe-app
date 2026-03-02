@@ -26,8 +26,10 @@ export function AuthProvider({ children }) {
     setUser(me)
   }
 
-  async function register(email, password) {
-    await api.post('/auth/register', { email, password })
+  async function register(email, password, captchaToken = null) {
+    const body = { email, password }
+    if (captchaToken) body.captcha_token = captchaToken
+    await api.post('/auth/register', body)
     await login(email, password)
   }
 

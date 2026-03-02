@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 # --- Auth ---
@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr, Field
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+    captcha_token: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -49,7 +50,16 @@ class UserOut(BaseModel):
 # --- Recipe ---
 
 class RecipeCreate(BaseModel):
-    raw_input: str
+    raw_input: str | None = None
+    source_url: str | None = None
+
+    @model_validator(mode="after")
+    def require_raw_or_url(self):
+        if (self.raw_input or "").strip() and (self.source_url or "").strip():
+            raise ValueError("Provide either raw_input or source_url, not both")
+        if not (self.raw_input or "").strip() and not (self.source_url or "").strip():
+            raise ValueError("Provide either raw_input or source_url")
+        return self
 
 
 
