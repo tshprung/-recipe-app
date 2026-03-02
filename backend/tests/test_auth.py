@@ -274,6 +274,24 @@ def test_resend_verification_returns_503_when_email_fails(client, registered_use
     assert r.status_code == 503
 
 
+def test_resend_verification_503_includes_config_message(client, registered_user, auth_headers):
+    """When Resend fails (e.g. 401), client gets 503 with message pointing to server config."""
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        user.is_verified = False
+        db.commit()
+    finally:
+        db.close()
+
+    with patch("app.routers.auth.send_verification_email") as mock_send:
+        mock_send.side_effect = RuntimeError("RESEND_API_KEY is invalid or expired. Check your Resend dashboard.")
+        r = client.post("/api/auth/resend-verification", headers=auth_headers)
+    assert r.status_code == 503
+    detail = r.json().get("detail", "")
+    assert "RESEND" in detail or "konfigurację" in detail or "serwerze" in detail
+
+
 def test_delete_me_requires_auth(client):
     r = client.delete("/api/users/me")
     assert r.status_code == 401

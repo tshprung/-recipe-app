@@ -66,5 +66,20 @@ def send_verification_email(to_email: str, token: str) -> None:
 
     logger.info("Sending verification email to %s", to_email)
     headers = {"Authorization": f"Bearer {api_key}"}
-    resp = httpx.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10.0)
-    resp.raise_for_status()
+    try:
+        resp = httpx.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10.0)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        body = e.response.text
+        logger.error(
+            "Resend API error: status=%s body=%s",
+            e.response.status_code,
+            body[:500] if body else "(empty)",
+        )
+        if e.response.status_code == 401:
+            raise RuntimeError("RESEND_API_KEY is invalid or expired. Check your Resend dashboard.") from e
+        if e.response.status_code == 422:
+            raise RuntimeError(
+                "Resend rejected the email (e.g. RESEND_FROM_EMAIL not verified). Check Resend dashboard → Domains."
+            ) from e
+        raise RuntimeError(f"Resend API error {e.response.status_code}: {body[:200] if body else 'unknown'}") from e
