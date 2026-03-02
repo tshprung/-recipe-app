@@ -1,0 +1,28 @@
+We need to prepare the app for deployment to Railway (backend) and Vercel (frontend).
+
+1. Add a railway.json file in the root of the project:
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "cd backend && pip install -r requirements.txt"
+  },
+  "deploy": {
+    "startCommand": "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+    "healthcheckPath": "/health"
+  }
+}
+
+2. Add a /health endpoint to FastAPI that returns {"status": "ok"}
+
+3. Add vercel.json in the root:
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [{"source": "/(.*)", "destination": "/index.html"}]
+}
+
+4. Frontend must use VITE_API_URL environment variable for all API calls instead of hardcoded localhost:8000
+
+5. Add CORS to FastAPI to allow all origins for now (we can restrict later)
+
+6. Make sure requirements.txt is complete and up to date

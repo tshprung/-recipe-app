@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/Users/Tal/AppData/Local/Programs/Python/Python311/python.exe:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/backend && \\\\\n  .venv/Scripts/pip install -r requirements.txt 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/frontend && npm install 2>&1)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/frontend && npm install react-router-dom 2>&1)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/backend && .venv/Scripts/pip install \"bcrypt>=3.1.0,<5.0\" 2>&1)",
+      "Bash(test:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/backend && .venv/Scripts/pip install \"openai>=1.30.0\" 2>&1)",
+      "Bash(head:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/backend && python -c \"from app.main import app\" 2>&1)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(grep recipes:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(powershell:*)",
+      "Bash(echo exit:$?:*)",
+      "Bash(sleep 3:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/backend && source .venv/Scripts/activate && python -m pytest tests/ -v 2>&1)",
+      "Bash(tail:*)",
+      "Bash(cd /c/Users/Tal/dev/recipe-app/frontend && npx vitest run 2>&1)",
+      "Bash(uvicorn app.main:app:*)",
+      "Bash(npm run:*)",
+      "Bash(source:*)",
+      "Bash(start:*)",
+      "Bash(python:*)",
+      "Bash(npm test:*)",
+      "Bash(git:*)",
+      "Bash(railway:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
