@@ -132,7 +132,7 @@ describe('RecipeDetailPage — adaptation', () => {
 
   it('shows an error message when the API call fails', async () => {
     api.post.mockRejectedValue(
-      new Error('ANTHROPIC_API_KEY is not configured on the server.')
+      new Error('OPENAI_API_KEY is not configured on the server.')
     )
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
@@ -142,7 +142,7 @@ describe('RecipeDetailPage — adaptation', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/ANTHROPIC_API_KEY is not configured/)
+        screen.getByText(/OPENAI_API_KEY is not configured/)
       ).toBeInTheDocument()
     })
   })

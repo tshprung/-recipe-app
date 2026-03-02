@@ -9,7 +9,6 @@ import os
 # --- must happen before any app import ---
 os.environ["DATABASE_URL"] = "sqlite:///./test_recipe_app.db"
 os.environ["SECRET_KEY"] = "test-secret-for-tests-only"
-os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-key"
 
 import pytest

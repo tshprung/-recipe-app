@@ -175,7 +175,7 @@ def test_variants_deleted_with_recipe(client, auth_headers, recipe):
 
 def test_vegan_adaptation_with_eggs_flagged_in_notes(client, auth_headers, recipe):
     """
-    When Claude cannot substitute eggs in a vegan recipe, it must either
+    When the adaptation model cannot substitute eggs in a vegan recipe, it must either
     remove the eggs from ingredients_pl OR keep them and add a warning note.
     The API must pass this information through unchanged.
     """
@@ -286,29 +286,31 @@ def test_adapt_recipe_with_curly_braces_in_data():
         "alternatives": [],
     })
     mock_msg = MagicMock()
-    mock_msg.content = [MagicMock(text=mock_response)]
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = mock_msg
+    mock_msg.choices = [MagicMock(message=MagicMock(content=mock_response))]
 
-    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
-        with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("app.services.adaptation.OpenAI") as MockOpenAI:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = mock_msg
+            MockOpenAI.return_value = mock_client
+
             # Must not raise any format/template error
             result = adapt_recipe(MockRecipe(), "vegan")
 
     assert result["can_adapt"] is True
 
 
-def test_adapt_recipe_without_anthropic_key_returns_503(client, auth_headers, recipe):
-    """POST /api/recipes/{id}/adapt must return 503 when ANTHROPIC_API_KEY is missing.
+def test_adapt_recipe_without_openai_key_returns_503(client, auth_headers, recipe):
+    """POST /api/recipes/{id}/adapt must return 503 when OPENAI_API_KEY is missing.
     Regression: the missing key error was surfaced as an unhandled 500."""
-    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
+    with patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
         r = client.post(
             f"/api/recipes/{recipe['id']}/adapt",
             json={"variant_type": "vegetarian"},
             headers=auth_headers,
         )
     assert r.status_code == 503
-    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert "OPENAI_API_KEY" in r.json()["detail"]
 
 
 def test_variants_route_returns_401_not_404_unauthenticated(client):
@@ -321,7 +323,7 @@ def test_variants_route_returns_401_not_404_unauthenticated(client):
 
 def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
     """
-    adapt_recipe() must send a prompt to Claude that includes:
+    adapt_recipe() must send a prompt to the model that includes:
     - the diet label (e.g. 'wegańskim')
     - the flagging rule keyword ('ostrzeżenia')
     - the 'Nie znaleziono' warning language
@@ -347,18 +349,23 @@ def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
 
     captured = {}
 
-    def fake_create(**kwargs):
-        captured["system"] = kwargs.get("system", "")
-        captured["prompt"] = kwargs.get("messages", [{}])[0].get("content", "")
+    def fake_create(model, messages, response_format, max_tokens, temperature):
+        captured["system"] = next(
+            (m["content"] for m in messages if m["role"] == "system"), ""
+        )
+        captured["prompt"] = next(
+            (m["content"] for m in messages if m["role"] == "user"), ""
+        )
         mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text=mock_response_body)]
+        mock_msg.choices = [MagicMock(message=MagicMock(content=mock_response_body))]
         return mock_msg
 
-    mock_client = MagicMock()
-    mock_client.messages.create.side_effect = fake_create
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("app.services.adaptation.OpenAI") as MockOpenAI:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.side_effect = fake_create
+            MockOpenAI.return_value = mock_client
 
-    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
-        with patch("anthropic.Anthropic", return_value=mock_client):
             adapt_recipe(MockRecipe(), "vegan")
 
     prompt = captured["prompt"]

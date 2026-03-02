@@ -455,7 +455,7 @@ export default function RecipeDetailPage() {
         </div>
       )}
 
-      {/* Variant warnings (e.g. unsubstitutable ingredients flagged by Claude) */}
+      {/* Variant warnings (e.g. unsubstitutable ingredients flagged by the adaptation model) */}
       {variantWarnings.length > 0 && (
         <Section title="Uwagi" icon="⚠️">
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
