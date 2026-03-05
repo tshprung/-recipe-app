@@ -67,13 +67,16 @@ app.add_exception_handler(
     RateLimitExceeded,
     lambda request, exc: JSONResponse(
         status_code=429,
-        content={"detail": "Zbyt wiele żądań. Spróbuj ponownie później."},
+        content={"detail": "Too many requests. Try again later."},
     ),
 )
 
+# In production set CORS_ORIGINS e.g. https://myrecipes.cloud (comma-separated for multiple)
+_cors_origins = os.getenv("CORS_ORIGINS", "*")
+allow_origins = [o.strip() for o in _cors_origins.split(",")] if _cors_origins != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

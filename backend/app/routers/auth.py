@@ -74,9 +74,17 @@ def register(
         send_verification_email(user.email, token)
     except Exception as e:
         logger.exception("Failed to send verification email to %s", user.email)
+        msg = str(e) if e else ""
+        # Keep error actionable without dumping internals.
+        if "RESEND_" in msg or "Resend" in msg:
+            detail = f"Failed to send verification email. {msg}"
+        else:
+            detail = (
+                "Failed to send verification email. Use “Resend verification email” in Settings."
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nie udało się wysłać emaila weryfikacyjnego. Użyj opcji „Wyślij ponownie” w ustawieniach.",
+            detail=detail,
         ) from e
 
     return user
@@ -95,7 +103,7 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
         if lockout > now:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Konto zablokowane. Spróbuj ponownie za 15 minut.",
+                detail="Account locked. Try again in 15 minutes.",
             )
 
     if not user or not verify_password(payload.password, user.password_hash):
@@ -128,7 +136,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     if not user or not user.verification_token_expires:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Nieprawidłowy lub wygasły token weryfikacyjny.",
+            detail="Invalid or expired verification token.",
         )
 
     expires = user.verification_token_expires
@@ -139,7 +147,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     if expires < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Nieprawidłowy lub wygasły token weryfikacyjny.",
+            detail="Invalid or expired verification token.",
         )
 
     user.is_verified = True
@@ -147,7 +155,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user.verification_token_expires = None
     db.commit()
 
-    return {"detail": "Adres email został zweryfikowany."}
+    return {"detail": "Email address has been verified."}
 
 
 @router.post("/resend-verification")
@@ -158,7 +166,7 @@ def resend_verification(
     if current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Adres email jest już zweryfikowany.",
+            detail="Email address is already verified.",
         )
 
     token = str(uuid.uuid4())
@@ -170,9 +178,14 @@ def resend_verification(
         send_verification_email(current_user.email, token)
     except Exception as e:
         logger.exception("Failed to resend verification email to %s", current_user.email)
+        msg = str(e) if e else ""
+        if "RESEND_" in msg or "Resend" in msg:
+            detail = f"Failed to send verification email. {msg}"
+        else:
+            detail = "Failed to send verification email. Check Resend configuration on the server."
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nie udało się wysłać emaila weryfikacyjnego. Sprawdź konfigurację RESEND na serwerze.",
+            detail=detail,
         ) from e
 
-    return {"detail": "Wiadomość weryfikacyjna została ponownie wysłana."}
+    return {"detail": "Verification email has been resent."}

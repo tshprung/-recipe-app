@@ -21,7 +21,7 @@ def send_shopping_list_email(to_email: str, items: dict) -> None:
     if not api_key:
         raise RuntimeError("RESEND_API_KEY is not configured on the server.")
 
-    lines = ["Lista zakupów", "=" * 30]
+    lines = ["Shopping list", "=" * 30]
     for cat, ingredients in items.items():
         if ingredients:
             icon = CATEGORY_ICONS.get(cat, "")
@@ -34,7 +34,7 @@ def send_shopping_list_email(to_email: str, items: dict) -> None:
     payload = {
         "from": os.getenv("RESEND_FROM_EMAIL", "no-reply@example.com"),
         "to": [to_email],
-        "subject": "Twoja lista zakupów",
+        "subject": "Your shopping list",
         "text": body,
     }
 
@@ -55,12 +55,12 @@ def send_verification_email(to_email: str, token: str) -> None:
     payload = {
         "from": os.getenv("RESEND_FROM_EMAIL", "no-reply@example.com"),
         "to": [to_email],
-        "subject": "Potwierdź swój adres email",
+        "subject": "Verify your email address",
         "html": (
-            f"<p>Witaj!</p>"
-            f"<p>Aby korzystać z aplikacji, kliknij poniższy link, aby zweryfikować swój adres email:</p>"
+            f"<p>Hi!</p>"
+            f"<p>To start using the app, please verify your email address by clicking the link below:</p>"
             f'<p><a href="{verify_link}">{verify_link}</a></p>'
-            f"<p>Link wygaśnie za 24 godziny.</p>"
+            f"<p>This link expires in 24 hours.</p>"
         ),
     }
 

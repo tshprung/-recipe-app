@@ -81,6 +81,6 @@ def test_send_verification_email_succeeds_when_resend_returns_200():
     mock_post.assert_called_once()
     call_kw = mock_post.call_args.kwargs
     assert call_kw["json"]["to"] == ["user@example.com"]
-    assert call_kw["json"]["subject"] == "Potwierdź swój adres email"
+    assert call_kw["json"]["subject"] == "Verify your email address"
     assert "token123" in call_kw["json"]["html"]
     assert call_kw["headers"]["Authorization"] == "Bearer test-key"

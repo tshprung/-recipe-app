@@ -111,7 +111,7 @@ def test_unverified_user_cannot_transform_recipe(client):
         headers=headers,
     )
     assert r.status_code == 403
-    assert "Zweryfikuj swój email" in r.json()["detail"]
+    assert "Verify your email" in r.json()["detail"]
 
 
 def test_verified_user_can_transform_up_to_limit(client, auth_headers, registered_user):
@@ -142,7 +142,7 @@ def test_verified_user_can_transform_up_to_limit(client, auth_headers, registere
         headers=auth_headers,
     )
     assert r.status_code == 402
-    assert "Wykorzystałeś limit darmowych przepisów" in r.json()["detail"]
+    assert "free recipes limit" in r.json()["detail"]
 
 
 def test_failed_logins_lead_to_lockout(client, registered_user):
@@ -167,7 +167,7 @@ def test_failed_logins_lead_to_lockout(client, registered_user):
         json={"email": registered_user["email"], "password": "securepassword"},
     )
     assert r.status_code == 403
-    assert "Konto zablokowane" in r.json()["detail"]
+    assert "Account locked" in r.json()["detail"]
 
 
 def test_verify_email_marks_user_verified_and_clears_token(client):
@@ -258,7 +258,7 @@ def test_verify_email_rejects_expired_token(client):
 
     r = client.post(f"/api/auth/verify?token={token}")
     assert r.status_code == 400
-    assert "Nieprawidłowy lub wygasły token" in r.json()["detail"]
+    assert "Invalid or expired verification token" in r.json()["detail"]
 
 
 def test_register_returns_503_when_verification_email_fails(client):

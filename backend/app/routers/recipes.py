@@ -51,7 +51,7 @@ def _fetch_and_extract_text(url: str) -> str:
     if not _is_safe_url(url):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Nieprawidłowy lub niedozwolony adres URL. Dozwolone są tylko adresy http(s) do stron publicznych.",
+            detail="Invalid or disallowed URL. Only public http(s) URLs are allowed.",
         )
     try:
         resp = httpx.get(
@@ -64,19 +64,19 @@ def _fetch_and_extract_text(url: str) -> str:
     except httpx.HTTPStatusError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Nie udało się pobrać strony: {e.response.status_code}",
+            detail=f"Failed to fetch page: {e.response.status_code}",
         ) from e
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Nie udało się połączyć z podanym adresem.",
+            detail="Failed to connect to the provided URL.",
         ) from e
 
     content = resp.content
     if len(content) > _MAX_FETCH_BYTES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Strona jest zbyt duża do przetworzenia.",
+            detail="Page is too large to process.",
         )
 
     text = resp.text
@@ -89,7 +89,7 @@ def _fetch_and_extract_text(url: str) -> str:
     if len(text) < _MIN_EXTRACTED_LEN:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Nie udało się wyodrębnić tekstu przepisu z podanego adresu.",
+            detail="Could not extract recipe text from the provided URL.",
         )
     return text
 
@@ -103,7 +103,7 @@ def create_recipe(
     if not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Zweryfikuj swój email przed użyciem aplikacji",
+            detail="Verify your email before using the app.",
         )
 
     # Quota check (before OpenAI)
@@ -115,7 +115,7 @@ def create_recipe(
     ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Wykorzystałeś limit darmowych przepisów. Skontaktuj się z administratorem.",
+            detail="You have reached the free recipes limit. Contact the administrator.",
         )
 
     user_for_update.transformations_used += 1
@@ -237,7 +237,7 @@ def adapt_recipe_endpoint(
     if not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Zweryfikuj swój email przed użyciem aplikacji",
+            detail="Verify your email before using the app.",
         )
 
     # Quota check (before OpenAI)
@@ -249,7 +249,7 @@ def adapt_recipe_endpoint(
     ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Wykorzystałeś limit darmowych przepisów. Skontaktuj się z administratorem.",
+            detail="You have reached the free recipes limit. Contact the administrator.",
         )
 
     user_for_update.transformations_used += 1
