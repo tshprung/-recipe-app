@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -52,6 +54,33 @@ export default function LoginPage() {
       setTurnstileToken('')
     }
   }, [tab])
+
+  const EyeIcon = ({ open }) => (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-5 h-5"
+    >
+      {open ? (
+        <>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      ) : (
+        <>
+          <path d="M10.58 10.58a2 2 0 0 0 2.83 2.83" />
+          <path d="M9.88 5.09A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a19.57 19.57 0 0 1-3.33 4.64" />
+          <path d="M6.61 6.61A19.57 19.57 0 0 0 2 12s3.5 7 10 7c1.06 0 2.07-.18 3.02-.49" />
+          <path d="M2 2l20 20" />
+        </>
+      )}
+    </svg>
+  )
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -140,26 +169,48 @@ export default function LoginPage() {
           </div>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('password')}</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                placeholder="••••••••"
+                className="w-full border border-stone-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-stone-500 hover:text-stone-700"
+              >
+                <EyeIcon open={showPassword} />
+              </button>
+            </div>
           </div>
           {tab === 'register' && (
             <div>
               <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('confirmPassword')}</label>
-              <input
-                type="password"
-                value={passwordConfirm}
-                onChange={e => setPasswordConfirm(e.target.value)}
-                required={tab === 'register'}
-                placeholder="••••••••"
-                className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswordConfirm ? "text" : "password"}
+                  value={passwordConfirm}
+                  onChange={e => setPasswordConfirm(e.target.value)}
+                  required={tab === 'register'}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className="w-full border border-stone-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordConfirm(v => !v)}
+                  aria-label={showPasswordConfirm ? t('hidePassword') : t('showPassword')}
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-stone-500 hover:text-stone-700"
+                >
+                  <EyeIcon open={showPasswordConfirm} />
+                </button>
+              </div>
             </div>
           )}
           {tab === 'register' && (

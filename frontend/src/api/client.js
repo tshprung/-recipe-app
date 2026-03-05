@@ -1,7 +1,40 @@
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
+const LANG_STORAGE_KEY = 'recipe-app-lang'
+
 function getToken() {
   return localStorage.getItem('token')
+}
+
+function getLang() {
+  try {
+    const l = localStorage.getItem(LANG_STORAGE_KEY)
+    if (l === 'en' || l === 'he' || l === 'pl') return l
+  } catch (_) {}
+  return 'en'
+}
+
+function t(key, vars = {}) {
+  const lang = getLang()
+  const dict = {
+    en: {
+      cantReachServer:
+        "Can't reach the server at {{apiBase}}. Check your connection, that VITE_API_URL is set correctly when building, and that CORS allows your origin.",
+    },
+    he: {
+      cantReachServer:
+        "לא ניתן להגיע לשרת בכתובת {{apiBase}}. בדוק את החיבור, ש־VITE_API_URL מוגדר נכון בבנייה, וש־CORS מאפשר את המקור שלך.",
+    },
+    pl: {
+      cantReachServer:
+        "Nie można połączyć się z serwerem pod adresem {{apiBase}}. Sprawdź połączenie, czy VITE_API_URL jest poprawnie ustawione podczas budowania oraz czy CORS zezwala na Twoje źródło.",
+    },
+  }
+  const raw = dict[lang]?.[key] ?? dict.en[key] ?? key
+  return Object.entries(vars).reduce(
+    (s, [k, v]) => s.replace(new RegExp(`{{${k}}}`, 'g'), String(v)),
+    raw
+  )
 }
 
 async function request(path, options = {}) {
@@ -15,8 +48,9 @@ async function request(path, options = {}) {
   } catch (err) {
     // Network error, CORS block, or server unreachable (browser often reports "Failed to fetch")
     const isFetchError = (err?.message ?? '').toLowerCase().includes('fetch')
+    const apiBase = (import.meta.env.VITE_API_URL ?? '(same origin)') + '/api'
     const msg = isFetchError
-      ? "Can't reach the server. Check your connection and that the API URL is correct (and CORS is configured on the server)."
+      ? t('cantReachServer', { apiBase })
       : (err?.message || 'Network error')
     throw new Error(msg)
   }
