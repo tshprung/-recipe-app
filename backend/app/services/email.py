@@ -78,6 +78,10 @@ def send_verification_email(to_email: str, token: str) -> None:
         )
         if e.response.status_code == 401:
             raise RuntimeError("RESEND_API_KEY is invalid or expired. Check your Resend dashboard.") from e
+        if e.response.status_code == 403:
+            raise RuntimeError(
+                "Resend is in testing mode: you can only send to your own email. Verify a domain in Resend dashboard → Domains to send to all users."
+            ) from e
         if e.response.status_code == 422:
             raise RuntimeError(
                 "Resend rejected the email (e.g. RESEND_FROM_EMAIL not verified). Check Resend dashboard → Domains."

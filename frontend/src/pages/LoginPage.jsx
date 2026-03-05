@@ -68,6 +68,7 @@ export default function LoginPage() {
         await login(email, password)
       } else {
         await register(email, password, turnstileToken || null)
+        alert(t('verificationEmailSent'))
       }
     } catch (err) {
       setError(err.message)

@@ -9,7 +9,17 @@ async function request(path, options = {}) {
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers })
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, { ...options, headers })
+  } catch (err) {
+    // Network error, CORS block, or server unreachable (browser often reports "Failed to fetch")
+    const isFetchError = (err?.message ?? '').toLowerCase().includes('fetch')
+    const msg = isFetchError
+      ? "Can't reach the server. Check your connection and that the API URL is correct (and CORS is configured on the server)."
+      : (err?.message || 'Network error')
+    throw new Error(msg)
+  }
 
   if (res.status === 204) return null
 

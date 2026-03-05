@@ -65,6 +65,7 @@ const translations = {
     verifySuccess: 'Your email has been verified. You can use the app.',
     verifyError: 'Failed to verify email.',
     missingToken: 'Missing verification token.',
+    verificationEmailSent: 'A verification email has been sent. Please check your inbox.',
     goToApp: 'Go to app',
     backToHome: 'Back to home',
     // RecipeList
@@ -191,6 +192,7 @@ const translations = {
     verifySuccess: 'האימייל אומת. אפשר להשתמש באפליקציה.',
     verifyError: 'אימות האימייל נכשל.',
     missingToken: 'חסר קוד אימות.',
+    verificationEmailSent: 'נשלח אימייל אימות. בדוק את תיבת הדואר.',
     goToApp: 'לאפליקציה',
     backToHome: 'בחזרה לדף הבית',
     onShoppingList: 'ברשימת הקניות',
@@ -314,6 +316,7 @@ const translations = {
     verifySuccess: 'E-mail zweryfikowany. Możesz korzystać z aplikacji.',
     verifyError: 'Weryfikacja e-mail nie powiodła się.',
     missingToken: 'Brak tokenu weryfikacji.',
+    verificationEmailSent: 'Wysłano e-mail weryfikacyjny. Sprawdź skrzynkę odbiorczą.',
     goToApp: 'Przejdź do aplikacji',
     backToHome: 'Strona główna',
     onShoppingList: 'Na liście zakupów',
