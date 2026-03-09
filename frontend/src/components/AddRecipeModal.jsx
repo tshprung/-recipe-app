@@ -12,7 +12,7 @@ function isValidHttpUrl(s) {
 
 export default function AddRecipeModal({ onClose, onCreated }) {
   const { refreshUser } = useAuth()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [mode, setMode] = useState(INPUT_MODE.PASTE)
   const [text, setText] = useState('')
   const [url, setUrl] = useState('')
@@ -47,15 +47,16 @@ export default function AddRecipeModal({ onClose, onCreated }) {
   }
 
   const canSubmit = mode === INPUT_MODE.URL ? url.trim() && isValidHttpUrl(url) : text.trim()
+  const isRtl = lang === 'he'
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-3 sm:p-4 pb-[env(safe-area-inset-bottom)]"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-3xl shadow-2xl shadow-stone-200 w-full max-w-lg">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl shadow-stone-200 w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-4">
+        <div className="flex items-start justify-between p-4 sm:p-6 pb-3 sm:pb-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-xl shadow-sm">
               📋
@@ -75,19 +76,19 @@ export default function AddRecipeModal({ onClose, onCreated }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-6">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 pb-4 sm:pb-6 flex-1 flex flex-col min-h-0 overflow-y-auto">
           <div className="flex bg-stone-100 rounded-xl p-1 mb-4">
             <button
               type="button"
               onClick={() => { setMode(INPUT_MODE.PASTE); setError('') }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.PASTE ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              className={`flex-1 min-h-[44px] py-2.5 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.PASTE ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
               {t('pasteText')}
             </button>
             <button
               type="button"
               onClick={() => { setMode(INPUT_MODE.URL); setError('') }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.URL ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              className={`flex-1 min-h-[44px] py-2.5 text-sm font-semibold rounded-lg transition-all ${mode === INPUT_MODE.URL ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
             >
               {t('pasteUrl')}
             </button>
@@ -99,17 +100,17 @@ export default function AddRecipeModal({ onClose, onCreated }) {
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+              className="w-full border border-stone-200 rounded-2xl px-4 py-3 min-h-[48px] text-base sm:text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
               autoFocus
             />
           ) : (
             <textarea
-              dir="rtl"
+              dir={isRtl ? 'rtl' : 'ltr'}
               value={text}
               onChange={e => setText(e.target.value)}
-              rows={10}
+              rows={8}
               placeholder={t('placeholderRecipe')}
-              className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white resize-none leading-relaxed transition-colors"
+              className="w-full border border-stone-200 rounded-2xl px-4 py-3 text-base sm:text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white resize-none leading-relaxed transition-colors min-h-[120px]"
               autoFocus
             />
           )}
@@ -127,18 +128,18 @@ export default function AddRecipeModal({ onClose, onCreated }) {
             </div>
           )}
 
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-3 mt-4 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-stone-200 text-stone-600 rounded-xl py-3 text-sm font-semibold hover:bg-stone-50 transition-colors"
+              className="flex-1 min-h-[48px] border border-stone-200 text-stone-600 rounded-xl py-3 text-sm font-semibold hover:bg-stone-50 transition-colors"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || !canSubmit}
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-amber-200 active:scale-[0.98]"
+              className="flex-1 min-h-[48px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-amber-200 active:scale-[0.98]"
             >
               {loading ? t('translating') : t('translateButton')}
             </button>

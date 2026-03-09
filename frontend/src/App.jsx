@@ -85,7 +85,7 @@ function AppRoutes() {
         {/* Wrap content in relative z-[1] so it sits above the fixed background */}
         <div className="relative" style={{ zIndex: 1 }}>
           <Navbar />
-          <main className="max-w-5xl mx-auto px-4 py-8">
+          <main className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             <Routes>
               <Route path="/"            element={<RecipeListPage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />

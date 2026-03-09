@@ -116,17 +116,17 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
 function EmptyState({ onAdd }) {
   const { t } = useLanguage()
   return (
-    <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-      <div className="text-7xl mb-6 select-none">🥘</div>
-      <h3 className="text-xl font-bold text-stone-700 mb-2">
+    <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center">
+      <div className="text-6xl sm:text-7xl mb-4 sm:mb-6 select-none">🥘</div>
+      <h3 className="text-lg sm:text-xl font-bold text-stone-700 mb-2">
         {t('emptyCookbookTitle')}
       </h3>
-      <p className="text-stone-400 max-w-sm mb-8 leading-relaxed">
+      <p className="text-stone-400 max-w-sm mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base">
         {t('emptyCookbookSubtitle')}
       </p>
       <button
         onClick={onAdd}
-        className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center gap-2"
+        className="min-h-[48px] bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center justify-center gap-2"
       >
         <span className="text-lg">+</span>
         {t('addYourFirstRecipe')}
@@ -209,21 +209,21 @@ export default function RecipeListPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-wrap gap-4 justify-between items-start mb-8">
+      {/* Header: stack on mobile for better touch targets and spacing */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 justify-between items-stretch sm:items-start mb-6 sm:mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-stone-800">{t('myRecipes')}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-stone-800">{t('myRecipes')}</h2>
           <p className="text-stone-400 text-sm mt-0.5">
             {recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Filter pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filter pills: touch-friendly min height */}
           <div className="flex bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm text-sm">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`min-h-[44px] px-4 py-2.5 font-medium transition-colors ${
                 filter === 'all'
                   ? 'bg-amber-500 text-white'
                   : 'text-stone-500 hover:bg-stone-50'
@@ -233,7 +233,7 @@ export default function RecipeListPage() {
             </button>
             <button
               onClick={() => setFilter('favorites')}
-              className={`px-4 py-2 font-medium transition-colors flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-4 py-2.5 font-medium transition-colors flex items-center gap-1.5 ${
                 filter === 'favorites'
                   ? 'bg-amber-500 text-white'
                   : 'text-stone-500 hover:bg-stone-50'
@@ -253,7 +253,7 @@ export default function RecipeListPage() {
 
           <button
             onClick={() => setShowAdd(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center gap-1.5"
+            className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2.5 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center justify-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
             <span>{t('add')}</span>

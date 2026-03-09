@@ -27,32 +27,32 @@ export default function Navbar() {
       : t('recipesQuota', { used, limit: limit ?? 0 })
 
   return (
-    <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10 print:hidden">
-      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+    <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)]">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 min-h-[56px] sm:h-16 flex items-center justify-between gap-2">
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm text-xl">
+        <Link to="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 flex-shrink">
+          <div className="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm text-xl">
             🍳
           </div>
-          <div className="leading-none">
-            <div className="font-bold text-stone-800 group-hover:text-amber-600 transition-colors text-[15px]">
+          <div className="leading-none min-w-0">
+            <div className="font-bold text-stone-800 group-hover:text-amber-600 transition-colors text-sm sm:text-[15px] truncate">
               {t('appTitle')}
             </div>
-            <div className="text-[11px] text-stone-400 mt-0.5">{t('appSubtitle')}</div>
+            <div className="text-[10px] sm:text-[11px] text-stone-400 mt-0.5 truncate">{t('appSubtitle')}</div>
           </div>
         </Link>
 
-        {/* Right side */}
-        <div className="flex items-center gap-1">
+        {/* Right side: touch-friendly min sizes, responsive gaps */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
           {/* Language selector */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-stone-200 bg-stone-50 mr-1">
+          <div className="flex items-center rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
             {(['en', 'he', 'pl']).map(l => (
               <button
                 key={l}
                 type="button"
                 onClick={() => setLang(l)}
-                className={`px-2.5 py-1.5 text-xs font-bold uppercase transition-colors ${
+                className={`min-h-[44px] min-w-[36px] px-2 sm:px-2.5 py-2 sm:py-1.5 text-xs font-bold uppercase transition-colors ${
                   lang === l ? 'bg-amber-500 text-white' : 'text-stone-500 hover:bg-stone-100'
                 }`}
                 title={l === 'en' ? 'English' : l === 'he' ? 'עברית' : 'Polski'}
@@ -65,28 +65,28 @@ export default function Navbar() {
           {/* Shopping list button */}
           <button
             onClick={openPanel}
-            className="relative p-2 rounded-xl text-stone-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+            className="relative min-h-[44px] min-w-[44px] p-2 rounded-xl text-stone-500 hover:bg-amber-50 hover:text-amber-600 transition-colors flex items-center justify-center"
             title={t('shoppingList')}
           >
             <span className="text-xl">🛒</span>
             {listCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-amber-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold px-1">
+              <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] bg-amber-500 text-white rounded-full text-[10px] flex items-center justify-center font-bold px-1">
                 {listCount}
               </span>
             )}
           </button>
 
-          <div className="w-px h-5 bg-stone-200 mx-1" />
+          <div className="w-px h-5 bg-stone-200 mx-0.5 sm:mx-1 hidden sm:block" />
 
           {user && (
-            <span className="text-xs font-medium text-stone-500 mr-1">
+            <span className="text-xs font-medium text-stone-500 mr-0.5 sm:mr-1 max-w-[64px] sm:max-w-none truncate" title={quotaLabel}>
               {quotaLabel}
             </span>
           )}
 
           <Link
             to="/settings"
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
               isSettings
                 ? 'bg-amber-50 text-amber-700'
                 : 'text-stone-500 hover:bg-stone-100 hover:text-stone-700'
@@ -95,9 +95,9 @@ export default function Navbar() {
             {t('settings')}
           </Link>
 
-          <div className="w-px h-5 bg-stone-200 mx-1" />
+          <div className="w-px h-5 bg-stone-200 mx-0.5 sm:mx-1 hidden sm:block" />
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">
               {initials}
             </div>
@@ -108,7 +108,7 @@ export default function Navbar() {
 
           <button
             onClick={handleLogout}
-            className="ml-1 px-3 py-2 rounded-xl text-sm font-medium text-stone-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             {t('logOut')}
           </button>

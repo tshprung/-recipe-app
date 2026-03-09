@@ -1,3 +1,5 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Safe area insets are applied per-component (navbar, modal, main) for notched phones */

@@ -101,7 +101,7 @@ export default function ShoppingListPanel() {
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col print:shadow-none print:static print:max-w-none print:h-auto">
+      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] print:shadow-none print:static print:max-w-none print:h-auto print:pt-0 print:pb-0">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100 flex-shrink-0 print:hidden">
