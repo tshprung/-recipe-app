@@ -6,13 +6,13 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password_hash: str = Field(min_length=1)
     captcha_token: str | None = None
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password_hash: str
 
 
 class Token(BaseModel):

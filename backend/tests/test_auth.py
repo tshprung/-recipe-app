@@ -3,7 +3,7 @@ from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from app import models
-from tests.conftest import TestSessionLocal, MOCK_TRANSLATED, CAPTCHA_DUMMY
+from tests.conftest import TestSessionLocal, MOCK_TRANSLATED, CAPTCHA_DUMMY, password_hash
 
 
 def test_register_success(client):
@@ -12,7 +12,7 @@ def test_register_success(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "new@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "new@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
     data = r.json()
@@ -27,7 +27,7 @@ def test_register_sends_verification_email(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "verify@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
     data = r.json()
@@ -39,7 +39,7 @@ def test_register_sends_verification_email(client):
 
 
 def test_register_duplicate_email(client):
-    payload = {"email": "dup@example.com", "password": "password8", "captcha_token": CAPTCHA_DUMMY}
+    payload = {"email": "dup@example.com", "password_hash": password_hash("password8"), "captcha_token": CAPTCHA_DUMMY}
     with patch("app.routers.auth.send_verification_email"), patch(
         "app.routers.auth._verify_turnstile", return_value=True
     ):
@@ -51,7 +51,7 @@ def test_register_duplicate_email(client):
 def test_login_success(client, registered_user):
     r = client.post(
         "/api/auth/login",
-        json={"email": "tester@example.com", "password": "securepassword"},
+        json={"email": "tester@example.com", "password_hash": password_hash("securepassword")},
     )
     assert r.status_code == 200
     data = r.json()
@@ -62,7 +62,7 @@ def test_login_success(client, registered_user):
 def test_login_wrong_password(client, registered_user):
     r = client.post(
         "/api/auth/login",
-        json={"email": "tester@example.com", "password": "wrongpassword"},
+        json={"email": "tester@example.com", "password_hash": password_hash("wrongpassword")},
     )
     assert r.status_code == 401
 
@@ -70,7 +70,7 @@ def test_login_wrong_password(client, registered_user):
 def test_login_unknown_email(client):
     r = client.post(
         "/api/auth/login",
-        json={"email": "nobody@example.com", "password": "any"},
+        json={"email": "nobody@example.com", "password_hash": password_hash("any")},
     )
     assert r.status_code == 401
 
@@ -92,14 +92,14 @@ def test_unverified_user_cannot_transform_recipe(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "unverified@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "unverified@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
     # Login as that user
     r = client.post(
         "/api/auth/login",
-        json={"email": "unverified@example.com", "password": "mypassword"},
+        json={"email": "unverified@example.com", "password_hash": password_hash("mypassword")},
     )
     token = r.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -150,21 +150,21 @@ def test_failed_logins_lead_to_lockout(client, registered_user):
     for _ in range(4):
         r = client.post(
             "/api/auth/login",
-            json={"email": registered_user["email"], "password": "wrong"},
+            json={"email": registered_user["email"], "password_hash": password_hash("wrong")},
         )
         assert r.status_code == 401
 
     # 5th failed attempt triggers lockout (still 401 on this request)
     r = client.post(
         "/api/auth/login",
-        json={"email": registered_user["email"], "password": "wrong"},
+        json={"email": registered_user["email"], "password_hash": password_hash("wrong")},
     )
     assert r.status_code == 401
 
     # Subsequent attempt within lockout window returns 403 with lockout message
     r = client.post(
         "/api/auth/login",
-        json={"email": registered_user["email"], "password": "securepassword"},
+        json={"email": registered_user["email"], "password_hash": password_hash("securepassword")},
     )
     assert r.status_code == 403
     assert "Account locked" in r.json()["detail"]
@@ -177,7 +177,7 @@ def test_verify_email_marks_user_verified_and_clears_token(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify-me@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "verify-me@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -210,7 +210,7 @@ def test_verify_email_handles_naive_expiry_datetime(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "naive-expiry@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "naive-expiry@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -242,7 +242,7 @@ def test_verify_email_rejects_expired_token(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "expired@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "expired@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     assert r.status_code == 201
 
@@ -268,7 +268,7 @@ def test_register_returns_503_when_verification_email_fails(client):
         mock_send.side_effect = RuntimeError("Resend unavailable")
         r = client.post(
             "/api/auth/register",
-            json={"email": "fail-email@example.com", "password": "mypassword", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "fail-email@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
         )
     # User is created then we try to send email; send fails -> 503
     assert r.status_code == 503

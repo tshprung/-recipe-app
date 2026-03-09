@@ -4,6 +4,8 @@ Test configuration.
 Sets DATABASE_URL to a dedicated test SQLite file BEFORE importing any app
 modules, so the app engine is created against the test DB.
 """
+import base64
+import hashlib
 import os
 from unittest.mock import patch
 
@@ -77,6 +79,11 @@ SAMPLE_EMAIL = "tester@example.com"
 SAMPLE_PASSWORD = "securepassword"
 
 
+def password_hash(plain: str) -> str:
+    """Same as backend _prehash: SHA-256 + base64. Use for login/register payloads."""
+    return base64.b64encode(hashlib.sha256(plain.encode()).digest()).decode()
+
+
 # Dummy captcha token for tests (auth router requires it; we mock verification)
 CAPTCHA_DUMMY = "test-captcha-token"
 
@@ -90,7 +97,7 @@ def registered_user(client):
             "/api/auth/register",
             json={
                 "email": SAMPLE_EMAIL,
-                "password": SAMPLE_PASSWORD,
+                "password_hash": password_hash(SAMPLE_PASSWORD),
                 "captcha_token": CAPTCHA_DUMMY,
             },
         )
@@ -115,7 +122,7 @@ def registered_user(client):
 def auth_headers(client, registered_user):
     r = client.post(
         "/api/auth/login",
-        json={"email": SAMPLE_EMAIL, "password": SAMPLE_PASSWORD},
+        json={"email": SAMPLE_EMAIL, "password_hash": password_hash(SAMPLE_PASSWORD)},
     )
     assert r.status_code == 200
     token = r.json()["access_token"]

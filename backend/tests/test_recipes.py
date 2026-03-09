@@ -1,7 +1,7 @@
 """Tests for recipe CRUD endpoints."""
 from unittest.mock import MagicMock, patch
 
-from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY
+from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY, password_hash
 from app import models
 from tests.conftest import TestSessionLocal
 
@@ -44,9 +44,9 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "b@example.com", "password": "bpass1234", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "b@example.com", "password_hash": password_hash("bpass1234"), "captcha_token": CAPTCHA_DUMMY},
         )
-    r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass1234"})
+    r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     # User B should see zero recipes
@@ -72,9 +72,9 @@ def test_get_recipe_other_user_returns_404(client, auth_headers):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "other@example.com", "password": "opass1234", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "other@example.com", "password_hash": password_hash("opass1234"), "captcha_token": CAPTCHA_DUMMY},
         )
-    r = client.post("/api/auth/login", json={"email": "other@example.com", "password": "opass1234"})
+    r = client.post("/api/auth/login", json={"email": "other@example.com", "password_hash": password_hash("opass1234")})
     other_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     r = client.get(f"/api/recipes/{created['id']}", headers=other_headers)

@@ -33,6 +33,16 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(_prehash(plain), hashed)
 
 
+def hash_password_from_prehashed(password_hash: str) -> str:
+    """Store a client-side prehashed value (SHA-256 + base64). No double prehash."""
+    return pwd_context.hash(password_hash)
+
+
+def verify_password_from_prehashed(password_hash: str, hashed: str) -> bool:
+    """Verify using client-side prehashed value. No double prehash."""
+    return pwd_context.verify(password_hash, hashed)
+
+
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": str(user_id), "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)

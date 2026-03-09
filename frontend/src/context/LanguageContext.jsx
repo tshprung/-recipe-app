@@ -17,6 +17,7 @@ const translations = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     passwordsMismatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 8 characters',
     logInButton: 'Log in →',
     createAccountButton: 'Create account →',
     // Navbar
@@ -150,6 +151,7 @@ const translations = {
     showPassword: 'הצג סיסמה',
     hidePassword: 'הסתר סיסמה',
     passwordsMismatch: 'הסיסמאות אינן תואמות',
+    passwordTooShort: 'הסיסמה חייבת להכיל לפחות 8 תווים',
     logInButton: 'התחבר ←',
     createAccountButton: 'צור חשבון ←',
     appSubtitle: 'תרגום מתכונים',
@@ -276,6 +278,7 @@ const translations = {
     showPassword: 'Pokaż hasło',
     hidePassword: 'Ukryj hasło',
     passwordsMismatch: 'Hasła nie są takie same',
+    passwordTooShort: 'Hasło musi mieć co najmniej 8 znaków',
     logInButton: 'Zaloguj →',
     createAccountButton: 'Utwórz konto →',
     appSubtitle: 'Tłumaczenie przepisów',

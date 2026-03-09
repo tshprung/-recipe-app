@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import hash_password, verify_password, create_access_token, get_current_user
+from ..auth import (
+    hash_password_from_prehashed,
+    verify_password_from_prehashed,
+    create_access_token,
+    get_current_user,
+)
 from ..database import get_db
 from ..services.email import send_verification_email
 
@@ -58,7 +63,7 @@ def register(
 
     user = models.User(
         email=payload.email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password_from_prehashed(payload.password_hash),
     )
 
     # Generate verification token (24h expiry)
@@ -106,7 +111,7 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
                 detail="Account locked. Try again in 15 minutes.",
             )
 
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not verify_password_from_prehashed(payload.password_hash, user.password_hash):
         if user:
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:

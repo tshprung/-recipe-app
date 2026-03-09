@@ -1,7 +1,7 @@
 """Tests for the shopping list endpoints."""
 from unittest.mock import patch
 
-from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY
+from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY, password_hash
 
 MOCK_CATEGORIES = {
     "Vegetables and fruit": ["500g pomidory", "1 sztuka cebula"],
@@ -75,9 +75,9 @@ def test_shopping_list_is_per_user(client, auth_headers, recipe):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "b@example.com", "password": "bpass1234", "captcha_token": CAPTCHA_DUMMY},
+            json={"email": "b@example.com", "password_hash": password_hash("bpass1234"), "captcha_token": CAPTCHA_DUMMY},
         )
-    r = client.post("/api/auth/login", json={"email": "b@example.com", "password": "bpass1234"})
+    r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     r = client.get("/api/shopping-list/recipes", headers=b_headers)

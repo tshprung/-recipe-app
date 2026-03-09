@@ -86,6 +86,10 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     if (tab === 'register') {
+      if (password.length < 8) {
+        setError(t('passwordTooShort') || 'Password must be at least 8 characters')
+        return
+      }
       if (password !== passwordConfirm) {
         setError(t('passwordsMismatch'))
         return
