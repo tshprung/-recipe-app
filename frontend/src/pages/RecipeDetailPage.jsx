@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
 const TAG_COLORS = [
@@ -24,6 +25,9 @@ const VARIANT_OPTIONS = [
   { key: 'dairy_free', label: 'Dairy free' },
   { key: 'gluten_free',label: 'Gluten free' },
   { key: 'kosher',     label: 'Kosher' },
+  { key: 'halal',      label: 'Halal' },
+  { key: 'nut_free',   label: 'Nut free' },
+  { key: 'low_sodium', label: 'Low sodium' },
 ]
 
 // Badge shown on the recipe hero card for original and each variant
@@ -34,6 +38,9 @@ const VARIANT_BADGE = {
   dairy_free:  { label: 'Dairy free', cls: 'bg-sky-100 text-sky-700' },
   gluten_free: { label: 'Gluten free', cls: 'bg-violet-100 text-violet-700' },
   kosher:      { label: 'Kosher',     cls: 'bg-blue-100 text-blue-700' },
+  halal:       { label: 'Halal',      cls: 'bg-teal-100 text-teal-700' },
+  nut_free:    { label: 'Nut free',   cls: 'bg-amber-100 text-amber-700' },
+  low_sodium:  { label: 'Low sodium', cls: 'bg-rose-100 text-rose-700' },
 }
 
 // Keywords for auto-detecting ingredient content tags
@@ -75,12 +82,22 @@ function Card({ children, className = '' }) {
 function variantLabelKey(key) {
   if (key === 'dairy_free') return 'dairyFree'
   if (key === 'gluten_free') return 'glutenFree'
+  if (key === 'nut_free') return 'nutFree'
+  if (key === 'low_sodium') return 'lowSodium'
   return key
+}
+
+function variantDisplayLabel(variantType, t) {
+  const parts = (variantType || '').split(',').map(s => s.trim()).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return t(variantLabelKey(parts[0]))
+  return parts.map(p => t(variantLabelKey(p))).join(' + ')
 }
 
 export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
   const { t } = useLanguage()
 
   const [recipe, setRecipe] = useState(null)
@@ -95,6 +112,7 @@ export default function RecipeDetailPage() {
   const [activeTab, setActiveTab] = useState('original')
   const [adaptLoading, setAdaptLoading] = useState(false)
   const [adaptDropdownOpen, setAdaptDropdownOpen] = useState(false)
+  const [selectedAdaptTypes, setSelectedAdaptTypes] = useState([])  // multi-select for Apply
   const [alternatives, setAlternatives] = useState(null)
   const [pendingVariantType, setPendingVariantType] = useState(null)
   const [adaptError, setAdaptError] = useState(null)
@@ -145,35 +163,46 @@ export default function RecipeDetailPage() {
     }
   }
 
-  async function handleAdapt(type) {
-    console.log('[handleAdapt] button clicked, type:', type)
+  async function handleAdapt(typesOrSingle) {
+    const types = Array.isArray(typesOrSingle) ? typesOrSingle : [typesOrSingle]
+    const compositeKey = types.length === 1 ? types[0] : types.join(',')
     setAdaptDropdownOpen(false)
     setAdaptError(null)
-    if (variants.find(v => v.variant_type === type)) {
-      console.log('[handleAdapt] variant already cached, switching tab')
-      setActiveTab(type)
+    if (variants.find(v => v.variant_type === compositeKey)) {
+      setActiveTab(compositeKey)
       return
     }
     setAdaptLoading(true)
     setAlternatives(null)
-    setPendingVariantType(type)
+    setPendingVariantType(compositeKey)
+    setSelectedAdaptTypes([])
     try {
-      console.log('[handleAdapt] calling POST /recipes/' + id + '/adapt')
-      const result = await api.post(`/recipes/${id}/adapt`, { variant_type: type })
-      console.log('[handleAdapt] API response:', result)
+      const body = types.length === 1
+        ? { variant_type: types[0] }
+        : { variant_types: types }
+      const result = await api.post(`/recipes/${id}/adapt`, body)
       if (result.can_adapt) {
-        console.log('[handleAdapt] can_adapt=true, variant:', result.variant)
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
+        await refreshUser()
       } else {
-        console.log('[handleAdapt] can_adapt=false, alternatives:', result.alternatives)
         setAlternatives(result.alternatives)
+        if (types.length > 1) setPendingVariantType(types[types.length - 1])
       }
     } catch (e) {
-      console.error('[handleAdapt] ERROR:', e)
       setAdaptError(e.message || t('failedToAdapt'))
     } finally {
       setAdaptLoading(false)
+    }
+  }
+
+  async function handleRemoveVariant(variantType) {
+    try {
+      await api.delete(`/recipes/${id}/variants`, { variant_type: variantType })
+      setVariants(vs => vs.filter(v => v.variant_type !== variantType))
+      if (activeTab === variantType) setActiveTab('original')
+    } catch (e) {
+      setAdaptError(e.message || t('failedToAdapt'))
     }
   }
 
@@ -190,6 +219,7 @@ export default function RecipeDetailPage() {
       if (result.can_adapt) {
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
+        await refreshUser()
       }
     } catch (e) {
       console.error('[handleAdaptAlternative] ERROR:', e)
@@ -248,20 +278,43 @@ export default function RecipeDetailPage() {
             {t('adaptRecipe')} ▾
           </button>
           {adaptDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-1.5 min-w-[180px]">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-2 min-w-[200px]">
+              <p className="px-4 py-1 text-xs font-semibold text-stone-400 uppercase tracking-wide">
+                {t('adaptRecipe')}
+              </p>
               {VARIANT_OPTIONS.map(opt => {
-                const alreadyHas = variants.find(v => v.variant_type === opt.key)
+                const alreadyHasSingle = variants.some(v => v.variant_type === opt.key)
+                const isChecked = selectedAdaptTypes.includes(opt.key)
                 return (
-                  <button
+                  <label
                     key={opt.key}
-                    onClick={() => handleAdapt(opt.key)}
-                    className="w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-700 transition-colors flex items-center justify-between"
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 cursor-pointer"
                   >
-                    {t(variantLabelKey(opt.key))}
-                    {alreadyHas && <span className="text-xs text-emerald-500 font-medium">✓</span>}
-                  </button>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        setSelectedAdaptTypes(prev =>
+                          prev.includes(opt.key) ? prev.filter(k => k !== opt.key) : [...prev, opt.key]
+                        )
+                      }}
+                      className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+                    />
+                    <span className="flex-1">{t(variantLabelKey(opt.key))}</span>
+                    {alreadyHasSingle && <span className="text-xs text-emerald-500">✓</span>}
+                  </label>
                 )
               })}
+              <div className="border-t border-stone-100 mt-2 pt-2 px-2">
+                <button
+                  type="button"
+                  onClick={() => selectedAdaptTypes.length > 0 && handleAdapt(selectedAdaptTypes)}
+                  disabled={selectedAdaptTypes.length === 0 || adaptLoading}
+                  className="w-full py-2 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                >
+                  {t('applyAdaptations')}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -298,11 +351,11 @@ export default function RecipeDetailPage() {
           ) : (
             <div className="mb-4">
               {(() => {
-                const baseKey = activeTab.replace(/_alt\d+$/, '')
+                const baseKey = (activeTab.split(',')[0] || activeTab).replace(/_alt\d+$/, '')
                 const badge = VARIANT_BADGE[baseKey] ?? { cls: 'bg-stone-100 text-stone-500' }
                 return (
                   <span className={`inline-block text-xs font-semibold rounded-full px-2.5 py-0.5 mb-2 ${badge.cls}`}>
-                    {t(variantLabelKey(baseKey))}
+                    {variantDisplayLabel(activeTab, t)}
                   </span>
                 )
               })()}
@@ -371,17 +424,37 @@ export default function RecipeDetailPage() {
             {t('original')}
           </button>
           {variants.map(v => (
-            <button
+            <div
               key={v.variant_type}
-              onClick={() => setActiveTab(v.variant_type)}
-              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 ${
-                activeTab === v.variant_type
-                  ? 'bg-amber-500 text-white shadow-sm'
-                  : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+              className={`flex items-center gap-0.5 rounded-xl flex-shrink-0 ${
+                activeTab === v.variant_type ? 'bg-amber-500 text-white shadow-sm' : ''
               }`}
             >
-              {t(variantLabelKey(v.variant_type))}
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab(v.variant_type)}
+                className={`px-3 py-1.5 rounded-l-xl text-sm font-medium transition-colors ${
+                  activeTab === v.variant_type
+                    ? 'bg-amber-500 text-white'
+                    : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50'
+                }`}
+              >
+                {variantDisplayLabel(v.variant_type, t)}
+              </button>
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); handleRemoveVariant(v.variant_type) }}
+                title={t('removeVariant')}
+                className={`p-1.5 rounded-r-xl text-xs transition-colors ${
+                  activeTab === v.variant_type
+                    ? 'text-white hover:bg-amber-600'
+                    : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'
+                }`}
+                aria-label={t('removeVariant')}
+              >
+                ✕
+              </button>
+            </div>
           ))}
           {adaptLoading && (
             <div className="px-3 py-1.5 flex items-center gap-1.5 text-sm text-stone-400 flex-shrink-0">

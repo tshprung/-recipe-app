@@ -5,6 +5,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import RecipeDetailPage from './RecipeDetailPage'
 import { api } from '../api/client'
 import { LanguageProvider } from '../context/LanguageContext'
+import { AuthProvider } from '../context/AuthContext'
 
 vi.mock('../api/client', () => ({
   api: {
@@ -51,13 +52,15 @@ const MOCK_VEGAN_VARIANT = {
 
 function renderPage(id = '1') {
   return render(
-    <LanguageProvider>
-      <MemoryRouter initialEntries={[`/recipes/${id}`]}>
-        <Routes>
-          <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-        </Routes>
-      </MemoryRouter>
-    </LanguageProvider>
+    <AuthProvider>
+      <LanguageProvider>
+        <MemoryRouter initialEntries={[`/recipes/${id}`]}>
+          <Routes>
+            <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </LanguageProvider>
+    </AuthProvider>
   )
 }
 
@@ -76,7 +79,7 @@ describe('RecipeDetailPage — adaptation', () => {
     expect(screen.getByText('Original')).toBeInTheDocument()
   })
 
-  it('clicking Vegan triggers POST /recipes/1/adapt with variant_type: vegan', async () => {
+  it('selecting Vegan and Apply triggers POST /recipes/1/adapt with variant_type: vegan', async () => {
     api.post.mockResolvedValue({
       can_adapt: true,
       variant: MOCK_VEGAN_VARIANT,
@@ -85,10 +88,9 @@ describe('RecipeDetailPage — adaptation', () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
 
-    // Open the adapt dropdown
     await userEvent.click(screen.getByText(/Adapt recipe/))
-    // Click the Vegan option
-    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await userEvent.click(screen.getByLabelText('Vegan'))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     expect(api.post).toHaveBeenCalledWith('/recipes/1/adapt', { variant_type: 'vegan' })
   })
@@ -103,11 +105,10 @@ describe('RecipeDetailPage — adaptation', () => {
     await screen.findByText('Zupa Pomidorowa')
 
     await userEvent.click(screen.getByText(/Adapt recipe/))
-    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await userEvent.click(screen.getByLabelText('Vegan'))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
-    // The tab bar and badge should now show Vegan
     await waitFor(() => {
-      // At least one element with text "Vegan" must appear (tab button or hero badge)
       const hits = screen.getAllByText('Vegan')
       expect(hits.length).toBeGreaterThanOrEqual(1)
     })
@@ -123,12 +124,12 @@ describe('RecipeDetailPage — adaptation', () => {
     await screen.findByText('Zupa Pomidorowa')
 
     await userEvent.click(screen.getByText(/Adapt recipe/))
-    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await userEvent.click(screen.getByLabelText('Vegan'))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => {
       expect(screen.getByText('1 cebula bez masła')).toBeInTheDocument()
     })
-    // Original ingredient label should no longer be shown (replaced by variant)
     expect(screen.queryByText('1 sztuka cebula')).not.toBeInTheDocument()
   })
 
@@ -140,7 +141,8 @@ describe('RecipeDetailPage — adaptation', () => {
     await screen.findByText('Zupa Pomidorowa')
 
     await userEvent.click(screen.getByText(/Adapt recipe/))
-    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await userEvent.click(screen.getByLabelText('Vegan'))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
     await waitFor(() => {
       expect(
@@ -195,7 +197,8 @@ describe('RecipeDetailPage — return to original', () => {
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
     await userEvent.click(screen.getByText(/Adapt recipe/))
-    await userEvent.click(screen.getByRole('button', { name: 'Vegan' }))
+    await userEvent.click(screen.getByLabelText('Vegan'))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
     await waitFor(() => screen.getAllByText('Vegan'))
   }
 

@@ -8,6 +8,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  async function refreshUser() {
+    try {
+      const me = await api.get('/users/me')
+      setUser(me)
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
@@ -42,7 +51,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )

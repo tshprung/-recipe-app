@@ -223,6 +223,12 @@ def list_variants(
     return recipe.variants
 
 
+def _normalize_adapt_types(payload: schemas.AdaptRequest) -> list[str]:
+    if payload.variant_types:
+        return list(payload.variant_types)
+    return [payload.variant_type] if payload.variant_type else []
+
+
 @router.post("/{recipe_id}/adapt")
 def adapt_recipe_endpoint(
     recipe_id: int,
@@ -240,10 +246,27 @@ def adapt_recipe_endpoint(
             detail="Verify your email before using the app.",
         )
 
-    # Quota check (before OpenAI)
+    types = _normalize_adapt_types(payload)
+    composite_key = ",".join(types)
+
     user_for_update = (
         db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
     )
+
+    # For standard (non-custom) adaptations, check cache first (don't consume quota)
+    if not payload.custom_instruction:
+        existing = (
+            db.query(models.RecipeVariant)
+            .filter_by(recipe_id=recipe_id, variant_type=composite_key)
+            .first()
+        )
+        if existing:
+            return {
+                "can_adapt": True,
+                "variant": schemas.RecipeVariantOut.model_validate(existing),
+                "alternatives": [],
+            }
+
     if user_for_update.transformations_limit != -1 and (
         user_for_update.transformations_used >= user_for_update.transformations_limit
     ):
@@ -255,20 +278,6 @@ def adapt_recipe_endpoint(
     user_for_update.transformations_used += 1
     db.commit()
 
-    # For standard (non-custom) adaptations, check cache first
-    if not payload.custom_instruction:
-        existing = (
-            db.query(models.RecipeVariant)
-            .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
-            .first()
-        )
-        if existing:
-            return {
-                "can_adapt": True,
-                "variant": schemas.RecipeVariantOut.model_validate(existing),
-                "alternatives": [],
-            }
-
     custom_instruction = (
         _sanitize_text(payload.custom_instruction, max_len=1000)
         if payload.custom_instruction is not None
@@ -276,51 +285,90 @@ def adapt_recipe_endpoint(
     )
 
     try:
-        result = adapt_recipe(recipe, payload.variant_type, custom_instruction)
+        if len(types) > 1:
+            # Chain adaptations: apply each diet in order
+            current = recipe
+            for t in types:
+                result = adapt_recipe(current, t, custom_instruction=None)
+                if not result.get("can_adapt"):
+                    return {
+                        "can_adapt": False,
+                        "variant": None,
+                        "alternatives": result.get("alternatives", []),
+                    }
+                current = {
+                    "title_pl": result["title_pl"],
+                    "ingredients_pl": result["ingredients_pl"],
+                    "steps_pl": result["steps_pl"],
+                    "notes": result.get("notes", {}),
+                }
+            result = current
+            variant_type = composite_key
+            title_pl = result["title_pl"]
+        else:
+            single_type = types[0]
+            result = adapt_recipe(recipe, single_type, custom_instruction)
+            if not result.get("can_adapt"):
+                return {
+                    "can_adapt": False,
+                    "variant": None,
+                    "alternatives": result.get("alternatives", []),
+                }
+            if payload.custom_instruction:
+                existing_count = (
+                    db.query(models.RecipeVariant)
+                    .filter(
+                        models.RecipeVariant.recipe_id == recipe_id,
+                        models.RecipeVariant.variant_type.like(f"{single_type}_alt%"),
+                    )
+                    .count()
+                )
+                variant_type = f"{single_type}_alt{existing_count}"
+            else:
+                variant_type = single_type
+            title_pl = payload.custom_title or result["title_pl"]
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Adaptation failed: {e}")
 
-    if result.get("can_adapt"):
-        # For custom alternatives, build a unique variant_type slug
-        if payload.custom_instruction:
-            existing_count = (
-                db.query(models.RecipeVariant)
-                .filter(
-                    models.RecipeVariant.recipe_id == recipe_id,
-                    models.RecipeVariant.variant_type.like(f"{payload.variant_type}_alt%"),
-                )
-                .count()
-            )
-            variant_type = f"{payload.variant_type}_alt{existing_count}"
-        else:
-            variant_type = payload.variant_type
+    variant = models.RecipeVariant(
+        recipe_id=recipe_id,
+        variant_type=variant_type,
+        title_pl=title_pl,
+        ingredients_pl=result["ingredients_pl"],
+        steps_pl=result["steps_pl"],
+        notes=result.get("notes", {}),
+    )
+    db.add(variant)
+    db.commit()
+    db.refresh(variant)
+    return {
+        "can_adapt": True,
+        "variant": schemas.RecipeVariantOut.model_validate(variant),
+        "alternatives": [],
+    }
 
-        title_pl = payload.custom_title or result["title_pl"]
 
-        variant = models.RecipeVariant(
-            recipe_id=recipe_id,
-            variant_type=variant_type,
-            title_pl=title_pl,
-            ingredients_pl=result["ingredients_pl"],
-            steps_pl=result["steps_pl"],
-            notes=result.get("notes", {}),
-        )
-        db.add(variant)
-        db.commit()
-        db.refresh(variant)
-        return {
-            "can_adapt": True,
-            "variant": schemas.RecipeVariantOut.model_validate(variant),
-            "alternatives": [],
-        }
-    else:
-        return {
-            "can_adapt": False,
-            "variant": None,
-            "alternatives": result.get("alternatives", []),
-        }
+@router.delete("/{recipe_id}/variants", status_code=status.HTTP_204_NO_CONTENT)
+def delete_variant(
+    recipe_id: int,
+    payload: schemas.DeleteVariantRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    variant = (
+        db.query(models.RecipeVariant)
+        .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
+        .first()
+    )
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+    db.delete(variant)
+    db.commit()
 
 
 @router.delete("/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)

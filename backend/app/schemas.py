@@ -120,9 +120,20 @@ class IngredientSubstitutionOut(BaseModel):
 # --- Recipe Adaptations ---
 
 class AdaptRequest(BaseModel):
-    variant_type: str  # "vegetarian" | "vegan" | "dairy_free" | "gluten_free" | "kosher"
+    variant_type: str | None = None   # single type (legacy)
+    variant_types: list[str] | None = None  # multiple types applied in order (e.g. ["vegetarian", "kosher"])
     custom_instruction: str | None = None  # for user-chosen alternatives
     custom_title: str | None = None        # display title for the resulting variant tab
+
+    @model_validator(mode="after")
+    def require_variant_type_or_types(self):
+        has_single = self.variant_type is not None
+        has_multi = bool(self.variant_types)
+        if has_single and not has_multi:
+            return self
+        if has_multi and not has_single:
+            return self
+        raise ValueError("Provide either variant_type or variant_types (not both)")
 
 
 class RecipeVariantOut(BaseModel):
@@ -136,6 +147,10 @@ class RecipeVariantOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DeleteVariantRequest(BaseModel):
+    variant_type: str  # e.g. "vegetarian" or "vegetarian,kosher"
 
 
 class SubstitutionReportRequest(BaseModel):

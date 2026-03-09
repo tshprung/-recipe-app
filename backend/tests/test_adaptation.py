@@ -313,6 +313,67 @@ def test_adapt_recipe_without_openai_key_returns_503(client, auth_headers, recip
     assert "OPENAI_API_KEY" in r.json()["detail"]
 
 
+def test_adapt_recipe_multiple_types_chained(client, auth_headers, recipe):
+    """POST with variant_types applies adaptations in order and stores composite variant_type."""
+    first = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska"}
+    second = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska koszerna", "ingredients_pl": ["500g pomidory", "1 cebula"]}
+
+    def side_effect(rec, variant_type, custom_instruction=None):
+        if variant_type == "vegetarian":
+            return first
+        if variant_type == "kosher":
+            return second
+        return MOCK_VARIANT
+
+    with patch("app.routers.recipes.adapt_recipe", side_effect=side_effect):
+        r = client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_types": ["vegetarian", "kosher"]},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["can_adapt"] is True
+    assert data["variant"]["variant_type"] == "vegetarian,kosher"
+    assert data["variant"]["title_pl"] == second["title_pl"]
+
+    variants = client.get(f"/api/recipes/{recipe['id']}/variants", headers=auth_headers).json()
+    assert any(v["variant_type"] == "vegetarian,kosher" for v in variants)
+
+
+def test_delete_variant(client, auth_headers, recipe):
+    """DELETE /api/recipes/{id}/variants with body variant_type removes the variant."""
+    with patch("app.routers.recipes.adapt_recipe", return_value=MOCK_VARIANT):
+        client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_type": "vegetarian"},
+            headers=auth_headers,
+        )
+    r = client.get(f"/api/recipes/{recipe['id']}/variants", headers=auth_headers)
+    assert len(r.json()) == 1
+
+    r = client.request(
+        "DELETE",
+        f"/api/recipes/{recipe['id']}/variants",
+        json={"variant_type": "vegetarian"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 204
+
+    r = client.get(f"/api/recipes/{recipe['id']}/variants", headers=auth_headers)
+    assert r.json() == []
+
+
+def test_delete_variant_not_found(client, auth_headers, recipe):
+    r = client.request(
+        "DELETE",
+        f"/api/recipes/{recipe['id']}/variants",
+        json={"variant_type": "nonexistent"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 404
+
+
 def test_variants_route_returns_401_not_404_unauthenticated(client):
     """GET /api/recipes/{id}/variants must be a registered route.
     Unauthenticated requests return 401 (auth required), not 404 (route missing).

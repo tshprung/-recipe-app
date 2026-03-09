@@ -10,6 +10,9 @@ DIET_LABELS = {
     "dairy_free": "bez nabiału (bez mleka, sera, masła, śmietany)",
     "gluten_free": "bez glutenu (bez pszenicy, żyta, jęczmienia, owsa)",
     "kosher": "koszernym (zasady kaszrutu)",
+    "halal": "halal (zgodnie z zasadami islamu)",
+    "nut_free": "bez orzechów (dla alergików)",
+    "low_sodium": "niskosodowym (ograniczona ilość soli)",
 }
 
 SYSTEM_PROMPT = (
@@ -101,14 +104,27 @@ $steps
 """)
 
 
+def _get_recipe_attrs(recipe):
+    """Recipe can be an ORM model or a dict (for chained adaptations)."""
+    if hasattr(recipe, "ingredients_pl"):
+        return recipe.title_pl, recipe.ingredients_pl or [], recipe.steps_pl or []
+    # dict from a previous adaptation result
+    return (
+        recipe.get("title_pl", ""),
+        recipe.get("ingredients_pl", []),
+        recipe.get("steps_pl", []),
+    )
+
+
 def _build_recipe_text(recipe) -> tuple[str, str]:
+    _, ingredients_pl, steps_pl = _get_recipe_attrs(recipe)
     ingredients_text = "\n".join(
         f"- {ing}" if isinstance(ing, str)
         else f"- {ing.get('amount', '')} {ing.get('name', '')}".strip()
-        for ing in (recipe.ingredients_pl or [])
+        for ing in ingredients_pl
     )
     steps_text = "\n".join(
-        f"{i + 1}. {step}" for i, step in enumerate(recipe.steps_pl or [])
+        f"{i + 1}. {step}" for i, step in enumerate(steps_pl)
     )
     return ingredients_text, steps_text
 
@@ -118,12 +134,13 @@ def adapt_recipe(recipe, variant_type: str, custom_instruction: str | None = Non
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
+    title_pl, _, _ = _get_recipe_attrs(recipe)
     ingredients_text, steps_text = _build_recipe_text(recipe)
 
     if custom_instruction:
         prompt = CUSTOM_TEMPLATE.safe_substitute(
             instruction=custom_instruction,
-            title=recipe.title_pl,
+            title=title_pl,
             ingredients=ingredients_text,
             steps=steps_text,
         )
@@ -131,7 +148,7 @@ def adapt_recipe(recipe, variant_type: str, custom_instruction: str | None = Non
         diet_label = DIET_LABELS.get(variant_type, variant_type)
         prompt = ADAPTED_TEMPLATE.safe_substitute(
             diet_label=diet_label,
-            title=recipe.title_pl,
+            title=title_pl,
             ingredients=ingredients_text,
             steps=steps_text,
         )

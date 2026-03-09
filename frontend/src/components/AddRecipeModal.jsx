@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
 const INPUT_MODE = { PASTE: 'paste', URL: 'url' }
@@ -10,6 +11,7 @@ function isValidHttpUrl(s) {
 }
 
 export default function AddRecipeModal({ onClose, onCreated }) {
+  const { refreshUser } = useAuth()
   const { t } = useLanguage()
   const [mode, setMode] = useState(INPUT_MODE.PASTE)
   const [text, setText] = useState('')
@@ -35,6 +37,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
         ? { source_url: url.trim() }
         : { raw_input: text.trim() }
       const recipe = await api.post('/recipes/', body)
+      await refreshUser()
       onCreated(recipe)
     } catch (err) {
       setError(err.message || t('urlError'))
