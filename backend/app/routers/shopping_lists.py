@@ -7,6 +7,10 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..services.categorization import categorize_ingredients
 from ..services.email import send_shopping_list_email
+from ..services.shopping_list_ingredients import (
+    aggregate_ingredients,
+    normalize_ingredient_for_shopping,
+)
 
 router = APIRouter(prefix="/api/shopping-list", tags=["shopping-list"])
 
@@ -53,14 +57,18 @@ def _collect_ingredients(recipe_ids: list[int], user_id: int, db: Session, user:
     for recipe in recipes:
         for ing in recipe.ingredients_pl or []:
             if isinstance(ing, dict):
-                label = f"{ing.get('amount', '')} {ing.get('name', '')}".strip()
+                amount, name = normalize_ingredient_for_shopping(
+                    ing.get("amount", ""), ing.get("name", "")
+                )
+                label = f"{amount} {name}".strip()
             else:
                 label = str(ing)
             if label:
                 if user is not None:
                     label = _apply_substitutions(label, user, db)
                 ingredients.append(label)
-    return ingredients
+    # Merge same ingredient and sum quantities (e.g. "1 egg" + "1 egg" → "2 eggs")
+    return aggregate_ingredients(ingredients)
 
 
 # --- GET /recipes — cheap, no OpenAI, just returns which recipes are in the list ---
