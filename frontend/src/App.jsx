@@ -5,6 +5,7 @@ import { ShoppingListProvider } from './context/ShoppingListContext'
 import LoginPage from './pages/LoginPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
+import WhatCanIMakePage from './pages/WhatCanIMakePage'
 import SettingsPage from './pages/SettingsPage'
 import VerifyPage from './pages/VerifyPage'
 import Navbar from './components/Navbar'
@@ -88,6 +89,7 @@ function AppRoutes() {
           <main className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             <Routes>
               <Route path="/"            element={<RecipeListPage />} />
+              <Route path="/what-can-i-make" element={<WhatCanIMakePage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
               <Route path="/settings"    element={<SettingsPage />} />
               <Route path="/verify"      element={<VerifyPage />} />

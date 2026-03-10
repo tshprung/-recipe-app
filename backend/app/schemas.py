@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Union
+
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
@@ -166,6 +170,41 @@ class DeleteVariantRequest(BaseModel):
 class IngredientAlternativesRequest(BaseModel):
     ingredient: str  # the ingredient line or name to find alternatives for
     diet_filters: list[str] | None = None  # e.g. ["vegan", "dairy_free"]; empty = no diet filter
+
+
+class WhatCanIMakeRequest(BaseModel):
+    ingredients: list[str]  # ingredients the user has
+    diet_filters: list[str] | None = None  # e.g. ["vegetarian", "vegan", "dairy_free"]
+    assume_pantry: bool = True  # assume salt, sugar, oil, etc.
+    source: str = "my_recipes"  # "my_recipes" | "ai"
+
+
+class WhatCanIMakeMatchOut(BaseModel):
+    recipe: RecipeOut
+    can_make: bool
+    missing_ingredients: list[str]
+
+
+class WhatCanIMakeMyRecipesOut(BaseModel):
+    source: str = "my_recipes"
+    matches: list[WhatCanIMakeMatchOut]
+
+
+class AISuggestedRecipeOut(BaseModel):
+    title: str
+    ingredients: list[str]
+    steps: list[str]
+    missing_ingredients: list[str] | None = None
+
+
+class WhatCanIMakeAIOut(BaseModel):
+    source: str = "ai"
+    suggestions: list[AISuggestedRecipeOut]
+
+
+class WhatCanIMakeIngredientAlternativesRequest(BaseModel):
+    previous_ingredients: list[str]  # original list
+    added_ingredients: list[str]  # user marked "I have this"
 
 
 class IngredientAlternativeOut(BaseModel):

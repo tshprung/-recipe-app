@@ -14,17 +14,24 @@ COOKING_PHRASES = [
     r",\s*beaten\s*$",
     r",\s*lightly\s+beaten\s*$",
     r",\s*soaked\s+in\s+water\s+and\s+squeezed\s*$",
+    r"\s+soaked\s+in\s+water\s+and\s+squeezed\s*$",
     r",\s*soaked\s+in\s+water\s*$",
     r",\s*diced\s*$",
     r",\s*minced\s*$",
     r",\s*chopped\s*$",
     r",\s*finely\s+chopped\s*$",
+    r",\s*sliced\s*$",
+    r",\s*peeled\s+and\s+chopped\s*$",
+    r",\s*peeled\s*$",
     r",\s*grated\s*$",
     r",\s*at\s+room\s+temperature\s*$",
     r",\s*softened\s*$",
     r",\s*melted\s*$",
     r"\s+for\s+coating\s*$",
     r",\s*for\s+coating\s*$",
+    # "for sauce", "for shallow frying", etc. — usage, not buying info
+    r",\s*for\s+[\w\s]+\s*$",
+    r"\s+for\s+[\w\s]+\s*$",
 ]
 
 # When the name part is entirely one of these (e.g. after splitting on comma), treat as empty
@@ -39,10 +46,12 @@ COOKING_PATTERNS = [re.compile(p, re.IGNORECASE) for p in COOKING_PHRASES]
 COOKING_PATTERNS_FULL = [re.compile(p, re.IGNORECASE) for p in COOKING_PHRASES_FULL]
 
 # Units we recognize for quantity aggregation (same unit + same name → sum)
-VOLUME_WEIGHT_UNITS = {
+VOLUME_UNITS = {
     "tablespoon", "tablespoons", "tbsp", "tb",
     "teaspoon", "teaspoons", "tsp",
     "cup", "cups",
+}
+VOLUME_WEIGHT_UNITS = VOLUME_UNITS | {
     "g", "gram", "grams", "kg",
     "ml", "milliliter", "milliliters", "l", "liter", "liters",
 }
@@ -55,6 +64,12 @@ COUNTABLE_UNITS = {
     "pinch", "pinches",
 }
 KNOWN_UNITS = VOLUME_WEIGHT_UNITS | COUNTABLE_UNITS
+
+# Convert tbsp/tsp to tablespoons for aggregation (1 tbsp = 3 tsp). Cups stay separate.
+TABLESPOON_TSP_TO_TABLESPOONS = {
+    "tablespoon": 1, "tablespoons": 1, "tbsp": 1, "tb": 1,
+    "teaspoon": 1 / 3, "teaspoons": 1 / 3, "tsp": 1 / 3,
+}
 
 
 def strip_cooking_instructions(name: str) -> str:
@@ -70,15 +85,29 @@ def strip_cooking_instructions(name: str) -> str:
     return result.strip().rstrip(",").strip()
 
 
+def _normalize_amount_range(amount: str) -> str:
+    """'1 to 1.25 cups' or '1-1.25' → '1.25 cups' or '1.25' (use upper bound for shopping)."""
+    if not amount:
+        return amount
+    amount = amount.strip()
+    # "1 to 1.25" or "1 to 1.25 cups" or "1 - 1.25"
+    m = re.match(r"^([\d./\s]+)\s+(?:to|-|–)\s+([\d./]+)\s*(.*)$", amount, re.IGNORECASE)
+    if m:
+        rest = m.group(3).strip()
+        return f"{m.group(2).strip()} {rest}".strip() if rest else m.group(2).strip()
+    return amount
+
+
 def normalize_ingredient_for_shopping(amount: str, name: str) -> tuple[str, str]:
     """
     Normalize (amount, name) for shopping: strip cooking instructions,
-    and convert 'for coating' to estimated amount 'some'.
+    convert 'for coating' to estimated amount 'some', and "X to Y" → Y.
     Returns (amount, normalized_name).
     """
     raw_name = (name or "").strip()
     amount = (amount or "").strip()
-    had_for_coating = bool(re.search(r"for\s+coating", raw_name + " " + amount, re.IGNORECASE))
+    amount = _normalize_amount_range(amount)
+    had_for_coating = bool(re.search(r"for\s+coating", raw_name + " " + (amount or ""), re.IGNORECASE))
 
     name = strip_cooking_instructions(raw_name)
 
@@ -154,6 +183,14 @@ def _tokenize_amount_and_rest(label: str) -> tuple[float | None, str, str]:
     return (value, "", " ".join(tokens[1:]).strip())
 
 
+def _tablespoon_or_teaspoon_to_tablespoons(value: float, unit: str) -> float | None:
+    """Convert tbsp/tsp to tablespoons for merging. Returns None for cup or other units."""
+    u = (unit or "").strip().lower()
+    if u in TABLESPOON_TSP_TO_TABLESPOONS:
+        return value * TABLESPOON_TSP_TO_TABLESPOONS[u]
+    return None
+
+
 def _aggregation_key(unit: str, name_rest: str) -> tuple[str, str]:
     """Key for grouping: (unit, normalized_name)."""
     name = (name_rest or "").strip() or unit
@@ -166,7 +203,7 @@ def _format_quantity(value: float, unit: str, name_rest: str) -> str:
     if not name:
         return ""
 
-    # Pretty-print fraction
+    # Pretty-print fraction or decimal
     if value == int(value) and value >= 0:
         num_str = str(int(value))
     elif value == 0.5:
@@ -181,7 +218,11 @@ def _format_quantity(value: float, unit: str, name_rest: str) -> str:
         num_str = str(round(value, 2)).rstrip("0").rstrip(".")
 
     if unit:
-        part = f"{num_str} {unit}"
+        # Pluralize volume units (tablespoon → tablespoons when value != 1)
+        display_unit = unit
+        if unit in VOLUME_UNITS and value != 1:
+            display_unit = unit + "s" if not unit.endswith("s") else unit
+        part = f"{num_str} {display_unit}"
         if name and name != unit:
             part += f" {name}"
         return part
@@ -197,10 +238,13 @@ def aggregate_ingredients(ingredient_labels: list[str]) -> list[str]:
     Merge same ingredient and sum quantities.
     E.g. ["1 egg", "1 egg", "1/2 tablespoon salt", "1/2 tablespoon salt"]
     → ["2 eggs", "1 tablespoon salt"].
+    Volume units (tbsp + tsp) are converted and merged (e.g. 1 tbsp + 1/2 tsp salt → 1.5 tbsp salt).
     Ingredients that cannot be parsed (e.g. "some flour") are kept as-is and not merged.
     """
-    # Group by (unit, name) -> list of values
-    groups: dict[tuple[str, str], list[float]] = defaultdict(list)
+    # Volume ingredients: key ("_vol_tbsp", name) -> list of values in tablespoons
+    volume_groups: dict[str, list[float]] = defaultdict(list)
+    # Non-volume: key (unit, name) -> list of values
+    other_groups: dict[tuple[str, str], list[float]] = defaultdict(list)
     unparseable: list[str] = []
 
     for label in ingredient_labels:
@@ -208,16 +252,29 @@ def aggregate_ingredients(ingredient_labels: list[str]) -> list[str]:
         if value is None:
             unparseable.append(label)
             continue
-        key = _aggregation_key(unit, name_rest)
-        # For "1 egg", we had unit="" and name_rest="egg"
-        if not key[1]:
-            key = (key[0], (name_rest or unit or "").strip().lower())
-        groups[key].append(value)
+        name_key = ((name_rest or "").strip() or (unit or "").strip()).lower()
+        if not name_key:
+            unparseable.append(label)
+            continue
+
+        tbsp = _tablespoon_or_teaspoon_to_tablespoons(value, unit) if unit else None
+        if tbsp is not None:
+            volume_groups[name_key].append(tbsp)
+        else:
+            key = _aggregation_key(unit, name_rest)
+            if not key[1]:
+                key = (key[0], (name_rest or unit or "").strip().lower())
+            other_groups[key].append(value)
 
     out: list[str] = []
-    for (unit, name), values in groups.items():
+    for name_key, values in volume_groups.items():
+        total_tbsp = sum(values)
+        # Round to 0.25 for readability (1.17 → 1.25, 1.5 stays 1.5)
+        total_tbsp = round(total_tbsp * 4) / 4
+        out.append(_format_quantity(total_tbsp, "tablespoon", name_key))
+
+    for (unit, name), values in other_groups.items():
         total = sum(values)
-        # Restore display name: if unit was empty and name is the product (e.g. egg), use it
         name_display = name
         if unit and name and name != unit:
             name_display = name

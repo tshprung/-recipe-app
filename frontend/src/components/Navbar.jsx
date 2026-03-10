@@ -30,7 +30,8 @@ export default function Navbar() {
     <nav className="bg-white border-b border-stone-200 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)]">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 min-h-[56px] sm:h-16 flex items-center justify-between gap-2">
 
-        {/* Logo */}
+        {/* Logo + What can I make */}
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink">
         <Link to="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 flex-shrink">
           <div className="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm text-xl">
             🍳
@@ -42,6 +43,15 @@ export default function Navbar() {
             <div className="text-[10px] sm:text-[11px] text-stone-400 mt-0.5 truncate">{t('appSubtitle')}</div>
           </div>
         </Link>
+        <Link
+          to="/what-can-i-make"
+          className={`hidden sm:flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+            location.pathname === '/what-can-i-make' ? 'bg-amber-50 text-amber-700' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-700'
+          }`}
+        >
+          {t('whatCanIMakeNav')}
+        </Link>
+        </div>
 
         {/* Right side: touch-friendly min sizes, responsive gaps */}
         <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">

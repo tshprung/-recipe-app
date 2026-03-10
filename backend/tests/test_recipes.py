@@ -315,6 +315,10 @@ def test_relocalize_updates_recipe_and_consumes_quota(client, auth_headers, regi
         user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
         user.transformations_used = 0
         user.transformations_limit = 5
+        # Change user locale so recipe (created with pl/PL) needs relocalization
+        user.target_language = "en"
+        user.target_country = "US"
+        user.target_city = "New York"
         db.commit()
     finally:
         db.close()

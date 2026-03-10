@@ -141,13 +141,17 @@ export default function RecipeListPage() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [toast, setToast] = useState(null)
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
-  const fetchRecipes = useCallback(async () => {
+  const fetchRecipes = useCallback(async (query = '') => {
+    setLoading(true)
     try {
-      const data = await api.get('/recipes/')
+      const path = query.trim() ? `/recipes/?q=${encodeURIComponent(query.trim())}` : '/recipes/'
+      const data = await api.get(path)
       setRecipes(data)
     } catch (e) {
       console.error(e)
@@ -156,7 +160,12 @@ export default function RecipeListPage() {
     }
   }, [])
 
-  useEffect(() => { fetchRecipes() }, [fetchRecipes])
+  useEffect(() => { fetchRecipes(appliedSearch) }, [fetchRecipes, appliedSearch])
+
+  function handleSearchSubmit(e) {
+    e.preventDefault()
+    setAppliedSearch(searchInput.trim())
+  }
 
   function showToast(msg) {
     setToast(msg)
@@ -209,12 +218,43 @@ export default function RecipeListPage() {
         </div>
       )}
 
+      {/* Search */}
+      <form onSubmit={handleSearchSubmit} className="mb-4">
+        <div className="flex gap-2">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            placeholder={t('searchRecipes')}
+            className="flex-1 min-w-0 rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+            aria-label={t('searchRecipes')}
+          />
+          <button
+            type="submit"
+            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-stone-100 text-stone-700 text-sm font-semibold hover:bg-stone-200 transition-colors"
+          >
+            {t('search')}
+          </button>
+          {appliedSearch && (
+            <button
+              type="button"
+              onClick={() => { setSearchInput(''); setAppliedSearch('') }}
+              className="min-h-[44px] px-3 py-2.5 rounded-xl text-stone-500 text-sm hover:bg-stone-100 transition-colors"
+            >
+              {t('clear')}
+            </button>
+          )}
+        </div>
+      </form>
+
       {/* Header: stack on mobile for better touch targets and spacing */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 justify-between items-stretch sm:items-start mb-6 sm:mb-8">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-stone-800">{t('myRecipes')}</h2>
           <p className="text-stone-400 text-sm mt-0.5">
-            {recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`}
+            {appliedSearch
+              ? (recipes.length === 0 ? t('noSearchResults') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`)
+              : (recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`)}
           </p>
         </div>
 
@@ -266,8 +306,20 @@ export default function RecipeListPage() {
         <div className="flex justify-center py-20">
           <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : visible.length === 0 && filter === 'all' ? (
+      ) : visible.length === 0 && filter === 'all' && !appliedSearch ? (
         <EmptyState onAdd={() => setShowAdd(true)} />
+      ) : visible.length === 0 && appliedSearch ? (
+        <div className="text-center py-20">
+          <div className="text-5xl mb-4">🔍</div>
+          <p className="text-stone-500 font-medium mb-1">{t('noSearchResults')}</p>
+          <button
+            type="button"
+            onClick={() => { setSearchInput(''); setAppliedSearch('') }}
+            className="text-sm text-amber-600 hover:underline font-medium"
+          >
+            {t('clear')} {t('search')}
+          </button>
+        </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-5xl mb-4">⭐</div>
