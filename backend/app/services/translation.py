@@ -26,13 +26,15 @@ USER_PROMPT_TEMPLATE = """\
 Translate this recipe from {source_lang} to {target_lang} for a cook in {city}, {target_country}.
 Apply localisation rules for that market (ingredient names, brands, units).
 
+CRITICAL: The output language for ALL user-facing text (title, ingredients, steps, tags, substitutions) MUST be {target_lang}. The JSON key names (title_pl, ingredients_pl, steps_pl) are legacy and do NOT mean Polish — write in {target_lang} only. If target_lang is "en", output English. If target_lang is "pl", output Polish. No exceptions.
+
 Return a single JSON object with EXACTLY these keys:
 
 {{
-  "title_pl": "<recipe title in the target language>",
+  "title_pl": "<recipe title in {target_lang}>",
   "title_original": "<original recipe title as it appears in the source>",
   "ingredients_pl": [
-    "<quantity + ingredient name in target language>",
+    "<quantity + ingredient name in {target_lang}>",
     ...
   ],
   "ingredients_original": [
@@ -40,10 +42,10 @@ Return a single JSON object with EXACTLY these keys:
     ...
   ],
   "steps_pl": [
-    "<step 1 in target language — clear, complete sentence>",
+    "<step 1 in {target_lang} — clear, complete sentence>",
     ...
   ],
-  "tags": ["<short tag in target language>", ...],
+  "tags": ["<short tag in {target_lang}>", ...],
   "substitutions": {{
     "<source ingredient>": "<target market equivalent + where to buy in {city}>"
   }},
@@ -55,11 +57,9 @@ Return a single JSON object with EXACTLY these keys:
 }}
 
 Rules:
-- ingredients_pl: one string per ingredient, fully in the target language; localise for {target_country}.
+- Write ALL of title_pl, ingredients_pl, steps_pl, and tags in {target_lang} only. Ignore the "_pl" in key names.
 - ingredients_original: copy each ingredient line exactly as in the source.
-- steps_pl: each step translated into the target language.
-- tags: 3–5 short tags in the target language.
-- substitutions: document substitutions (unavailable/brand → local equivalent). Omit universal ingredients.
+- substitutions: in {target_lang}; localise for {target_country}.
 - notes: include ONLY keys explicitly mentioned in the source. Omit the rest.
 - If the input is not a recipe, DO NOT invent steps. Keep output minimal and truthful.
 
