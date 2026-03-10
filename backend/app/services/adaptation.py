@@ -49,6 +49,9 @@ Kosher-specific rules (when diet is kosher):
 - No pork → substitute with beef, chicken, or turkey
 - No shellfish → substitute with fish or omit
 - Flag ingredients needing kosher certification (wine, vinegar, gelatin) in notes
+- Always include in "notes" an "adaptation_summary" string (in the same language as the recipe):
+  * If you made changes: briefly list what was changed (e.g. "Replaced butter with plant margarine; omitted cream.").
+  * If no changes were needed: say so clearly (e.g. "No changes were needed — this recipe already fits this diet." or "Brak zmian — przepis jest już zgodny z dietą.").
 
 Return JSON with exactly this shape:
 {
@@ -56,7 +59,7 @@ Return JSON with exactly this shape:
   "title_pl": "...",
   "ingredients_pl": ["..."],
   "steps_pl": ["..."],
-  "notes": {"ostrzeżenia": []},
+  "notes": {"ostrzeżenia": [], "adaptation_summary": "..."},
   "alternatives": []
 }
 OR if cannot adapt:
@@ -86,6 +89,7 @@ Rules:
 - Apply the instruction faithfully while keeping as much of the original recipe's character as possible.
 - Use Polish supermarket equivalents for any new ingredients.
 - Return the full adapted recipe — do not leave anything out.
+- Always include in "notes" an "adaptation_summary" string: briefly list what was changed, or "No changes were needed." if the recipe already matched the instruction.
 
 Return JSON with exactly this shape:
 {
@@ -93,7 +97,7 @@ Return JSON with exactly this shape:
   "title_pl": "...",
   "ingredients_pl": ["..."],
   "steps_pl": ["..."],
-  "notes": {},
+  "notes": {"adaptation_summary": "..."},
   "alternatives": []
 }
 

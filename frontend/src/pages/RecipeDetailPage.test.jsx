@@ -153,11 +153,28 @@ describe('RecipeDetailPage — adaptation', () => {
 })
 
 describe('RecipeDetailPage — re-localize', () => {
+  const userWithDifferentLocale = {
+    id: 1,
+    email: 'u@u.com',
+    ui_language: 'en',
+    target_language: 'en',
+    target_country: 'US',
+    target_city: 'New York',
+    target_zip: null,
+    transformations_used: 0,
+    transformations_limit: 5,
+    is_verified: true,
+    account_tier: 'free',
+    created_at: '2024-01-01T00:00:00Z',
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
-    api.get.mockImplementation(path =>
-      path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
-    )
+    api.get.mockImplementation(path => {
+      if (path === '/users/me') return Promise.resolve(userWithDifferentLocale)
+      if (path.endsWith('/variants')) return Promise.resolve([])
+      return Promise.resolve(MOCK_RECIPE)
+    })
   })
 
   it('shows Re-localize button and calls POST /recipes/1/relocalize', async () => {

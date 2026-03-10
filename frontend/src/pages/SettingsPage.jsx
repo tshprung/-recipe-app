@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -8,6 +8,23 @@ const TARGET_LANGUAGES = [
   { code: 'en', name: 'English' },
   { code: 'pl', name: 'Polski' },
   { code: 'he', name: 'עברית' },
+  { code: 'es', name: 'Español' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'pt', name: 'Português' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'ar', name: 'العربية' },
+  { code: 'uk', name: 'Українська' },
+  { code: 'nl', name: 'Nederlands' },
+  { code: 'tr', name: 'Türkçe' },
+  { code: 'ja', name: '日本語' },
+  { code: 'zh', name: '中文' },
+  { code: 'cs', name: 'Čeština' },
+  { code: 'hu', name: 'Magyar' },
+  { code: 'ro', name: 'Română' },
+  { code: 'el', name: 'Ελληνικά' },
+  { code: 'sv', name: 'Svenska' },
 ]
 
 const COUNTRIES = [
@@ -72,6 +89,18 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState('')
 
   const set = key => v => setForm(f => ({ ...f, [key]: v }))
+
+  // Sync form from user when user loads/updates (fixes wrong default when user had e.g. English saved)
+  useEffect(() => {
+    if (!user) return
+    setForm({
+      ui_language: user.ui_language ?? 'en',
+      target_language: user.target_language ?? 'pl',
+      target_country: user.target_country ?? 'PL',
+      target_city: user.target_city ?? 'Wrocław',
+      target_zip: user.target_zip ?? '',
+    })
+  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip])
 
   async function handleSubmit(e) {
     e.preventDefault()

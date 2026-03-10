@@ -15,6 +15,12 @@ from ..services.translation import translate_recipe
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
+# Users with this email get unlimited transformations (no quota check, no increment).
+_UNLIMITED_QUOTA_EMAIL = "tshprung@gmail.com"
+
+def _has_unlimited_quota(user: models.User) -> bool:
+    return (user.email or "").strip().lower() == _UNLIMITED_QUOTA_EMAIL
+
 _TAG_RE = re.compile(r"<[^>]+>")
 _MAX_FETCH_BYTES = 500 * 1024  # 500 KB
 _MIN_EXTRACTED_LEN = 10
@@ -115,7 +121,7 @@ def create_recipe(
     user_for_update = (
         db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
     )
-    if user_for_update.transformations_limit != -1 and (
+    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
         user_for_update.transformations_used >= user_for_update.transformations_limit
     ):
         raise HTTPException(
@@ -163,8 +169,9 @@ def create_recipe(
         target_city=current_user.target_city,
     )
 
-    # Consume quota only for valid recipe creation
-    user_for_update.transformations_used += 1
+    # Consume quota only for valid recipe creation (unless unlimited)
+    if not _has_unlimited_quota(current_user):
+        user_for_update.transformations_used += 1
 
     db.add(recipe)
     db.commit()
@@ -236,6 +243,15 @@ def list_variants(
     return recipe.variants
 
 
+def _recipe_needs_relocalize(recipe: models.Recipe, user: models.User) -> bool:
+    """True if recipe locale differs from user's current settings (so re-localize is meaningful)."""
+    return (
+        (recipe.target_language or "").strip() != (user.target_language or "").strip()
+        or (recipe.target_country or "").strip() != (user.target_country or "").strip()
+        or (recipe.target_city or "").strip() != (user.target_city or "").strip()
+    )
+
+
 @router.post("/{recipe_id}/relocalize", response_model=schemas.RecipeOut)
 def relocalize_recipe(
     recipe_id: int,
@@ -245,6 +261,12 @@ def relocalize_recipe(
     recipe = db.get(models.Recipe, recipe_id)
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    if not _recipe_needs_relocalize(recipe, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Recipe is already in your current language and location. Change settings first if you want a different localization.",
+        )
 
     if not current_user.is_verified:
         raise HTTPException(
@@ -256,7 +278,7 @@ def relocalize_recipe(
     user_for_update = (
         db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
     )
-    if user_for_update.transformations_limit != -1 and (
+    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
         user_for_update.transformations_used >= user_for_update.transformations_limit
     ):
         raise HTTPException(
@@ -300,7 +322,8 @@ def relocalize_recipe(
     recipe.target_country = current_user.target_country
     recipe.target_city = current_user.target_city
 
-    user_for_update.transformations_used += 1
+    if not _has_unlimited_quota(current_user):
+        user_for_update.transformations_used += 1
     db.commit()
     db.refresh(recipe)
     return recipe
@@ -350,7 +373,7 @@ def adapt_recipe_endpoint(
                 "alternatives": [],
             }
 
-    if user_for_update.transformations_limit != -1 and (
+    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
         user_for_update.transformations_used >= user_for_update.transformations_limit
     ):
         raise HTTPException(
@@ -358,7 +381,8 @@ def adapt_recipe_endpoint(
             detail="You have reached the free recipes limit. Contact the administrator.",
         )
 
-    user_for_update.transformations_used += 1
+    if not _has_unlimited_quota(current_user):
+        user_for_update.transformations_used += 1
     db.commit()
 
     custom_instruction = (

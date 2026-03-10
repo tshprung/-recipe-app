@@ -97,8 +97,15 @@ function variantDisplayLabel(variantType, t) {
 export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { t } = useLanguage()
+
+  const needsRelocalize =
+    user &&
+    recipe &&
+    (recipe.target_language !== user.target_language ||
+      recipe.target_country !== user.target_country ||
+      (recipe.target_city || '').trim() !== (user.target_city || '').trim())
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -273,6 +280,7 @@ export default function RecipeDetailPage() {
   const hasNotes         = activeTab === 'original' && Object.keys(recipe.notes ?? {}).length > 0
   const contentTags      = activeTab === 'original' ? detectContentTags(recipe.ingredients_pl) : []
   const variantWarnings  = activeTab !== 'original' ? (displayData?.notes?.ostrzeżenia ?? []) : []
+  const adaptationSummary = activeTab !== 'original' ? (displayData?.notes?.adaptation_summary ?? '') : ''
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
@@ -290,19 +298,21 @@ export default function RecipeDetailPage() {
           ← {t('back')}
         </button>
 
-        <button
-          onClick={handleRelocalize}
-          disabled={relocalizeLoading || adaptLoading}
-          className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
-          title={t('relocalizeHint')}
-        >
-          {relocalizeLoading ? (
-            <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
-          ) : (
-            '🌍'
-          )}
-          {t('relocalize')}
-        </button>
+        {needsRelocalize && (
+          <button
+            onClick={handleRelocalize}
+            disabled={relocalizeLoading || adaptLoading}
+            className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
+            title={t('relocalizeHint')}
+          >
+            {relocalizeLoading ? (
+              <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
+            ) : (
+              '🌍'
+            )}
+            {t('relocalize')}
+          </button>
+        )}
 
         {/* Adapt dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -578,12 +588,22 @@ export default function RecipeDetailPage() {
       )}
 
       {/* Variant warnings (e.g. unsubstitutable ingredients flagged by the adaptation model) */}
-      {variantWarnings.length > 0 && (
-        <Section title={t('notes')} icon="⚠️">
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
-            {variantWarnings.map((msg, i) => (
-              <p key={i} className="text-sm text-amber-800">{msg}</p>
-            ))}
+      {(adaptationSummary || variantWarnings.length > 0) && activeTab !== 'original' && (
+        <Section title={t('notes')} icon="📝">
+          <div className="space-y-3">
+            {adaptationSummary && (
+              <div className="bg-stone-50 border border-stone-100 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-1.5">{t('adaptationSummary')}</p>
+                <p className="text-sm text-stone-700">{adaptationSummary}</p>
+              </div>
+            )}
+            {variantWarnings.length > 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 space-y-2">
+                {variantWarnings.map((msg, i) => (
+                  <p key={i} className="text-sm text-amber-800">{msg}</p>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
       )}
