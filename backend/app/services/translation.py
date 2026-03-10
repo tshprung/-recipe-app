@@ -6,6 +6,13 @@ from openai import APIError, OpenAI, RateLimitError
 DETECT_PROMPT = """\
 Detect the language of this recipe text. Reply with ONLY the ISO 639-1 two-letter code (e.g. he, pl, en, ar, es). Nothing else."""
 
+CLASSIFY_PROMPT = """\
+You are a classifier. Decide if the input is a cooking recipe (ingredients + steps) or not.
+
+Return ONLY valid JSON:
+{ "is_recipe": true|false }
+"""
+
 SYSTEM_PROMPT = (
     "You are a professional recipe translator. "
     "You translate recipes between any languages and adapt ingredients for the target market. "
@@ -54,7 +61,7 @@ Rules:
 - tags: 3–5 short tags in the target language.
 - substitutions: document substitutions (unavailable/brand → local equivalent). Omit universal ingredients.
 - notes: include ONLY keys explicitly mentioned in the source. Omit the rest.
-- If the input is not a recipe, extract what you can.
+- If the input is not a recipe, DO NOT invent steps. Keep output minimal and truthful.
 
 Recipe in {source_lang}:
 ---
@@ -79,6 +86,23 @@ def detect_language(raw_input: str, client: OpenAI) -> str:
     return code[:2] if len(code) >= 2 else code
 
 
+def _is_recipe(raw_input: str, client: OpenAI) -> bool:
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "user", "content": CLASSIFY_PROMPT + "\n\n" + (raw_input[:4000] or " ")},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    content = response.choices[0].message.content or "{}"
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        return True  # fail-open to avoid blocking valid recipes
+    return bool(data.get("is_recipe", True))
+
+
 def translate_recipe(
     raw_input: str,
     target_language: str,
@@ -95,6 +119,9 @@ def translate_recipe(
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
     client = OpenAI(api_key=api_key)
+
+    if not _is_recipe(raw_input, client):
+        raise ValueError("NOT_A_RECIPE: classifier=false")
     source_lang = detect_language(raw_input, client)
 
     try:

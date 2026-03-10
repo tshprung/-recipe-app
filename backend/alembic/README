@@ -1,0 +1,5 @@
+Alembic migrations live here.
+
+Railway deploy should run:
+  alembic -c backend/alembic.ini upgrade head
+

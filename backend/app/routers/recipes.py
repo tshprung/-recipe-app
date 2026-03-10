@@ -106,7 +106,12 @@ def create_recipe(
             detail="Verify your email before using the app.",
         )
 
-    # Quota check (before OpenAI)
+    if (payload.source_url or "").strip():
+        raw_input = _fetch_and_extract_text(payload.source_url.strip())
+    else:
+        raw_input = _sanitize_text(payload.raw_input or "", max_len=10000)
+
+    # Quota check (before OpenAI cost, but do not consume quota yet)
     user_for_update = (
         db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
     )
@@ -118,14 +123,6 @@ def create_recipe(
             detail="You have reached the free recipes limit. Contact the administrator.",
         )
 
-    user_for_update.transformations_used += 1
-    db.commit()
-
-    if (payload.source_url or "").strip():
-        raw_input = _fetch_and_extract_text(payload.source_url.strip())
-    else:
-        raw_input = _sanitize_text(payload.raw_input or "", max_len=10000)
-
     try:
         translated = translate_recipe(
             raw_input=raw_input,
@@ -133,6 +130,17 @@ def create_recipe(
             target_country=current_user.target_country,
             target_city=current_user.target_city,
         )
+    except ValueError as e:
+        msg = str(e) or ""
+        if msg.startswith("NOT_A_RECIPE:"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This doesn't look like a recipe. Please paste the ingredients + steps, or try a different URL. "
+                    "If you think this is a mistake, contact tshprung.us@gmail.com."
+                ),
+            )
+        raise
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
@@ -152,7 +160,12 @@ def create_recipe(
         detected_language=translated.get("detected_language"),
         target_language=current_user.target_language,
         target_country=current_user.target_country,
+        target_city=current_user.target_city,
     )
+
+    # Consume quota only for valid recipe creation
+    user_for_update.transformations_used += 1
+
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
@@ -221,6 +234,76 @@ def list_variants(
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     return recipe.variants
+
+
+@router.post("/{recipe_id}/relocalize", response_model=schemas.RecipeOut)
+def relocalize_recipe(
+    recipe_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email before using the app.",
+        )
+
+    # Quota check before OpenAI cost, but do not consume quota yet
+    user_for_update = (
+        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    )
+    if user_for_update.transformations_limit != -1 and (
+        user_for_update.transformations_used >= user_for_update.transformations_limit
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="You have reached the free recipes limit. Contact the administrator.",
+        )
+
+    try:
+        translated = translate_recipe(
+            raw_input=recipe.raw_input,
+            target_language=current_user.target_language,
+            target_country=current_user.target_country,
+            target_city=current_user.target_city,
+        )
+    except ValueError as e:
+        msg = str(e) or ""
+        if msg.startswith("NOT_A_RECIPE:"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This doesn't look like a recipe. If you think this is a mistake, "
+                    "contact tshprung.us@gmail.com."
+                ),
+            )
+        raise
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Translation failed: {e}")
+
+    recipe.title_pl = translated.get("title_pl", recipe.title_pl)
+    recipe.title_original = translated.get("title_original", recipe.title_original)
+    recipe.ingredients_pl = translated.get("ingredients_pl", recipe.ingredients_pl)
+    recipe.ingredients_original = translated.get("ingredients_original", recipe.ingredients_original)
+    recipe.steps_pl = translated.get("steps_pl", recipe.steps_pl)
+    recipe.tags = translated.get("tags", recipe.tags)
+    recipe.substitutions = translated.get("substitutions", recipe.substitutions)
+    recipe.notes = translated.get("notes", recipe.notes)
+    recipe.detected_language = translated.get("detected_language", recipe.detected_language)
+    recipe.target_language = current_user.target_language
+    recipe.target_country = current_user.target_country
+    recipe.target_city = current_user.target_city
+
+    user_for_update.transformations_used += 1
+    db.commit()
+    db.refresh(recipe)
+    return recipe
 
 
 def _normalize_adapt_types(payload: schemas.AdaptRequest) -> list[str]:

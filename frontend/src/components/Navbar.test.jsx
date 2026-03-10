@@ -43,11 +43,9 @@ describe('Navbar', () => {
     expect(screen.getByText('Recipe translation')).toBeInTheDocument()
   })
 
-  it('renders language selector with EN, HE, PL options', () => {
+  it('does not render UI language selector on main pages', () => {
     renderNavbar()
-    expect(screen.getByTitle('English')).toBeInTheDocument()
-    expect(screen.getByTitle('עברית')).toBeInTheDocument()
-    expect(screen.getByTitle('Polski')).toBeInTheDocument()
+    expect(screen.queryByTitle('English')).not.toBeInTheDocument()
   })
 
   it('renders shopping list button', () => {

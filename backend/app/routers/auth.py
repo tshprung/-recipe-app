@@ -64,6 +64,10 @@ def register(
     user = models.User(
         email=payload.email,
         password_hash=hash_password_from_prehashed(payload.password_hash),
+        ui_language=(payload.ui_language or "en"),
+        target_language=payload.target_language,
+        target_country=payload.target_country,
+        target_city=payload.target_city,
     )
 
     # Generate verification token (24h expiry)

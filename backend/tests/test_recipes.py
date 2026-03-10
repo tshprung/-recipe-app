@@ -44,7 +44,15 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "b@example.com", "password_hash": password_hash("bpass1234"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "b@example.com",
+                "password_hash": password_hash("bpass1234"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -72,7 +80,15 @@ def test_get_recipe_other_user_returns_404(client, auth_headers):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "other@example.com", "password_hash": password_hash("opass1234"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "other@example.com",
+                "password_hash": password_hash("opass1234"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     r = client.post("/api/auth/login", json={"email": "other@example.com", "password_hash": password_hash("opass1234")})
     other_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -264,3 +280,58 @@ def test_create_recipe_saves_detected_language(client, auth_headers):
         )
     assert r.status_code == 201
     assert r.json().get("detected_language") == "he"
+
+
+def test_create_recipe_not_a_recipe_returns_422_and_does_not_consume_quota(client, auth_headers, registered_user):
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        user.transformations_used = 0
+        user.transformations_limit = 5
+        db.commit()
+    finally:
+        db.close()
+
+    with patch("app.routers.recipes.translate_recipe", side_effect=ValueError("NOT_A_RECIPE: classifier=false")):
+        r = client.post(
+            "/api/recipes/",
+            json={"raw_input": "hello this is not a recipe"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 422
+    assert "doesn't look like a recipe" in r.json()["detail"].lower()
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        assert user.transformations_used == 0
+    finally:
+        db.close()
+
+
+def test_relocalize_updates_recipe_and_consumes_quota(client, auth_headers, registered_user, recipe):
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        user.transformations_used = 0
+        user.transformations_limit = 5
+        db.commit()
+    finally:
+        db.close()
+
+    relocalized = dict(MOCK_TRANSLATED)
+    relocalized["title_pl"] = "Zupa Pomidorowa (PL 2)"
+    relocalized["ingredients_pl"] = ["1 pomidor"]
+    with patch("app.routers.recipes.translate_recipe", return_value=relocalized):
+        r = client.post(f"/api/recipes/{recipe['id']}/relocalize", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["title_pl"] == "Zupa Pomidorowa (PL 2)"
+    assert data["ingredients_pl"] == ["1 pomidor"]
+
+    db = TestSessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == registered_user["email"]).first()
+        assert user.transformations_used == 1
+    finally:
+        db.close()

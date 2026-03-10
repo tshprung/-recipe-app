@@ -75,7 +75,15 @@ def test_shopping_list_is_per_user(client, auth_headers, recipe):
     ):
         client.post(
             "/api/auth/register",
-            json={"email": "b@example.com", "password_hash": password_hash("bpass1234"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "b@example.com",
+                "password_hash": password_hash("bpass1234"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}

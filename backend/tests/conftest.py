@@ -99,6 +99,10 @@ def registered_user(client):
                 "email": SAMPLE_EMAIL,
                 "password_hash": password_hash(SAMPLE_PASSWORD),
                 "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
             },
         )
     assert r.status_code == 201

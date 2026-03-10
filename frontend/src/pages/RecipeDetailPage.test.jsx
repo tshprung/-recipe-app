@@ -152,6 +152,24 @@ describe('RecipeDetailPage — adaptation', () => {
   })
 })
 
+describe('RecipeDetailPage — re-localize', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.get.mockImplementation(path =>
+      path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
+    )
+  })
+
+  it('shows Re-localize button and calls POST /recipes/1/relocalize', async () => {
+    api.post.mockResolvedValue({ ...MOCK_RECIPE, title_pl: 'Zupa Pomidorowa 2' })
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+
+    await userEvent.click(screen.getByRole('button', { name: /Re-localize/ }))
+    expect(api.post).toHaveBeenCalledWith('/recipes/1/relocalize', {})
+  })
+})
+
 describe('RecipeDetailPage — error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()

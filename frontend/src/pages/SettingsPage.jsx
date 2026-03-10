@@ -37,9 +37,10 @@ function SettingsCard({ icon, title, children }) {
 
 export default function SettingsPage() {
   const { user, setUser, logout } = useAuth()
-  const { t } = useLanguage()
+  const { t, lang, setLang } = useLanguage()
   const navigate = useNavigate()
   const [form, setForm] = useState({
+    ui_language: user?.ui_language ?? 'en',
     target_language: user?.target_language ?? 'pl',
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
@@ -60,6 +61,9 @@ export default function SettingsPage() {
     try {
       const updated = await api.patch('/users/me/settings', form)
       setUser(updated)
+      if (updated?.ui_language && updated.ui_language !== lang) {
+        setLang(updated.ui_language)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {
@@ -77,11 +81,30 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <SettingsCard icon="🗣️" title={t('language')}>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+            <select
+              value={form.ui_language}
+              onChange={e => setForm(f => ({ ...f, ui_language: e.target.value }))}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            >
+              <option value="en">English</option>
+              <option value="he">עברית</option>
+              <option value="pl">Polski</option>
+            </select>
+          </div>
+        </SettingsCard>
+
         <SettingsCard icon="🌐" title={t('translateTo')}>
           <Field label={t('language')} hint={t('hintLanguage')} value={form.target_language} onChange={set('target_language')} />
           <Field label={t('country')}  hint={t('hintCountry')} value={form.target_country}  onChange={set('target_country')}  />
           <Field label={t('city')}     hint={t('hintCity')} value={form.target_city}     onChange={set('target_city')}     />
         </SettingsCard>
+
+        <p className="text-xs text-stone-400 px-1">
+          Changes affect recipes you add next, diet adaptations you run next, and re-localizations you run next.
+        </p>
 
         {error && (
           <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">

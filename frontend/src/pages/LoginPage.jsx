@@ -6,11 +6,15 @@ import { useLanguage } from '../context/LanguageContext'
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
 export default function LoginPage() {
-  const { lang, setLang, t } = useLanguage()
+  const { t } = useLanguage()
   const [tab, setTab] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [uiLanguage, setUiLanguage] = useState('en')
+  const [targetLanguage, setTargetLanguage] = useState('pl')
+  const [targetCountry, setTargetCountry] = useState('PL')
+  const [targetCity, setTargetCity] = useState('Wrocław')
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
@@ -100,7 +104,12 @@ export default function LoginPage() {
       if (tab === 'login') {
         await login(email, password)
       } else {
-        await register(email, password, turnstileToken || null)
+        await register(email, password, turnstileToken || null, {
+          ui_language: uiLanguage,
+          target_language: targetLanguage,
+          target_country: targetCountry,
+          target_city: targetCity,
+        })
         alert(t('verificationEmailSent'))
       }
     } catch (err) {
@@ -118,20 +127,6 @@ export default function LoginPage() {
       <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-rose-200/20 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative bg-white rounded-3xl shadow-2xl shadow-orange-100 w-full max-w-md p-8">
-        {/* Language switcher */}
-        <div className="absolute top-4 right-4 flex rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
-          {['en', 'he', 'pl'].map(l => (
-            <button
-              key={l}
-              type="button"
-              onClick={() => setLang(l)}
-              className={`px-2 py-1 text-xs font-bold uppercase ${lang === l ? 'bg-amber-500 text-white' : 'text-stone-500 hover:bg-stone-100'}`}
-            >
-              {l === 'he' ? 'עב' : l.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-lg shadow-orange-200 text-3xl mb-4">
@@ -217,6 +212,57 @@ export default function LoginPage() {
               </div>
             </div>
           )}
+
+          {tab === 'register' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+                <select
+                  value={uiLanguage}
+                  onChange={e => setUiLanguage(e.target.value)}
+                  className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                >
+                  <option value="en">English</option>
+                  <option value="he">עברית</option>
+                  <option value="pl">Polski</option>
+                </select>
+                <p className="text-xs text-stone-400 mt-1.5">{t('language')}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('translateTo')}</label>
+                  <input
+                    value={targetLanguage}
+                    onChange={e => setTargetLanguage(e.target.value)}
+                    placeholder={t('hintLanguage')}
+                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('country')}</label>
+                  <input
+                    value={targetCountry}
+                    onChange={e => setTargetCountry(e.target.value)}
+                    placeholder={t('hintCountry')}
+                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('city')}</label>
+                  <input
+                    value={targetCity}
+                    onChange={e => setTargetCity(e.target.value)}
+                    placeholder={t('hintCity')}
+                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === 'register' && (
             <div className="flex justify-center min-h-[65px]" ref={turnstileContainerRef} />
           )}

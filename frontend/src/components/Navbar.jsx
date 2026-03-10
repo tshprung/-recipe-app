@@ -5,7 +5,7 @@ import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
-  const { lang, setLang, t } = useLanguage()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const { recipeIds, openPanel } = useShoppingList()
@@ -45,23 +45,6 @@ export default function Navbar() {
 
         {/* Right side: touch-friendly min sizes, responsive gaps */}
         <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-          {/* Language selector */}
-          <div className="flex items-center rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
-            {(['en', 'he', 'pl']).map(l => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => setLang(l)}
-                className={`min-h-[44px] min-w-[36px] px-2 sm:px-2.5 py-2 sm:py-1.5 text-xs font-bold uppercase transition-colors ${
-                  lang === l ? 'bg-amber-500 text-white' : 'text-stone-500 hover:bg-stone-100'
-                }`}
-                title={l === 'en' ? 'English' : l === 'he' ? 'עברית' : 'Polski'}
-              >
-                {l === 'he' ? 'עב' : l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
           {/* Shopping list button */}
           <button
             onClick={openPanel}

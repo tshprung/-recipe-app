@@ -8,6 +8,10 @@ class UserRegister(BaseModel):
     email: EmailStr
     password_hash: str = Field(min_length=1)
     captcha_token: str | None = None
+    ui_language: str | None = "en"
+    target_language: str
+    target_country: str
+    target_city: str
 
 
 class UserLogin(BaseModel):
@@ -23,6 +27,7 @@ class Token(BaseModel):
 # --- User ---
 
 class UserSettings(BaseModel):
+    ui_language: str
     target_language: str
     target_country: str
     target_city: str
@@ -31,6 +36,7 @@ class UserSettings(BaseModel):
 class UserOut(BaseModel):
     id: int
     email: str
+    ui_language: str
     target_language: str
     target_country: str
     target_city: str
@@ -77,6 +83,7 @@ class RecipeOut(BaseModel):
     detected_language: str | None
     target_language: str
     target_country: str
+    target_city: str
     created_at: datetime
 
     model_config = {"from_attributes": True}

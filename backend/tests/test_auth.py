@@ -12,7 +12,15 @@ def test_register_success(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "new@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "new@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
     data = r.json()
@@ -27,7 +35,15 @@ def test_register_sends_verification_email(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "verify@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
     data = r.json()
@@ -39,7 +55,15 @@ def test_register_sends_verification_email(client):
 
 
 def test_register_duplicate_email(client):
-    payload = {"email": "dup@example.com", "password_hash": password_hash("password8"), "captcha_token": CAPTCHA_DUMMY}
+    payload = {
+        "email": "dup@example.com",
+        "password_hash": password_hash("password8"),
+        "captcha_token": CAPTCHA_DUMMY,
+        "ui_language": "en",
+        "target_language": "pl",
+        "target_country": "PL",
+        "target_city": "Wrocław",
+    }
     with patch("app.routers.auth.send_verification_email"), patch(
         "app.routers.auth._verify_turnstile", return_value=True
     ):
@@ -92,7 +116,15 @@ def test_unverified_user_cannot_transform_recipe(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "unverified@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "unverified@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
 
@@ -177,7 +209,15 @@ def test_verify_email_marks_user_verified_and_clears_token(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "verify-me@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "verify-me@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
 
@@ -210,7 +250,15 @@ def test_verify_email_handles_naive_expiry_datetime(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "naive-expiry@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "naive-expiry@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
 
@@ -242,7 +290,15 @@ def test_verify_email_rejects_expired_token(client):
     ):
         r = client.post(
             "/api/auth/register",
-            json={"email": "expired@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "expired@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     assert r.status_code == 201
 
@@ -268,7 +324,15 @@ def test_register_returns_503_when_verification_email_fails(client):
         mock_send.side_effect = RuntimeError("Resend unavailable")
         r = client.post(
             "/api/auth/register",
-            json={"email": "fail-email@example.com", "password_hash": password_hash("mypassword"), "captcha_token": CAPTCHA_DUMMY},
+            json={
+                "email": "fail-email@example.com",
+                "password_hash": password_hash("mypassword"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
         )
     # User is created then we try to send email; send fails -> 503
     assert r.status_code == 503

@@ -118,6 +118,10 @@ export default function RecipeDetailPage() {
   const [adaptError, setAdaptError] = useState(null)
   const dropdownRef = useRef(null)
 
+  // Re-localize state
+  const [relocalizeLoading, setRelocalizeLoading] = useState(false)
+  const [relocalizeToast, setRelocalizeToast] = useState(null)
+
   useEffect(() => {
     Promise.all([
       api.get(`/recipes/${id}`),
@@ -229,6 +233,24 @@ export default function RecipeDetailPage() {
     }
   }
 
+  async function handleRelocalize() {
+    setRelocalizeLoading(true)
+    setAdaptDropdownOpen(false)
+    try {
+      const updated = await api.post(`/recipes/${id}/relocalize`, {})
+      setRecipe(updated)
+      setActiveTab('original')
+      setRelocalizeToast(t('relocalized'))
+      setTimeout(() => setRelocalizeToast(null), 2500)
+      await refreshUser()
+    } catch (e) {
+      setRelocalizeToast(e.message || t('failedToRelocalize'))
+      setTimeout(() => setRelocalizeToast(null), 3500)
+    } finally {
+      setRelocalizeLoading(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex justify-center py-20">
       <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -254,6 +276,11 @@ export default function RecipeDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
+      {relocalizeToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-stone-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg pointer-events-none">
+          {relocalizeToast}
+        </div>
+      )}
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6 gap-3">
         <button
@@ -261,6 +288,20 @@ export default function RecipeDetailPage() {
           className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 bg-white hover:bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-xl transition-colors flex-shrink-0"
         >
           ← {t('back')}
+        </button>
+
+        <button
+          onClick={handleRelocalize}
+          disabled={relocalizeLoading || adaptLoading}
+          className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
+          title={t('relocalizeHint')}
+        >
+          {relocalizeLoading ? (
+            <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
+          ) : (
+            '🌍'
+          )}
+          {t('relocalize')}
         </button>
 
         {/* Adapt dropdown */}

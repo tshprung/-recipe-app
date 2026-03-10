@@ -32,6 +32,7 @@ class User(Base):
     )
 
     # Translation settings (target only; source is auto-detected per recipe)
+    ui_language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     target_language: Mapped[str] = mapped_column(String(10), default="pl", nullable=False)
     target_country: Mapped[str] = mapped_column(String(10), default="PL", nullable=False)
     target_city: Mapped[str] = mapped_column(String(100), default="Wrocław", nullable=False)
@@ -70,6 +71,7 @@ class Recipe(Base):
     detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     target_language: Mapped[str] = mapped_column(String(10), nullable=False)
     target_country: Mapped[str] = mapped_column(String(10), nullable=False)
+    target_city: Mapped[str] = mapped_column(String(100), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

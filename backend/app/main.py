@@ -2,59 +2,15 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import text
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from .database import engine, Base
+from .database import engine
 from .routers import auth, users, recipes, shopping_lists, substitutions, admin
 
-# Create tables on startup (dev convenience; use Alembic for production)
-Base.metadata.create_all(bind=engine)
-
-
-def _run_migrations(engine):
-    """Best-effort lightweight migrations for dev SQLite DB."""
-    with engine.connect() as conn:
-        statements = [
-            # Ingredient substitutions (older migration)
-            "ALTER TABLE ingredient_substitutions ADD COLUMN created_by_user_id INTEGER REFERENCES users(id)",
-            "ALTER TABLE ingredient_substitutions ADD COLUMN created_at DATETIME",
-            # User quota / verification / security columns
-            "ALTER TABLE users ADD COLUMN transformations_used INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE users ADD COLUMN transformations_limit INTEGER NOT NULL DEFAULT 5",
-            "ALTER TABLE users ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT 0",
-            "ALTER TABLE users ADD COLUMN verification_token VARCHAR(255)",
-            "ALTER TABLE users ADD COLUMN verification_token_expires DATETIME",
-            "ALTER TABLE users ADD COLUMN account_tier VARCHAR(50) NOT NULL DEFAULT 'free'",
-            "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE users ADD COLUMN lockout_until DATETIME",
-            # Remove source language; add detected_language on recipes (SQLite 3.35+ for DROP COLUMN)
-            "ALTER TABLE recipes ADD COLUMN detected_language VARCHAR(10)",
-        ]
-        for sql in statements:
-            try:
-                conn.execute(text(sql))
-                conn.commit()
-            except Exception:
-                pass
-        # Drop columns (SQLite 3.35+); ignore if not supported
-        for sql in [
-            "ALTER TABLE recipes DROP COLUMN source_language",
-            "ALTER TABLE recipes DROP COLUMN source_country",
-            "ALTER TABLE users DROP COLUMN source_language",
-            "ALTER TABLE users DROP COLUMN source_country",
-        ]:
-            try:
-                conn.execute(text(sql))
-                conn.commit()
-            except Exception:
-                pass
-
-
-_run_migrations(engine)
+# DB schema is managed via Alembic migrations (production) or test fixtures (tests).
 
 limiter = Limiter(
     key_func=get_remote_address,
