@@ -163,6 +163,20 @@ class DeleteVariantRequest(BaseModel):
     variant_type: str  # e.g. "vegetarian" or "vegetarian,kosher"
 
 
+class IngredientAlternativesRequest(BaseModel):
+    ingredient: str  # the ingredient line or name to find alternatives for
+    diet_filters: list[str] | None = None  # e.g. ["vegan", "dairy_free"]; empty = no diet filter
+
+
+class IngredientAlternativeOut(BaseModel):
+    name: str
+    notes: str | None = None
+
+
+class IngredientAlternativesOut(BaseModel):
+    alternatives: list[IngredientAlternativeOut]
+
+
 class SubstitutionReportRequest(BaseModel):
     original_label: str
     better_substitution: str

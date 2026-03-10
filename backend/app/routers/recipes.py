@@ -11,6 +11,7 @@ from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
 from ..services.adaptation import adapt_recipe
+from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.translation import translate_recipe
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -391,12 +392,16 @@ def adapt_recipe_endpoint(
         else None
     )
 
+    target_lang = (current_user.target_language or "").strip() or "en"
+
     try:
         if len(types) > 1:
             # Chain adaptations: apply each diet in order
             current = recipe
             for t in types:
-                result = adapt_recipe(current, t, custom_instruction=None)
+                result = adapt_recipe(
+                    current, t, custom_instruction=None, target_language=target_lang
+                )
                 if not result.get("can_adapt"):
                     return {
                         "can_adapt": False,
@@ -414,7 +419,9 @@ def adapt_recipe_endpoint(
             title_pl = result["title_pl"]
         else:
             single_type = types[0]
-            result = adapt_recipe(recipe, single_type, custom_instruction)
+            result = adapt_recipe(
+                recipe, single_type, custom_instruction, target_language=target_lang
+            )
             if not result.get("can_adapt"):
                 return {
                     "can_adapt": False,
@@ -455,6 +462,56 @@ def adapt_recipe_endpoint(
         "variant": schemas.RecipeVariantOut.model_validate(variant),
         "alternatives": [],
     }
+
+
+@router.post(
+    "/{recipe_id}/ingredient-alternatives",
+    response_model=schemas.IngredientAlternativesOut,
+)
+def ingredient_alternatives(
+    recipe_id: int,
+    payload: schemas.IngredientAlternativesRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Get alternative ingredients for a given ingredient, optionally filtered by diet. Consumes one transformation."""
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email before using the app.",
+        )
+
+    user_for_update = (
+        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    )
+    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
+        user_for_update.transformations_used >= user_for_update.transformations_limit
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="You have reached the free recipes limit. Contact the administrator.",
+        )
+
+    if not _has_unlimited_quota(current_user):
+        user_for_update.transformations_used += 1
+    db.commit()
+
+    target_lang = (current_user.target_language or "").strip() or "en"
+    try:
+        alternatives = get_ingredient_alternatives(
+            ingredient=payload.ingredient,
+            diet_filters=payload.diet_filters or None,
+            target_language=target_lang,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+
+    return schemas.IngredientAlternativesOut(
+        alternatives=[schemas.IngredientAlternativeOut(name=a["name"], notes=a.get("notes")) for a in alternatives],
+    )
 
 
 @router.delete("/{recipe_id}/variants", status_code=status.HTTP_204_NO_CONTENT)

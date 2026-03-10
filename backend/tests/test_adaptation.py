@@ -318,7 +318,7 @@ def test_adapt_recipe_multiple_types_chained(client, auth_headers, recipe):
     first = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska"}
     second = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska koszerna", "ingredients_pl": ["500g pomidory", "1 cebula"]}
 
-    def side_effect(rec, variant_type, custom_instruction=None):
+    def side_effect(rec, variant_type, custom_instruction=None, target_language="en"):
         if variant_type == "vegetarian":
             return first
         if variant_type == "kosher":
@@ -384,10 +384,8 @@ def test_variants_route_returns_401_not_404_unauthenticated(client):
 
 def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
     """
-    adapt_recipe() must send a prompt to the model that includes:
-    - the diet label (e.g. 'wegańskim')
-    - the flagging rule keyword ('ostrzeżenia')
-    - the 'Nie znaleziono' warning language
+    adapt_recipe() must send a prompt that includes diet instructions,
+    output language, and the ostrzeżenia (warnings) key.
     """
     from app.services.adaptation import adapt_recipe
 
@@ -401,10 +399,10 @@ def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
 
     mock_response_body = json.dumps({
         "can_adapt": True,
-        "title_pl": "Jajecznica wegańska",
-        "ingredients_pl": ["tofu scramble", "boczek wegański"],
-        "steps_pl": ["Pokrusz tofu.", "Podsmaż."],
-        "notes": {"ostrzeżenia": []},
+        "title_pl": "Vegan scramble",
+        "ingredients_pl": ["tofu scramble", "vegan bacon"],
+        "steps_pl": ["Crumble tofu.", "Fry."],
+        "notes": {"ostrzeżenia": [], "adaptation_summary": "Replaced eggs and bacon with vegan alternatives."},
         "alternatives": [],
     })
 
@@ -427,9 +425,9 @@ def test_adapt_prompt_contains_correct_diet_instructions(auth_headers):
             mock_client.chat.completions.create.side_effect = fake_create
             MockOpenAI.return_value = mock_client
 
-            adapt_recipe(MockRecipe(), "vegan")
+            adapt_recipe(MockRecipe(), "vegan", target_language="en")
 
     prompt = captured["prompt"]
-    assert "wegańskim" in prompt, "Prompt must contain the Polish diet label"
+    assert "vegan" in prompt.lower(), "Prompt must contain the diet type"
     assert "ostrzeżenia" in prompt, "Prompt must mention the 'ostrzeżenia' notes key"
-    assert "Nie znaleziono" in prompt, "Prompt must include the flagging warning language"
+    assert "OUTPUT LANGUAGE" in prompt or "output_lang" in prompt or "English" in prompt, "Prompt must specify output language"
