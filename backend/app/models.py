@@ -36,6 +36,7 @@ class User(Base):
     target_language: Mapped[str] = mapped_column(String(10), default="pl", nullable=False)
     target_country: Mapped[str] = mapped_column(String(10), default="PL", nullable=False)
     target_city: Mapped[str] = mapped_column(String(100), default="Wrocław", nullable=False)
+    target_zip: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

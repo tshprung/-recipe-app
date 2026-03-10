@@ -68,6 +68,7 @@ def register(
         target_language=payload.target_language,
         target_country=payload.target_country,
         target_city=payload.target_city,
+        target_zip=payload.target_zip,
     )
 
     # Generate verification token (24h expiry)

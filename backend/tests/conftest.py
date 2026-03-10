@@ -103,6 +103,7 @@ def registered_user(client):
                 "target_language": "pl",
                 "target_country": "PL",
                 "target_city": "Wrocław",
+                "target_zip": "50-001",
             },
         )
     assert r.status_code == 201

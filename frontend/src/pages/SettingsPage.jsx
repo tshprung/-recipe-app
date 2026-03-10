@@ -44,7 +44,9 @@ export default function SettingsPage() {
     target_language: user?.target_language ?? 'pl',
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
+    target_zip:      user?.target_zip      ?? '',
   })
+  const [zipStatus, setZipStatus] = useState(null) // null | 'loading' | 'ok' | 'error'
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
   const [error, setError]   = useState('')
@@ -70,6 +72,22 @@ export default function SettingsPage() {
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function resolveZipToCity() {
+    const zip = (form.target_zip || '').trim()
+    const country = (form.target_country || '').trim()
+    if (!zip || !country) return
+    setZipStatus('loading')
+    try {
+      const data = await api.get(`/meta/resolve-city?country=${encodeURIComponent(country)}&zip=${encodeURIComponent(zip)}`)
+      if (data?.city) setForm(f => ({ ...f, target_city: data.city }))
+      setZipStatus('ok')
+      setTimeout(() => setZipStatus(null), 2000)
+    } catch (_) {
+      setZipStatus('error')
+      setTimeout(() => setZipStatus(null), 3500)
     }
   }
 
@@ -99,6 +117,21 @@ export default function SettingsPage() {
         <SettingsCard icon="🌐" title={t('translateTo')}>
           <Field label={t('language')} hint={t('hintLanguage')} value={form.target_language} onChange={set('target_language')} />
           <Field label={t('country')}  hint={t('hintCountry')} value={form.target_country}  onChange={set('target_country')}  />
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+              ZIP
+              <span className="ml-1.5 text-xs font-normal text-stone-400">(postal code)</span>
+            </label>
+            <input
+              type="text"
+              value={form.target_zip}
+              onChange={e => setForm(f => ({ ...f, target_zip: e.target.value }))}
+              onBlur={resolveZipToCity}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            />
+            {zipStatus === 'loading' && <p className="text-xs text-stone-400 mt-1">Looking up city…</p>}
+            {zipStatus === 'error' && <p className="text-xs text-red-600 mt-1">Could not resolve city from ZIP.</p>}
+          </div>
           <Field label={t('city')}     hint={t('hintCity')} value={form.target_city}     onChange={set('target_city')}     />
         </SettingsCard>
 

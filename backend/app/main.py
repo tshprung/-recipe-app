@@ -8,7 +8,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from .database import engine
-from .routers import auth, users, recipes, shopping_lists, substitutions, admin
+from .routers import auth, users, recipes, shopping_lists, substitutions, admin, meta
 
 # DB schema is managed via Alembic migrations (production) or test fixtures (tests).
 
@@ -82,6 +82,7 @@ app.include_router(recipes.router)
 app.include_router(shopping_lists.router)
 app.include_router(substitutions.router)
 app.include_router(admin.router)
+app.include_router(meta.router)
 
 
 @app.get("/health")

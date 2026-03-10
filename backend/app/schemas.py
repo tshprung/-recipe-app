@@ -12,6 +12,7 @@ class UserRegister(BaseModel):
     target_language: str
     target_country: str
     target_city: str
+    target_zip: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -31,6 +32,7 @@ class UserSettings(BaseModel):
     target_language: str
     target_country: str
     target_city: str
+    target_zip: str | None = None
 
 
 class UserOut(BaseModel):
@@ -40,6 +42,7 @@ class UserOut(BaseModel):
     target_language: str
     target_country: str
     target_city: str
+    target_zip: str | None = None
     transformations_used: int
     transformations_limit: int
     is_verified: bool

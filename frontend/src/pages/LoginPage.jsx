@@ -1,9 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { api } from '../api/client'
 
 // Use Cloudflare test key so widget always shows when no real key is set
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
+
+const COUNTRIES = [
+  { code: 'PL', name: 'Poland' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+]
+
+const TARGET_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'he', name: 'עברית' },
+]
 
 export default function LoginPage() {
   const { t } = useLanguage()
@@ -15,6 +33,8 @@ export default function LoginPage() {
   const [targetLanguage, setTargetLanguage] = useState('pl')
   const [targetCountry, setTargetCountry] = useState('PL')
   const [targetCity, setTargetCity] = useState('Wrocław')
+  const [targetZip, setTargetZip] = useState('50-001')
+  const [zipStatus, setZipStatus] = useState(null) // null | 'loading' | 'ok' | 'error'
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
@@ -109,6 +129,7 @@ export default function LoginPage() {
           target_language: targetLanguage,
           target_country: targetCountry,
           target_city: targetCity,
+          target_zip: targetZip || null,
         })
         alert(t('verificationEmailSent'))
       }
@@ -116,6 +137,20 @@ export default function LoginPage() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function resolveZipToCity() {
+    if (!targetZip.trim() || !targetCountry.trim()) return
+    setZipStatus('loading')
+    try {
+      const data = await api.get(`/meta/resolve-city?country=${encodeURIComponent(targetCountry)}&zip=${encodeURIComponent(targetZip.trim())}`)
+      if (data?.city) setTargetCity(data.city)
+      setZipStatus('ok')
+      setTimeout(() => setZipStatus(null), 2000)
+    } catch (_) {
+      setZipStatus('error')
+      setTimeout(() => setZipStatus(null), 3500)
     }
   }
 
@@ -216,7 +251,7 @@ export default function LoginPage() {
           {tab === 'register' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+                <label className="block text-sm font-semibold text-stone-600 mb-1.5">Site language</label>
                 <select
                   value={uiLanguage}
                   onChange={e => setUiLanguage(e.target.value)}
@@ -226,39 +261,60 @@ export default function LoginPage() {
                   <option value="he">עברית</option>
                   <option value="pl">Polski</option>
                 </select>
-                <p className="text-xs text-stone-400 mt-1.5">{t('language')}</p>
+                <p className="text-xs text-stone-400 mt-1.5">You can change this later in Settings.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('translateTo')}</label>
-                  <input
+                  <select
                     value={targetLanguage}
                     onChange={e => setTargetLanguage(e.target.value)}
-                    placeholder={t('hintLanguage')}
                     className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
                     required
-                  />
+                  >
+                    {TARGET_LANGUAGES.map(l => (
+                      <option key={l.code} value={l.code}>{l.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('country')}</label>
-                  <input
+                  <select
                     value={targetCountry}
                     onChange={e => setTargetCountry(e.target.value)}
-                    placeholder={t('hintCountry')}
                     className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
                     required
-                  />
+                  >
+                    {COUNTRIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('city')}</label>
+                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">ZIP</label>
                   <input
-                    value={targetCity}
-                    onChange={e => setTargetCity(e.target.value)}
-                    placeholder={t('hintCity')}
+                    value={targetZip}
+                    onChange={e => setTargetZip(e.target.value)}
+                    onBlur={resolveZipToCity}
+                    placeholder="e.g. 50-001"
                     className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
                     required
                   />
+                  {zipStatus === 'loading' && <p className="text-xs text-stone-400 mt-1">Looking up city…</p>}
+                  {zipStatus === 'error' && <p className="text-xs text-red-600 mt-1">Could not resolve city from ZIP.</p>}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('city')}</label>
+                <input
+                  value={targetCity}
+                  onChange={e => setTargetCity(e.target.value)}
+                  placeholder={t('hintCity')}
+                  className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                  required
+                />
+                <p className="text-xs text-stone-400 mt-1.5">Auto-filled from ZIP. You can adjust if needed.</p>
               </div>
             </div>
           )}
