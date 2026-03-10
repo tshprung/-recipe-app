@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 # Copy the whole project (backend + frontend, though we only run backend here)
 COPY . .
 
-EXPOSE 8000
+# Railway injects PORT (e.g. 8080). App listens on $PORT; proxy must use same port.
+EXPOSE 8080
 
-CMD ["sh", "-c", "alembic -c backend/alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --app-dir backend"]
+CMD ["sh", "backend/scripts/railway_start.sh"]
 
