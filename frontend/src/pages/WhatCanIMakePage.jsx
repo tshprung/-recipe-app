@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
 const DIET_OPTIONS = [
@@ -11,6 +12,7 @@ const DIET_OPTIONS = [
 
 export default function WhatCanIMakePage() {
   const { t } = useLanguage()
+  const { refreshUser } = useAuth()
   const navigate = useNavigate()
   const [ingredientsText, setIngredientsText] = useState('')
   const [dietFilters, setDietFilters] = useState([])
@@ -50,6 +52,7 @@ export default function WhatCanIMakePage() {
       .then(data => {
         setResult(data)
         setLoading(false)
+        if (data?.source === 'ai') refreshUser()
       })
       .catch(e => {
         setError(e.message || t('somethingWentWrong'))
