@@ -4,6 +4,23 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
 
+const TARGET_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'he', name: 'עברית' },
+]
+
+const COUNTRIES = [
+  { code: 'PL', name: 'Poland' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+]
+
 function Field({ label, hint, value, onChange }) {
   return (
     <div>
@@ -115,8 +132,30 @@ export default function SettingsPage() {
         </SettingsCard>
 
         <SettingsCard icon="🌐" title={t('translateTo')}>
-          <Field label={t('language')} hint={t('hintLanguage')} value={form.target_language} onChange={set('target_language')} />
-          <Field label={t('country')}  hint={t('hintCountry')} value={form.target_country}  onChange={set('target_country')}  />
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+            <select
+              value={form.target_language}
+              onChange={e => setForm(f => ({ ...f, target_language: e.target.value }))}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            >
+              {TARGET_LANGUAGES.map(l => (
+                <option key={l.code} value={l.code}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('country')}</label>
+            <select
+              value={form.target_country}
+              onChange={e => setForm(f => ({ ...f, target_country: e.target.value }))}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            >
+              {COUNTRIES.map(c => (
+                <option key={c.code} value={c.code}>{c.name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">
               ZIP

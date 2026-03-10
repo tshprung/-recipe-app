@@ -7,7 +7,7 @@ from openai import APIError, OpenAI, RateLimitError
 DIET_LABELS = {
     "vegetarian": "wegetariańskim (bez mięsa i ryb)",
     "vegan": "wegańskim (bez produktów odzwierzęcych)",
-    "dairy_free": "bez nabiału (bez mleka, sera, masła, śmietany)",
+    "dairy_free": "bez nabiału — zastąp mleko, śmietanę, masło i ser zamiennikami roślinnymi (np. mleko owsiane/sojowe, margaryna roślinna, śmietanka kokosowa, ser wegański lub pominięcie gdzie to możliwe)",
     "gluten_free": "bez glutenu (bez pszenicy, żyta, jęczmienia, owsa)",
     "kosher": "koszernym (zasady kaszrutu)",
     "halal": "halal (zgodnie z zasadami islamu)",
@@ -39,11 +39,13 @@ Rules:
     - "reason": one sentence why this works
     - "instruction": precise English instruction to pass back for re-adaptation
 - If adaptation is possible (even partially), always set "can_adapt": true.
+- For dairy_free: ALWAYS substitute milk, cream, butter, cheese with plant-based alternatives (oat/soy/almond milk, coconut cream, plant margarine, vegan cheese or omit). Do NOT set can_adapt=false just because the recipe contains dairy — replace it like for vegan.
 
 Kosher-specific rules (when diet is kosher):
 - No mixing meat + dairy — if the recipe has both, set can_adapt=false and offer:
   1. A meat version (remove all dairy)
   2. A dairy version (remove all meat)
+- When kosher is combined with dairy_free (e.g. user chose both), produce a single version: no meat+dairy mixing and no dairy — use plant-based dairy substitutes so the recipe is both kosher and dairy-free.
 - No pork → substitute with beef, chicken, or turkey
 - No shellfish → substitute with fish or omit
 - Flag ingredients needing kosher certification (wine, vinegar, gelatin) in notes
