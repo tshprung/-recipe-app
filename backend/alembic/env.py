@@ -1,4 +1,5 @@
 import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -11,6 +12,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import metadata for autogenerate support
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+BACKEND_DIR = os.path.join(ROOT, "backend")
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 from app.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
