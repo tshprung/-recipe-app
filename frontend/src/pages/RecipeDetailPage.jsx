@@ -100,13 +100,6 @@ export default function RecipeDetailPage() {
   const { user, refreshUser } = useAuth()
   const { t } = useLanguage()
 
-  const needsRelocalize =
-    user &&
-    recipe &&
-    (recipe.target_language !== user.target_language ||
-      recipe.target_country !== user.target_country ||
-      (recipe.target_city || '').trim() !== (user.target_city || '').trim())
-
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -128,6 +121,13 @@ export default function RecipeDetailPage() {
   // Re-localize state
   const [relocalizeLoading, setRelocalizeLoading] = useState(false)
   const [relocalizeToast, setRelocalizeToast] = useState(null)
+
+  const needsRelocalize =
+    user &&
+    recipe &&
+    (recipe.target_language !== user.target_language ||
+      recipe.target_country !== user.target_country ||
+      (recipe.target_city || '').trim() !== (user.target_city || '').trim())
 
   useEffect(() => {
     Promise.all([
