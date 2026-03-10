@@ -32,7 +32,7 @@ def resolve_city(country: str, zip: str):
             detail="Invalid ZIP / postal code format.",
         )
 
-    url = f"http://api.zippopotam.us/{country}/{zip_clean}"
+    url = f"https://api.zippopotam.us/{country}/{zip_clean}"
     try:
         resp = httpx.get(url, timeout=8.0)
         if resp.status_code == 404:
