@@ -4,28 +4,41 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
+from ..auth import get_current_user_optional
 from ..database import get_db
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def _verify_admin_token(admin_token: str | None) -> None:
+def _admin_emails() -> set[str]:
+    raw = os.getenv("ADMIN_EMAILS") or ""
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def _verify_admin_token(admin_token: str | None) -> bool:
     expected = os.getenv("ADMIN_TOKEN") or ""
-    if not expected or admin_token != expected:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid admin token",
-        )
+    return bool(expected and admin_token == expected)
 
 
-def _admin_token_dep(admin_token: str | None = Header(default=None, alias="X-Admin-Token")) -> None:
-    _verify_admin_token(admin_token)
+def _require_admin(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    current_user: models.User | None = Depends(get_current_user_optional),
+) -> None:
+    """Allow access if X-Admin-Token matches ADMIN_TOKEN or if JWT user email is in ADMIN_EMAILS."""
+    if _verify_admin_token(x_admin_token):
+        return
+    if current_user and (current_user.email or "").strip().lower() in _admin_emails():
+        return
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid admin token",
+    )
 
 
 @router.get("/users", response_model=list[schemas.AdminUserOut])
 def list_users(
     db: Session = Depends(get_db),
-    _: None = Depends(_admin_token_dep),
+    _: None = Depends(_require_admin),
 ):
     """List all users (admin only)."""
     users = db.query(models.User).order_by(models.User.id).all()
@@ -36,7 +49,7 @@ def list_users(
 def upgrade_user(
     payload: schemas.AdminUpgradeUserRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(_admin_token_dep),
+    _: None = Depends(_require_admin),
 ):
     user = db.query(models.User).filter(models.User.email == payload.email).first()
     if not user:
@@ -64,7 +77,7 @@ def upgrade_user(
 def block_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(_admin_token_dep),
+    _: None = Depends(_require_admin),
 ):
     user = db.get(models.User, user_id)
     if not user:
@@ -78,7 +91,7 @@ def block_user(
 def unblock_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(_admin_token_dep),
+    _: None = Depends(_require_admin),
 ):
     user = db.get(models.User, user_id)
     if not user:
@@ -109,7 +122,7 @@ def _delete_user_cascade(user_id: int, db: Session) -> None:
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(_admin_token_dep),
+    _: None = Depends(_require_admin),
 ):
     user = db.get(models.User, user_id)
     if not user:

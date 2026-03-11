@@ -52,6 +52,7 @@ class UserOut(BaseModel):
     is_verified: bool
     account_tier: str
     created_at: datetime
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -92,6 +93,9 @@ class RecipeOut(BaseModel):
     target_country: str
     target_city: str
     created_at: datetime
+    author_name: str | None = None
+    author_bio: str | None = None
+    author_image_url: str | None = None
 
     model_config = {"from_attributes": True}
 

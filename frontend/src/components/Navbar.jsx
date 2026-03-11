@@ -79,6 +79,18 @@ export default function Navbar() {
             </span>
           )}
 
+          {user?.is_admin && (
+            <Link
+              to="/admin"
+              className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                location.pathname === '/admin'
+                  ? 'bg-amber-500/15 text-amber-300'
+                  : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
+              }`}
+            >
+              Admin
+            </Link>
+          )}
           <Link
             to="/settings"
             className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${

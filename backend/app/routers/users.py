@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -8,9 +10,16 @@ from ..database import get_db
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+def _admin_emails() -> set[str]:
+    raw = os.getenv("ADMIN_EMAILS") or ""
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
 @router.get("/me", response_model=schemas.UserOut)
 def get_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+    data = schemas.UserOut.model_validate(current_user).model_dump()
+    data["is_admin"] = (current_user.email or "").strip().lower() in _admin_emails()
+    return schemas.UserOut(**data)
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

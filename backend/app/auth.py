@@ -18,6 +18,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 def _prehash(password: str) -> str:
@@ -73,4 +74,24 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account disabled. Contact support.",
         )
+    return user
+
+
+def get_current_user_optional(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> models.User | None:
+    """Return the current user if a valid JWT is present, else None. Does not raise on missing/invalid token."""
+    if not token or not token.strip():
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str | None = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+    user = db.get(models.User, int(user_id))
+    if user is None or user.is_blocked:
+        return None
     return user

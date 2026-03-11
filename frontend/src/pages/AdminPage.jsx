@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { api } from '../api/client'
 
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 const ADMIN_TOKEN_KEY = 'recipe_app_admin_token'
@@ -33,7 +35,7 @@ function toIntOr(value, fallback) {
   return Number.isFinite(n) ? n : fallback
 }
 
-async function adminRequest(token, path, options = {}) {
+async function adminRequestWithToken(token, path, options = {}) {
   const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': token, ...options.headers }
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
   if (res.status === 204) return null
@@ -43,6 +45,8 @@ async function adminRequest(token, path, options = {}) {
 }
 
 export default function AdminPage() {
+  const { user } = useAuth()
+  const isAdminUser = user?.is_admin === true
   const [token, setToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY) || '')
   const [users, setUsers] = useState(null)
   const [error, setError] = useState(null)
@@ -56,11 +60,34 @@ export default function AdminPage() {
     if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token)
   }, [token])
 
+  async function adminRequest(path, options = {}) {
+    if (isAdminUser) {
+      const method = (options.method || 'GET').toUpperCase()
+      if (method === 'GET') return api.get(path)
+      if (method === 'POST') return api.post(path, options.body ? JSON.parse(options.body) : undefined)
+      if (method === 'DELETE') return api.delete(path)
+      return api.get(path)
+    }
+    return adminRequestWithToken(token, path, options)
+  }
+
   function fetchUsers() {
+    if (isAdminUser) {
+      setLoading(true)
+      setError(null)
+      adminRequest('/admin/users')
+        .then(data => setUsers(data))
+        .catch(e => {
+          setError(e.message || 'Failed to load users')
+          setUsers(null)
+        })
+        .finally(() => setLoading(false))
+      return
+    }
     if (!token.trim()) return
     setLoading(true)
     setError(null)
-    adminRequest(token, '/admin/users')
+    adminRequest('/admin/users')
       .then(data => setUsers(data))
       .catch(e => {
         setError(e.message || 'Failed to load users')
@@ -70,17 +97,18 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (token.trim()) fetchUsers()
+    if (isAdminUser) fetchUsers()
+    else if (token.trim()) fetchUsers()
     else setUsers(null)
-  }, [token])
+  }, [isAdminUser, token])
 
   function handleSetCredits(userId, newLimit, newUsed) {
-    const user = users?.find(u => u.id === userId)
-    if (!user) return
+    const targetUser = users?.find(u => u.id === userId)
+    if (!targetUser) return
     setActionLoading(userId)
-    const payload = { email: user.email, new_limit: newLimit }
+    const payload = { email: targetUser.email, new_limit: newLimit }
     if (newUsed !== undefined && newUsed !== '') payload.transformations_used = parseInt(newUsed, 10)
-    adminRequest(token, '/admin/upgrade-user', {
+    adminRequest('/admin/upgrade-user', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
@@ -94,7 +122,7 @@ export default function AdminPage() {
 
   function handleBlock(userId) {
     setActionLoading(userId)
-    adminRequest(token, `/admin/users/${userId}/block`, { method: 'POST' })
+    adminRequest(`/admin/users/${userId}/block`, { method: 'POST' })
       .then(() => fetchUsers())
       .catch(e => setError(e.message || 'Failed to block'))
       .finally(() => setActionLoading(null))
@@ -102,17 +130,17 @@ export default function AdminPage() {
 
   function handleUnblock(userId) {
     setActionLoading(userId)
-    adminRequest(token, `/admin/users/${userId}/unblock`, { method: 'POST' })
+    adminRequest(`/admin/users/${userId}/unblock`, { method: 'POST' })
       .then(() => fetchUsers())
       .catch(e => setError(e.message || 'Failed to unblock'))
       .finally(() => setActionLoading(null))
   }
 
   function handleDelete(userId) {
-    const user = users?.find(u => u.id === userId)
-    if (!user || !window.confirm(`Delete user ${user.email} and all their data?`)) return
+    const targetUser = users?.find(u => u.id === userId)
+    if (!targetUser || !window.confirm(`Delete user ${targetUser.email} and all their data?`)) return
     setActionLoading(userId)
-    adminRequest(token, `/admin/users/${userId}`, { method: 'DELETE' })
+    adminRequest(`/admin/users/${userId}`, { method: 'DELETE' })
       .then(() => setUsers(prev => (prev || []).filter(u => u.id !== userId)))
       .catch(e => setError(e.message || 'Failed to delete'))
       .finally(() => setActionLoading(null))
@@ -120,42 +148,44 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-stone-800 mb-4">Admin</h1>
-      <div className="mb-4">
-        <label className="block text-sm font-semibold text-stone-600 mb-1">Admin token</label>
-        <input
-          type="password"
-          value={token}
-          onChange={e => setToken(e.target.value)}
-          placeholder="Enter admin token"
-          className="w-full max-w-md border border-stone-200 rounded-lg px-3 py-2 text-sm"
-        />
-      </div>
+      <h1 className="text-2xl font-bold text-stone-50 mb-4">Admin</h1>
+      {!isAdminUser && (
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-stone-400 mb-1">Admin token</label>
+          <input
+            type="password"
+            value={token}
+            onChange={e => setToken(e.target.value)}
+            placeholder="Enter admin token"
+            className="w-full max-w-md border border-stone-500 rounded-lg px-3 py-2 text-sm bg-stone-800 text-stone-100 placeholder-stone-500"
+          />
+        </div>
+      )}
       {error && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2">
+        <div className="mb-4 text-sm text-red-300 bg-red-500/20 border border-red-500/30 rounded-lg px-4 py-2">
           {error}
         </div>
       )}
-      {loading && <p className="text-stone-500 text-sm">Loading users…</p>}
-      {!token.trim() && <p className="text-stone-500 text-sm">Enter admin token to list users.</p>}
-      {users && users.length === 0 && <p className="text-stone-500 text-sm">No users.</p>}
+      {loading && <p className="text-stone-400 text-sm">Loading users…</p>}
+      {!isAdminUser && !token.trim() && <p className="text-stone-400 text-sm">Enter admin token to list users.</p>}
+      {users && users.length === 0 && <p className="text-stone-400 text-sm">No users.</p>}
       {users && users.length > 0 && (
-        <div className="overflow-x-auto border border-stone-200 rounded-xl bg-white">
+        <div className="overflow-x-auto border border-stone-600 rounded-xl bg-stone-800/80">
           <table className="w-full text-sm text-left">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="px-4 py-3 font-semibold text-stone-700">Email</th>
-                <th className="px-4 py-3 font-semibold text-stone-700">Used / Limit</th>
-                <th className="px-4 py-3 font-semibold text-stone-700">Tier</th>
-                <th className="px-4 py-3 font-semibold text-stone-700">Verified</th>
-                <th className="px-4 py-3 font-semibold text-stone-700">Blocked</th>
-                <th className="px-4 py-3 font-semibold text-stone-700">Actions</th>
+              <tr className="border-b border-stone-600 bg-stone-800">
+                <th className="px-4 py-3 font-semibold text-stone-200">Email</th>
+                <th className="px-4 py-3 font-semibold text-stone-200">Used / Limit</th>
+                <th className="px-4 py-3 font-semibold text-stone-200">Tier</th>
+                <th className="px-4 py-3 font-semibold text-stone-200">Verified</th>
+                <th className="px-4 py-3 font-semibold text-stone-200">Blocked</th>
+                <th className="px-4 py-3 font-semibold text-stone-200">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} className="border-b border-stone-100 hover:bg-stone-50/50">
-                  <td className="px-4 py-3 text-stone-800">{u.email}</td>
+                <tr key={u.id} className="border-b border-stone-600 hover:bg-stone-700/50">
+                  <td className="px-4 py-3 text-stone-200">{u.email}</td>
                   <td className="px-4 py-3">
                     {editingLimit[u.id] ? (
                       <span className="flex items-center gap-2 flex-wrap">
@@ -163,14 +193,14 @@ export default function AdminPage() {
                           type="number"
                           value={limitInput[u.id] ?? u.transformations_limit}
                           onChange={e => setLimitInput(prev => ({ ...prev, [u.id]: e.target.value }))}
-                          className="w-20 border border-stone-200 rounded px-2 py-1 text-sm"
+                          className="w-20 border border-stone-500 rounded px-2 py-1 text-sm bg-stone-800 text-stone-100"
                           placeholder="Limit"
                         />
                         <input
                           type="number"
                           value={usedInput[u.id] ?? u.transformations_used}
                           onChange={e => setUsedInput(prev => ({ ...prev, [u.id]: e.target.value }))}
-                          className="w-16 border border-stone-200 rounded px-2 py-1 text-sm"
+                          className="w-16 border border-stone-500 rounded px-2 py-1 text-sm bg-stone-800 text-stone-100"
                           placeholder="Used"
                         />
                         <button
@@ -192,34 +222,34 @@ export default function AdminPage() {
                         <button
                           type="button"
                           onClick={() => setEditingLimit(prev => ({ ...prev, [u.id]: false }))}
-                          className="text-stone-500 hover:underline text-xs"
+                          className="text-stone-400 hover:underline text-xs"
                         >
                           Cancel
                         </button>
                       </span>
                     ) : (
-                      <span>
+                      <span className="text-stone-200">
                         {u.transformations_used} / {u.transformations_limit === -1 ? '∞' : u.transformations_limit}
                         <button
                           type="button"
                           onClick={() => setEditingLimit(prev => ({ ...prev, [u.id]: true }))}
-                          className="ml-2 text-amber-600 hover:underline text-xs"
+                          className="ml-2 text-amber-400 hover:underline text-xs"
                         >
                           Edit
                         </button>
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-stone-600">{u.account_tier}</td>
-                  <td className="px-4 py-3">{u.is_verified ? 'Yes' : 'No'}</td>
-                  <td className="px-4 py-3">{u.is_blocked ? 'Yes' : 'No'}</td>
+                  <td className="px-4 py-3 text-stone-300">{u.account_tier}</td>
+                  <td className="px-4 py-3 text-stone-300">{u.is_verified ? 'Yes' : 'No'}</td>
+                  <td className="px-4 py-3 text-stone-300">{u.is_blocked ? 'Yes' : 'No'}</td>
                   <td className="px-4 py-3 space-x-2">
                     {u.is_blocked ? (
                       <button
                         type="button"
                         onClick={() => handleUnblock(u.id)}
                         disabled={actionLoading === u.id}
-                        className="text-emerald-600 hover:underline text-xs font-medium"
+                        className="text-emerald-400 hover:underline text-xs font-medium"
                       >
                         Unblock
                       </button>
@@ -228,7 +258,7 @@ export default function AdminPage() {
                         type="button"
                         onClick={() => handleBlock(u.id)}
                         disabled={actionLoading === u.id}
-                        className="text-amber-600 hover:underline text-xs font-medium"
+                        className="text-amber-400 hover:underline text-xs font-medium"
                       >
                         Block
                       </button>
@@ -237,7 +267,7 @@ export default function AdminPage() {
                       type="button"
                       onClick={() => handleDelete(u.id)}
                       disabled={actionLoading === u.id}
-                      className="text-red-600 hover:underline text-xs font-medium"
+                      className="text-red-400 hover:underline text-xs font-medium"
                     >
                       Delete
                     </button>
