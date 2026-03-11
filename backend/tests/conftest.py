@@ -125,10 +125,11 @@ def registered_user(client):
 
 @pytest.fixture
 def auth_headers(client, registered_user):
-    r = client.post(
-        "/api/auth/login",
-        json={"email": SAMPLE_EMAIL, "password_hash": password_hash(SAMPLE_PASSWORD)},
-    )
+    with patch("app.routers.auth.ensure_starter_recipes_for_user"):
+        r = client.post(
+            "/api/auth/login",
+            json={"email": SAMPLE_EMAIL, "password_hash": password_hash(SAMPLE_PASSWORD)},
+        )
     assert r.status_code == 200
     token = r.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

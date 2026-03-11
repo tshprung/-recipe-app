@@ -47,6 +47,15 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
           {recipe.title_pl}
         </h3>
 
+        {/* Author (e.g. starter recipes from famous cooks) */}
+        {(recipe.author_name || recipe.author_bio) && (
+          <p className="text-xs text-stone-500 mb-2 line-clamp-1">
+            {recipe.author_name && <span className="font-medium text-stone-600">By {recipe.author_name}</span>}
+            {recipe.author_name && recipe.author_bio && ' · '}
+            {recipe.author_bio && <span className="italic">{recipe.author_bio}</span>}
+          </p>
+        )}
+
         {/* Tags */}
         {recipe.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2 mb-3">

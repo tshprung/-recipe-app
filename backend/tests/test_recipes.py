@@ -38,10 +38,10 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     # Create recipe for user A
     _create_recipe(client, auth_headers)
 
-    # Register and login as user B
+    # Register and login as user B (patch starter recipes so B gets none on login — we are testing isolation)
     with patch("app.routers.auth.send_verification_email"), patch(
         "app.routers.auth._verify_turnstile", return_value=True
-    ):
+    ), patch("app.routers.auth.ensure_starter_recipes_for_user"):
         client.post(
             "/api/auth/register",
             json={
@@ -54,10 +54,10 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
                 "target_city": "Wrocław",
             },
         )
-    r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
+        r = client.post("/api/auth/login", json={"email": "b@example.com", "password_hash": password_hash("bpass1234")})
     b_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
-    # User B should see zero recipes
+    # User B should see zero recipes (starter recipes were patched out)
     r = client.get("/api/recipes/", headers=b_headers)
     assert r.status_code == 200
     assert r.json() == []
@@ -65,6 +65,37 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     # User A should see their recipe
     r = client.get("/api/recipes/", headers=auth_headers)
     assert len(r.json()) == 1
+
+
+def test_starter_recipes_added_on_first_login(client):
+    """New user gets 3 starter recipes on first login (fallback when no OpenAI key)."""
+    with patch("app.routers.auth.send_verification_email"), patch(
+        "app.routers.auth._verify_turnstile", return_value=True
+    ):
+        client.post(
+            "/api/auth/register",
+            json={
+                "email": "starter@example.com",
+                "password_hash": password_hash("pass1234"),
+                "captcha_token": CAPTCHA_DUMMY,
+                "ui_language": "en",
+                "target_language": "pl",
+                "target_country": "PL",
+                "target_city": "Wrocław",
+            },
+        )
+    r = client.post("/api/auth/login", json={"email": "starter@example.com", "password_hash": password_hash("pass1234")})
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    r = client.get("/api/recipes/", headers=headers)
+    assert r.status_code == 200
+    recipes = r.json()
+    assert len(recipes) == 3
+    for rec in recipes:
+        assert "title_pl" in rec
+        assert "ingredients_pl" in rec
+        assert "steps_pl" in rec
+        assert rec.get("author_name") or rec.get("author_bio")
 
 
 def test_get_recipe_not_found(client, auth_headers):

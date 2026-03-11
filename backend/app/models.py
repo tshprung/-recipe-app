@@ -25,6 +25,7 @@ class User(Base):
     )
     account_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    starter_recipes_added: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Login security
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -68,6 +69,11 @@ class Recipe(Base):
     user_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     raw_input: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Optional author attribution (e.g. for starter recipes from famous cooks)
+    author_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    author_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Target locale snapshot; source language is auto-detected
     detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)

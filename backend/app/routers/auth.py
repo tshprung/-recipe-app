@@ -19,6 +19,7 @@ from ..auth import (
 )
 from ..database import get_db
 from ..services.email import send_verification_email
+from ..services.starter_recipes import ensure_starter_recipes_for_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -131,6 +132,12 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     user.failed_login_attempts = 0
     user.lockout_until = None
     db.commit()
+
+    # First-time starter recipes (one-time gift; does not consume credits)
+    try:
+        ensure_starter_recipes_for_user(user, db)
+    except Exception as e:
+        logger.warning("Starter recipes on login failed: %s", e)
 
     return {"access_token": create_access_token(user.id)}
 
@@ -323,6 +330,10 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
         front = _frontend_url("/login", {"error": "google_failed"})
         return RedirectResponse(url=front if front else "/login")
     user = _get_or_create_oauth_user(db, email, name)
+    try:
+        ensure_starter_recipes_for_user(user, db)
+    except Exception as e:
+        logger.warning("Starter recipes on Google login failed: %s", e)
     token = create_access_token(user.id)
     front = _frontend_url("/login", {"token": token})
     return RedirectResponse(url=front if front else "/login")
@@ -390,6 +401,10 @@ def facebook_callback(code: str | None = None, error: str | None = None, db: Ses
         front = _frontend_url("/login", {"error": "facebook_failed"})
         return RedirectResponse(url=front if front else "/login")
     user = _get_or_create_oauth_user(db, email, name)
+    try:
+        ensure_starter_recipes_for_user(user, db)
+    except Exception as e:
+        logger.warning("Starter recipes on Facebook login failed: %s", e)
     token = create_access_token(user.id)
     front = _frontend_url("/login", {"token": token})
     return RedirectResponse(url=front if front else "/login")

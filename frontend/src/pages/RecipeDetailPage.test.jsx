@@ -67,6 +67,7 @@ const DEFAULT_USER = {
 
 function renderPage(id = '1') {
   localStorage.setItem('token', 'test-token')
+  localStorage.setItem('recipe_app_remember_me', '1')
   return render(
     <AuthProvider>
       <LanguageProvider>
@@ -198,8 +199,8 @@ describe('RecipeDetailPage — re-localize', () => {
     api.post.mockResolvedValue({ ...MOCK_RECIPE, title_pl: 'Zupa Pomidorowa 2' })
     renderPage()
     await screen.findByText('Zupa Pomidorowa')
-
-    await userEvent.click(screen.getByRole('button', { name: /Re-localize/ }))
+    const relocalizeBtn = await screen.findByRole('button', { name: /Re-localize/i })
+    await userEvent.click(relocalizeBtn)
     expect(api.post).toHaveBeenCalledWith('/recipes/1/relocalize', {})
   })
 })

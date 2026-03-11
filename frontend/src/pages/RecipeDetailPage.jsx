@@ -555,6 +555,27 @@ export default function RecipeDetailPage() {
             </div>
           )}
 
+          {/* Author (e.g. starter recipes from famous cooks) — original only */}
+          {activeTab === 'original' && (recipe.author_name || recipe.author_bio) && (
+            <div className="mb-4 flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              {recipe.author_image_url && (
+                <img
+                  src={recipe.author_image_url}
+                  alt={recipe.author_name || ''}
+                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                />
+              )}
+              <div className="min-w-0">
+                {recipe.author_name && (
+                  <p className="text-sm font-semibold text-stone-800">By {recipe.author_name}</p>
+                )}
+                {recipe.author_bio && (
+                  <p className="text-xs text-stone-600 mt-0.5">{recipe.author_bio}</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Tags */}
           {recipe.tags?.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
