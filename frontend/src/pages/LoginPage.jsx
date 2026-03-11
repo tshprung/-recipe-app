@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
@@ -380,6 +380,13 @@ export default function LoginPage() {
               </span>
             ) : tab === 'login' ? t('logInButton') : t('createAccountButton')}
           </button>
+
+          <p className="mt-6 text-xs text-white/55 text-center leading-relaxed">
+            By continuing, you agree to the{' '}
+            <Link to="/terms" className="underline hover:text-white/80 transition-colors">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-white/80 transition-colors">Privacy Policy</Link>.
+          </p>
         </form>
       </div>
     </div>

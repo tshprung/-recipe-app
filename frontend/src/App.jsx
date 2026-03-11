@@ -10,6 +10,8 @@ import RecipeDetailPage from './pages/RecipeDetailPage'
 import WhatCanIMakePage from './pages/WhatCanIMakePage'
 import SettingsPage from './pages/SettingsPage'
 import VerifyPage from './pages/VerifyPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
 import Navbar from './components/Navbar'
 import ShoppingListPanel from './components/ShoppingListPanel'
 
@@ -79,6 +81,8 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )
