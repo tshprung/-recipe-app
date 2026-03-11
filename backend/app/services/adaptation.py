@@ -4,6 +4,8 @@ from string import Template
 
 from openai import APIError, OpenAI, RateLimitError
 
+from .translation import COUNTRY_TO_LOCAL_LANG, LANG_DISPLAY_NAMES
+
 # Language code -> readable name for prompts (so model outputs in correct language)
 _LANG_NAMES = {
     "en": "English",
@@ -54,6 +56,8 @@ Adapt this recipe to be $diet_label.
 
 OUTPUT LANGUAGE: All of title_pl, ingredients_pl, steps_pl, and notes.adaptation_summary MUST be written in $output_lang only. The recipe you receive may be in any language; your output must be entirely in $output_lang.
 
+$ingredient_parenthetical_rule
+
 Rules:
 - Replace every non-compliant ingredient with the closest compliant equivalent appropriate for the recipe's market.
 - If a suitable substitute exists, use it — never leave a non-compliant ingredient unchanged without flagging it.
@@ -96,6 +100,8 @@ CUSTOM_TEMPLATE = Template("""\
 Adapt this recipe using the following instruction: $instruction
 
 OUTPUT LANGUAGE: All of title_pl, ingredients_pl, steps_pl, and notes.adaptation_summary MUST be written in $output_lang only.
+
+$ingredient_parenthetical_rule
 
 Rules:
 - Apply the instruction faithfully while keeping the recipe's character. Use market-appropriate equivalents for any new ingredients.
@@ -145,11 +151,29 @@ def _build_recipe_text(recipe) -> tuple[str, str]:
     return ingredients_text, steps_text
 
 
+def _ingredient_parenthetical_rule(target_language: str, target_country: str | None) -> str:
+    """Instruction for adding local-language parenthetical to ingredients when recipe and local lang differ."""
+    if not target_country or not target_country.strip():
+        return ""
+    local_lang = COUNTRY_TO_LOCAL_LANG.get(target_country.strip().upper()) or target_language
+    if (local_lang or "").strip().lower() == (target_language or "").strip().lower():
+        return ""
+    recipe_lang_name = LANG_DISPLAY_NAMES.get((target_language or "").strip().lower(), target_language or "English")
+    local_lang_name = LANG_DISPLAY_NAMES.get((local_lang or "").strip().lower(), local_lang or "")
+    return (
+        f"INGREDIENT PARENTHETICAL: For each ingredient in ingredients_pl, output the name in the output language. "
+        f"Since the shopper's local language ({local_lang_name}) differs from the recipe language ({recipe_lang_name}), "
+        f'add in parentheses: the same ingredient name in the local language, written phonetically in the script of the output language, '
+        f'then a comma and the recipe language name in the output language. E.g. "cilantro (kolendra, English)" or "כוסברה (קולנדרה, פולנית)".'
+    )
+
+
 def adapt_recipe(
     recipe,
     variant_type: str,
     custom_instruction: str | None = None,
     target_language: str = "en",
+    target_country: str | None = None,
 ) -> dict:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -158,6 +182,7 @@ def adapt_recipe(
     output_lang = _lang_name(target_language)
     title_pl, _, _ = _get_recipe_attrs(recipe)
     ingredients_text, steps_text = _build_recipe_text(recipe)
+    ingredient_rule = _ingredient_parenthetical_rule(target_language, target_country)
 
     if custom_instruction:
         prompt = CUSTOM_TEMPLATE.safe_substitute(
@@ -166,6 +191,7 @@ def adapt_recipe(
             title=title_pl,
             ingredients=ingredients_text,
             steps=steps_text,
+            ingredient_parenthetical_rule=ingredient_rule,
         )
     else:
         diet_label = DIET_LABELS.get(variant_type, variant_type)
@@ -175,6 +201,7 @@ def adapt_recipe(
             title=title_pl,
             ingredients=ingredients_text,
             steps=steps_text,
+            ingredient_parenthetical_rule=ingredient_rule,
         )
 
     client = OpenAI(api_key=api_key)

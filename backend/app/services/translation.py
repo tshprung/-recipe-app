@@ -22,11 +22,25 @@ SYSTEM_PROMPT = (
     "Always respond with valid JSON only — no markdown, no prose outside the JSON."
 )
 
+# Country code -> ISO 639-1 language code for "local" shopper language
+COUNTRY_TO_LOCAL_LANG = {
+    "PL": "pl", "IL": "he", "US": "en", "GB": "uk", "DE": "de", "FR": "fr",
+    "ES": "es", "IT": "it", "PT": "pt", "NL": "nl", "RU": "ru", "UA": "uk",
+    "TR": "tr", "AR": "ar", "JP": "ja", "CN": "zh", "IN": "hi", "BR": "pt",
+}
+LANG_DISPLAY_NAMES = {
+    "en": "English", "pl": "Polish", "he": "Hebrew", "de": "German", "fr": "French",
+    "es": "Spanish", "it": "Italian", "pt": "Portuguese", "ru": "Russian", "uk": "Ukrainian",
+    "tr": "Turkish", "ar": "Arabic", "ja": "Japanese", "zh": "Chinese", "hi": "Hindi",
+}
+
 USER_PROMPT_TEMPLATE = """\
 Translate this recipe from {source_lang} to {target_lang} for a cook in {city}, {target_country}.
 Apply localisation rules for that market (ingredient names, brands, units).
 
 CRITICAL: The output language for ALL user-facing text (title, ingredients, steps, tags, substitutions) MUST be {target_lang}. The JSON key names (title_pl, ingredients_pl, steps_pl) are legacy and do NOT mean Polish — write in {target_lang} only. If target_lang is "en", output English. If target_lang is "pl", output Polish. No exceptions.
+
+INGREDIENT PARENTHETICAL: For each ingredient in ingredients_pl, output the name in {target_lang}. If the shopper's local language ({local_lang_name}) is different from the recipe language ({recipe_lang_name}), add in parentheses: the same ingredient name in the local language, written phonetically in the script of the recipe language, then a comma and the recipe language name in {target_lang}. Examples: recipe English, local Polish → "cilantro (kolendra, English)"; recipe Hebrew, local Polish → "כוסברה (קולנדרה, פולנית)". Only add the parenthetical when the two languages differ; if they are the same, output just the ingredient name.
 
 Return a single JSON object with EXACTLY these keys:
 
@@ -34,7 +48,7 @@ Return a single JSON object with EXACTLY these keys:
   "title_pl": "<recipe title in {target_lang}>",
   "title_original": "<original recipe title as it appears in the source>",
   "ingredients_pl": [
-    "<quantity + ingredient name in {target_lang}>",
+    "<quantity + ingredient name in {target_lang}>" or "<quantity + name (local name in recipe script, recipe lang label)>",
     ...
   ],
   "ingredients_original": [
@@ -124,6 +138,10 @@ def translate_recipe(
         raise ValueError("NOT_A_RECIPE: classifier=false")
     source_lang = detect_language(raw_input, client)
 
+    local_lang = COUNTRY_TO_LOCAL_LANG.get((target_country or "").strip().upper()) or target_language
+    recipe_lang_name = LANG_DISPLAY_NAMES.get((target_language or "").strip().lower(), (target_language or "English"))
+    local_lang_name = LANG_DISPLAY_NAMES.get((local_lang or "").strip().lower(), (local_lang or ""))
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -137,6 +155,8 @@ def translate_recipe(
                         target_country=target_country,
                         city=target_city,
                         raw_input=raw_input,
+                        recipe_lang_name=recipe_lang_name,
+                        local_lang_name=local_lang_name,
                     ),
                 },
             ],

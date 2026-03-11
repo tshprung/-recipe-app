@@ -8,6 +8,11 @@ const DIET_OPTIONS = [
   { key: 'vegetarian', labelKey: 'vegetarian' },
   { key: 'vegan', labelKey: 'vegan' },
   { key: 'dairy_free', labelKey: 'dairyFree' },
+  { key: 'gluten_free', labelKey: 'glutenFree' },
+  { key: 'kosher', labelKey: 'kosher' },
+  { key: 'halal', labelKey: 'halal' },
+  { key: 'nut_free', labelKey: 'nutFree' },
+  { key: 'low_sodium', labelKey: 'lowSodium' },
 ]
 
 export default function WhatCanIMakePage() {
@@ -22,6 +27,8 @@ export default function WhatCanIMakePage() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [addedIngredients, setAddedIngredients] = useState([])
+  const [addingRecipeId, setAddingRecipeId] = useState(null)
+  const [addRecipeSuccess, setAddRecipeSuccess] = useState(null) // { id, title } when added
 
   const ingredientsList = ingredientsText
     .split(/[\n,]+/)
@@ -58,6 +65,24 @@ export default function WhatCanIMakePage() {
         setError(e.message || t('somethingWentWrong'))
         setLoading(false)
       })
+  }
+
+  async function handleAddToMyRecipes(sug) {
+    setAddingRecipeId(sug.title)
+    setAddRecipeSuccess(null)
+    try {
+      const created = await api.post('/recipes/from-ai-suggestion', {
+        title: sug.title,
+        ingredients: sug.ingredients ?? [],
+        steps: sug.steps ?? [],
+      })
+      setAddRecipeSuccess({ id: created.id, title: sug.title })
+      setTimeout(() => setAddRecipeSuccess(null), 5000)
+    } catch (e) {
+      setError(e.message || t('somethingWentWrong'))
+    } finally {
+      setAddingRecipeId(null)
+    }
   }
 
   function handleAddMissing(ingredient) {
@@ -245,6 +270,25 @@ export default function WhatCanIMakePage() {
                     </ol>
                   </div>
                 )}
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => handleAddToMyRecipes(sug)}
+                    disabled={addingRecipeId !== null}
+                    className="text-sm font-medium text-amber-600 hover:text-amber-700 hover:underline disabled:opacity-50"
+                  >
+                    {addingRecipeId === sug.title ? t('adding') : addRecipeSuccess?.title === sug.title ? t('addedToRecipes') : t('addToMyRecipes')}
+                  </button>
+                  {addRecipeSuccess?.title === sug.title && addRecipeSuccess?.id && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/recipes/${addRecipeSuccess.id}`)}
+                      className="ml-3 text-sm font-medium text-stone-500 hover:underline"
+                    >
+                      {t('viewRecipe')}
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

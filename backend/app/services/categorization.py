@@ -24,6 +24,8 @@ Your tasks:
 Return a JSON object where each key is a category name and the value is a list of merged ingredient strings.
 Every category key must be present even if its list is empty.
 
+Output only what to buy: do NOT include preparation or usage phrases (e.g. no "finely chopped", "diced", "for sauce", "for frying"). Just the ingredient name and quantity.
+
 Ingredients:
 {ingredients}
 """

@@ -24,6 +24,7 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
     account_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Login security
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -119,6 +120,24 @@ class ShoppingListRecipe(Base):
 
     user: Mapped["User"] = relationship("User")
     recipe: Mapped["Recipe"] = relationship("Recipe")
+
+
+class ShoppingListCache(Base):
+    """Cached categorized shopping list per user, keyed by sorted recipe_ids."""
+
+    __tablename__ = "shopping_list_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    recipe_ids_snapshot: Mapped[list] = mapped_column(JSON, nullable=False)  # sorted list of recipe ids
+    items: Mapped[dict] = mapped_column(JSON, nullable=False)  # categorized dict
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
 
 class IngredientSubstitution(Base):

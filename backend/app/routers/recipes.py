@@ -181,6 +181,44 @@ def create_recipe(
     return recipe
 
 
+@router.post("/from-ai-suggestion", response_model=schemas.RecipeOut, status_code=status.HTTP_201_CREATED)
+def create_recipe_from_ai_suggestion(
+    payload: schemas.FromAISuggestionRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Create a recipe from an AI suggestion (e.g. What can I make). No translation, no quota consumed."""
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email before using the app.",
+        )
+    title = (payload.title or "").strip() or "Untitled"
+    ingredients = payload.ingredients or []
+    steps = payload.steps or []
+    raw_input = title + "\n\nIngredients:\n" + "\n".join(f"- {s}" for s in ingredients) + "\n\nSteps:\n" + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
+    recipe = models.Recipe(
+        user_id=current_user.id,
+        title_pl=title,
+        title_original=title,
+        ingredients_pl=ingredients,
+        ingredients_original=ingredients,
+        steps_pl=steps,
+        tags=[],
+        substitutions={},
+        notes={},
+        raw_input=raw_input,
+        detected_language=current_user.target_language,
+        target_language=current_user.target_language,
+        target_country=current_user.target_country,
+        target_city=current_user.target_city,
+    )
+    db.add(recipe)
+    db.commit()
+    db.refresh(recipe)
+    return recipe
+
+
 def _recipe_matches_query(recipe: models.Recipe, q: str) -> bool:
     """True if recipe title, ingredients, or tags contain the query (case-insensitive)."""
     if not q or not recipe:
@@ -619,7 +657,8 @@ def adapt_recipe_endpoint(
             current = recipe
             for t in types:
                 result = adapt_recipe(
-                    current, t, custom_instruction=None, target_language=target_lang
+                    current, t, custom_instruction=None, target_language=target_lang,
+                    target_country=current_user.target_country,
                 )
                 if not result.get("can_adapt"):
                     return {
@@ -639,7 +678,8 @@ def adapt_recipe_endpoint(
         else:
             single_type = types[0]
             result = adapt_recipe(
-                recipe, single_type, custom_instruction, target_language=target_lang
+                recipe, single_type, custom_instruction, target_language=target_lang,
+                target_country=current_user.target_country,
             )
             if not result.get("can_adapt"):
                 return {
@@ -768,4 +808,8 @@ def delete_recipe(
         models.ShoppingListRecipe.recipe_id == recipe_id
     ).delete()
     db.delete(recipe)
+    # Invalidate shopping list cache for owner so next GET recomputes
+    db.query(models.ShoppingListCache).filter(
+        models.ShoppingListCache.user_id == current_user.id
+    ).delete(synchronize_session=False)
     db.commit()

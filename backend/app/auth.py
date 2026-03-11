@@ -68,4 +68,9 @@ def get_current_user(
     user = db.get(models.User, int(user_id))
     if user is None:
         raise credentials_exception
+    if user.is_blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account disabled. Contact support.",
+        )
     return user

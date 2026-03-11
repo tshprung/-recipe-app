@@ -318,7 +318,7 @@ def test_adapt_recipe_multiple_types_chained(client, auth_headers, recipe):
     first = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska"}
     second = {**MOCK_VARIANT, "title_pl": "Zupa wegetariańska koszerna", "ingredients_pl": ["500g pomidory", "1 cebula"]}
 
-    def side_effect(rec, variant_type, custom_instruction=None, target_language="en"):
+    def side_effect(rec, variant_type, custom_instruction=None, target_language="en", target_country=None):
         if variant_type == "vegetarian":
             return first
         if variant_type == "kosher":

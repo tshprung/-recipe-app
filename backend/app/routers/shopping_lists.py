@@ -5,12 +5,22 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user
 from ..database import get_db
-from ..services.categorization import categorize_ingredients
+from ..services.categorization import CATEGORIES, categorize_ingredients
 from ..services.email import send_shopping_list_email
 from ..services.shopping_list_ingredients import (
     aggregate_ingredients,
     normalize_ingredient_for_shopping,
+    strip_cooking_instructions,
 )
+
+_EMPTY_ITEMS = {cat: [] for cat in CATEGORIES}
+
+
+def _invalidate_shopping_list_cache(user_id: int, db: Session) -> None:
+    """Remove cached shopping list for this user so next GET recomputes."""
+    db.query(models.ShoppingListCache).filter(
+        models.ShoppingListCache.user_id == user_id
+    ).delete(synchronize_session=False)
 
 router = APIRouter(prefix="/api/shopping-list", tags=["shopping-list"])
 
@@ -62,7 +72,7 @@ def _collect_ingredients(recipe_ids: list[int], user_id: int, db: Session, user:
                 )
                 label = f"{amount} {name}".strip()
             else:
-                label = str(ing)
+                label = strip_cooking_instructions(str(ing)).strip()
             if label:
                 if user is not None:
                     label = _apply_substitutions(label, user, db)
@@ -90,13 +100,24 @@ def get_shopping_list(
 ):
     recipe_ids = _get_recipe_ids(current_user.id, db)
     if not recipe_ids:
-        return {"recipe_ids": [], "items": {cat: [] for cat in
-                ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]}}
+        _invalidate_shopping_list_cache(current_user.id, db)
+        return {"recipe_ids": [], "items": _EMPTY_ITEMS.copy()}
+
+    snapshot = sorted(recipe_ids)
+    cached = (
+        db.query(models.ShoppingListCache)
+        .filter(
+            models.ShoppingListCache.user_id == current_user.id,
+            models.ShoppingListCache.recipe_ids_snapshot == snapshot,
+        )
+        .first()
+    )
+    if cached:
+        return {"recipe_ids": recipe_ids, "items": cached.items}
 
     ingredients = _collect_ingredients(recipe_ids, current_user.id, db, user=current_user)
     if not ingredients:
-        return {"recipe_ids": recipe_ids, "items": {cat: [] for cat in
-                ["Warzywa i owoce", "Nabiał", "Mięso i ryby", "Przyprawy i sosy", "Inne"]}}
+        return {"recipe_ids": recipe_ids, "items": _EMPTY_ITEMS.copy()}
 
     try:
         items = categorize_ingredients(ingredients)
@@ -104,6 +125,23 @@ def get_shopping_list(
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Categorization failed: {e}")
+
+    # Post-process: strip any prep/usage phrases the categorizer may have re-added
+    for cat in items:
+        items[cat] = [
+            cleaned for s in items[cat]
+            if (cleaned := strip_cooking_instructions(s).strip())
+        ]
+
+    _invalidate_shopping_list_cache(current_user.id, db)
+    db.add(
+        models.ShoppingListCache(
+            user_id=current_user.id,
+            recipe_ids_snapshot=snapshot,
+            items=items,
+        )
+    )
+    db.commit()
 
     return {"recipe_ids": recipe_ids, "items": items}
 
@@ -137,6 +175,7 @@ def add_recipe(
         )
         db.add(entry)
         db.commit()
+        _invalidate_shopping_list_cache(current_user.id, db)
 
     return {"recipe_ids": _get_recipe_ids(current_user.id, db)}
 
@@ -160,6 +199,7 @@ def remove_recipe(
     if entry:
         db.delete(entry)
         db.commit()
+        _invalidate_shopping_list_cache(current_user.id, db)
 
     return {"recipe_ids": _get_recipe_ids(current_user.id, db)}
 
@@ -175,6 +215,7 @@ def clear_shopping_list(
         models.ShoppingListRecipe.user_id == current_user.id
     ).delete(synchronize_session=False)
     db.commit()
+    _invalidate_shopping_list_cache(current_user.id, db)
     return {"recipe_ids": []}
 
 

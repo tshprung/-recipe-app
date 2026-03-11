@@ -202,6 +202,13 @@ class WhatCanIMakeAIOut(BaseModel):
     suggestions: list[AISuggestedRecipeOut]
 
 
+class FromAISuggestionRequest(BaseModel):
+    """Create a recipe from an AI suggestion without calling translation (no extra credit)."""
+    title: str
+    ingredients: list[str]  # e.g. ["2 cups flour", "1 egg"]
+    steps: list[str]
+
+
 class WhatCanIMakeIngredientAlternativesRequest(BaseModel):
     previous_ingredients: list[str]  # original list
     added_ingredients: list[str]  # user marked "I have this"
@@ -223,6 +230,20 @@ class SubstitutionReportRequest(BaseModel):
     target_country: str = "PL"
 
 
+class AdminUserOut(BaseModel):
+    id: int
+    email: str
+    transformations_used: int
+    transformations_limit: int
+    account_tier: str
+    is_verified: bool
+    is_blocked: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AdminUpgradeUserRequest(BaseModel):
     email: EmailStr
     new_limit: int
+    transformations_used: int | None = None  # optional reset of used count

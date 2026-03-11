@@ -122,7 +122,8 @@ export default function RecipeDetailPage() {
   const [relocalizeLoading, setRelocalizeLoading] = useState(false)
   const [relocalizeToast, setRelocalizeToast] = useState(null)
 
-  // Ingredient alternatives modal (uses 1 token per request)
+  // Ingredient alternatives: off by default so users don't waste credits by accident
+  const [ingredientLookupEnabled, setIngredientLookupEnabled] = useState(false)
   const [altIngredient, setAltIngredient] = useState(null)
   const [altOpen, setAltOpen] = useState(false)
   const [altLoading, setAltLoading] = useState(false)
@@ -698,6 +699,17 @@ export default function RecipeDetailPage() {
       {hasIngredients && (
         <Section title={t('ingredients')} icon="🧅">
           <Card>
+            {!ingredientLookupEnabled ? (
+              <div className="mb-3 pb-3 border-b border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setIngredientLookupEnabled(true)}
+                  className="text-sm font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                >
+                  {t('enableIngredientLookup')}
+                </button>
+              </div>
+            ) : null}
             {showOriginal && activeTab === 'original' ? (
               <div>
                 <div className="grid grid-cols-2 gap-4 pb-2 mb-1 border-b border-stone-100">
@@ -710,14 +722,18 @@ export default function RecipeDetailPage() {
                   const he = orig ? (typeof orig === 'object' ? `${orig.amount ?? ''} ${orig.name ?? ''}`.trim() : orig) : ''
                   return (
                     <div key={i} className="grid grid-cols-2 gap-4 py-2 border-b border-stone-50 last:border-0">
-                      <button
-                        type="button"
-                        onClick={() => openIngredientAlternatives(pl)}
-                        className="text-left text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                        title={t('ingredientAlternatives')}
-                      >
-                        {pl}
-                      </button>
+                      {ingredientLookupEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => openIngredientAlternatives(pl)}
+                          className="text-left text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
+                          title={t('ingredientAlternatives')}
+                        >
+                          {pl}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-stone-700">{pl}</span>
+                      )}
                       <span dir="rtl" className="text-sm text-stone-400 text-right">{he}</span>
                     </div>
                   )
@@ -732,14 +748,18 @@ export default function RecipeDetailPage() {
                       <span className="w-5 h-5 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                         {i + 1}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => openIngredientAlternatives(label)}
-                        className="text-left hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                        title={t('ingredientAlternatives')}
-                      >
-                        {label}
-                      </button>
+                      {ingredientLookupEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => openIngredientAlternatives(label)}
+                          className="text-left hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
+                          title={t('ingredientAlternatives')}
+                        >
+                          {label}
+                        </button>
+                      ) : (
+                        <span className="text-left">{label}</span>
+                      )}
                     </li>
                   )
                 })}

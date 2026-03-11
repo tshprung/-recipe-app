@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { LanguageProvider, useLanguage } from './context/LanguageContext'
 import { ShoppingListProvider } from './context/ShoppingListContext'
 import LoginPage from './pages/LoginPage'
+import AdminPage from './pages/AdminPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
 import WhatCanIMakePage from './pages/WhatCanIMakePage'
@@ -73,6 +74,7 @@ function AppRoutes() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
@@ -89,6 +91,7 @@ function AppRoutes() {
           <main className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             <Routes>
               <Route path="/"            element={<RecipeListPage />} />
+              <Route path="/admin"       element={<AdminPage />} />
               <Route path="/what-can-i-make" element={<WhatCanIMakePage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
               <Route path="/settings"    element={<SettingsPage />} />
