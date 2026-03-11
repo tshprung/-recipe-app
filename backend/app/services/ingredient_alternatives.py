@@ -8,7 +8,9 @@ SYSTEM_PROMPT = (
     "You suggest ingredient alternatives for cooking. "
     "Given an ingredient and optional diet restrictions, return 3–6 substitute options. "
     "Respond with valid JSON only: {\"alternatives\": [{\"name\": \"...\", \"notes\": \"...\"}, ...]}. "
-    "Keep names concise; use notes for where to buy or how to use."
+    "Keep names concise; use notes for how to use. "
+    "Prefer common, widely available substitutes for the user's target country; avoid niche products and avoid claiming certain availability. "
+    "If a good substitute cannot be found, return an empty alternatives list."
 )
 
 USER_PROMPT_TEMPLATE = """\
@@ -30,6 +32,7 @@ def get_ingredient_alternatives(
     ingredient: str,
     diet_filters: list[str] | None = None,
     target_language: str = "en",
+    target_country: str | None = None,
 ) -> list[dict]:
     """
     Return list of dicts with keys name, notes (notes optional).
@@ -44,6 +47,8 @@ def get_ingredient_alternatives(
         ingredient=(ingredient or "").strip() or "unknown",
         diet_list=diet_list,
     )
+    if target_country and target_country.strip():
+        prompt += f"\nTarget country for shopping context: {target_country.strip().upper()}."
     # Ask for output in target language
     if target_language and target_language.strip().lower() != "en":
         prompt += f"\nWrite all alternative names and notes in the user's language (code: {target_language.strip().lower()})."

@@ -764,6 +764,7 @@ def ingredient_alternatives(
             ingredient=payload.ingredient,
             diet_filters=payload.diet_filters or None,
             target_language=target_lang,
+            target_country=current_user.target_country,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
@@ -771,6 +772,51 @@ def ingredient_alternatives(
     return schemas.IngredientAlternativesOut(
         alternatives=[schemas.IngredientAlternativeOut(name=a["name"], notes=a.get("notes")) for a in alternatives],
     )
+
+
+@router.post("/{recipe_id}/replace-ingredient", response_model=schemas.RecipeOut | schemas.RecipeVariantOut)
+def replace_ingredient(
+    recipe_id: int,
+    payload: schemas.ReplaceIngredientRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Replace an ingredient line in the original recipe or a variant."""
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    idx = payload.ingredient_index
+    new_line = (payload.new_ingredient or "").strip()
+    if not new_line:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New ingredient cannot be empty")
+
+    if payload.variant_type:
+        variant = (
+            db.query(models.RecipeVariant)
+            .filter_by(recipe_id=recipe_id, variant_type=payload.variant_type)
+            .first()
+        )
+        if not variant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+        if idx >= len(variant.ingredients_pl or []):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Ingredient index out of range")
+        ingredients = list(variant.ingredients_pl or [])
+        ingredients[idx] = new_line
+        variant.ingredients_pl = ingredients
+        db.commit()
+        db.refresh(variant)
+        return schemas.RecipeVariantOut.model_validate(variant)
+
+    # Original recipe
+    if idx >= len(recipe.ingredients_pl or []):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Ingredient index out of range")
+    ingredients = list(recipe.ingredients_pl or [])
+    ingredients[idx] = new_line
+    recipe.ingredients_pl = ingredients
+    db.commit()
+    db.refresh(recipe)
+    return schemas.RecipeOut.model_validate(recipe)
 
 
 @router.delete("/{recipe_id}/variants", status_code=status.HTTP_204_NO_CONTENT)

@@ -223,6 +223,12 @@ class IngredientAlternativesOut(BaseModel):
     alternatives: list[IngredientAlternativeOut]
 
 
+class ReplaceIngredientRequest(BaseModel):
+    variant_type: str | None = None  # null/omitted = original recipe
+    ingredient_index: int = Field(ge=0)
+    new_ingredient: str = Field(min_length=1)
+
+
 class SubstitutionReportRequest(BaseModel):
     original_label: str
     better_substitution: str

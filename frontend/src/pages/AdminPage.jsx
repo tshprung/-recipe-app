@@ -3,12 +3,42 @@ import { useState, useEffect } from 'react'
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 const ADMIN_TOKEN_KEY = 'recipe_app_admin_token'
 
+function formatApiErrorDetail(detail) {
+  if (!detail) return 'Request failed'
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    // FastAPI / Pydantic often returns [{ loc, msg, type, ... }]
+    const msgs = detail
+      .map(d => {
+        if (!d) return null
+        if (typeof d === 'string') return d
+        if (d.msg) {
+          const loc = Array.isArray(d.loc) ? d.loc.join('.') : null
+          return loc ? `${loc}: ${d.msg}` : d.msg
+        }
+        return null
+      })
+      .filter(Boolean)
+    if (msgs.length) return msgs.join('; ')
+  }
+  try {
+    return JSON.stringify(detail)
+  } catch {
+    return String(detail)
+  }
+}
+
+function toIntOr(value, fallback) {
+  const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10)
+  return Number.isFinite(n) ? n : fallback
+}
+
 async function adminRequest(token, path, options = {}) {
   const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': token, ...options.headers }
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
   if (res.status === 204) return null
   const data = await res.json().catch(() => ({ detail: 'Request failed' }))
-  if (!res.ok) throw new Error(data.detail || 'Request failed')
+  if (!res.ok) throw new Error(formatApiErrorDetail(data.detail))
   return data
 }
 
@@ -145,7 +175,15 @@ export default function AdminPage() {
                         />
                         <button
                           type="button"
-                          onClick={() => handleSetCredits(u.id, Number(limitInput[u.id]) ?? u.transformations_limit, usedInput[u.id] !== undefined && usedInput[u.id] !== '' ? Number(usedInput[u.id]) : undefined)}
+                          onClick={() =>
+                            handleSetCredits(
+                              u.id,
+                              toIntOr(limitInput[u.id], u.transformations_limit),
+                              usedInput[u.id] !== undefined && usedInput[u.id] !== ''
+                                ? toIntOr(usedInput[u.id], u.transformations_used)
+                                : undefined
+                            )
+                          }
                           disabled={actionLoading === u.id}
                           className="text-amber-600 hover:underline text-xs font-medium"
                         >

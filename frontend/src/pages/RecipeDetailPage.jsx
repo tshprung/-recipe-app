@@ -125,6 +125,7 @@ export default function RecipeDetailPage() {
   // Ingredient alternatives: off by default so users don't waste credits by accident
   const [ingredientLookupEnabled, setIngredientLookupEnabled] = useState(false)
   const [altIngredient, setAltIngredient] = useState(null)
+  const [altIngredientIndex, setAltIngredientIndex] = useState(null)
   const [altOpen, setAltOpen] = useState(false)
   const [altLoading, setAltLoading] = useState(false)
   const [altData, setAltData] = useState(null)
@@ -248,10 +249,11 @@ export default function RecipeDetailPage() {
     }
   }
 
-  function openIngredientAlternatives(ingredientLabel) {
+  function openIngredientAlternatives(ingredientLabel, ingredientIndex) {
     const label = (typeof ingredientLabel === 'string' ? ingredientLabel : '').trim()
     if (!label) return
     setAltIngredient(label)
+    setAltIngredientIndex(typeof ingredientIndex === 'number' ? ingredientIndex : null)
     setAltOpen(true)
     setAltLoading(true)
     setAltData(null)
@@ -267,6 +269,30 @@ export default function RecipeDetailPage() {
         setAltError(e.message || t('failedToAdapt'))
         setAltLoading(false)
       })
+  }
+
+  async function applyIngredientReplacement(newIngredient) {
+    if (altIngredientIndex == null) return
+    const variantType = activeTab === 'original' ? null : activeTab
+    try {
+      const updated = await api.post(`/recipes/${id}/replace-ingredient`, {
+        variant_type: variantType,
+        ingredient_index: altIngredientIndex,
+        new_ingredient: newIngredient,
+      })
+      if (variantType) {
+        setVariants(vs => vs.map(v => (v.variant_type === variantType ? { ...v, ingredients_pl: updated.ingredients_pl } : v)))
+      } else {
+        setRecipe(r => (r ? { ...r, ingredients_pl: updated.ingredients_pl } : r))
+      }
+      setAltOpen(false)
+      setAltIngredient(null)
+      setAltIngredientIndex(null)
+      setAltData(null)
+      setAltError(null)
+    } catch (e) {
+      setAltError(e.message || t('failedToAdapt'))
+    }
   }
 
   async function handleRelocalize() {
@@ -327,6 +353,7 @@ export default function RecipeDetailPage() {
             if (e.target === e.currentTarget) {
               setAltOpen(false)
               setAltIngredient(null)
+              setAltIngredientIndex(null)
               setAltData(null)
               setAltError(null)
             }
@@ -339,14 +366,13 @@ export default function RecipeDetailPage() {
               </h3>
               <button
                 type="button"
-                onClick={() => { setAltOpen(false); setAltIngredient(null); setAltData(null); setAltError(null) }}
+                onClick={() => { setAltOpen(false); setAltIngredient(null); setAltIngredientIndex(null); setAltData(null); setAltError(null) }}
                 className="p-2 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
                 aria-label={t('close')}
               >
                 ✕
               </button>
             </div>
-            <p className="text-xs text-stone-400 px-4 pb-1">{t('usesOneToken')}</p>
             <div className="p-4 overflow-y-auto flex-1 min-h-0">
               {altLoading && (
                 <div className="flex items-center justify-center py-12">
@@ -363,14 +389,34 @@ export default function RecipeDetailPage() {
                     <p className="text-sm text-stone-500">{t('noAlternativesFound')}</p>
                   ) : (
                     altData.map((a, i) => (
-                      <li key={i} className="flex flex-col gap-0.5 p-3 bg-stone-50 rounded-xl border border-stone-100">
-                        <span className="font-semibold text-stone-800">{a.name}</span>
-                        {a.notes && <span className="text-xs text-stone-500">{a.notes}</span>}
+                      <li key={i} className="p-3 bg-stone-50 rounded-xl border border-stone-100">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-stone-800 block">{a.name}</span>
+                            {a.notes && <span className="text-xs text-stone-500 block mt-0.5">{a.notes}</span>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => applyIngredientReplacement(a.name)}
+                            className="flex-shrink-0 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition-colors active:scale-95"
+                          >
+                            {t('replace') || 'Replace'}
+                          </button>
+                        </div>
                       </li>
                     ))
                   )}
                 </ul>
               )}
+            </div>
+            <div className="p-4 border-t border-stone-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setAltOpen(false); setAltIngredient(null); setAltIngredientIndex(null); setAltData(null); setAltError(null) }}
+                className="text-sm font-semibold text-stone-600 hover:text-stone-800 px-3 py-2 rounded-xl hover:bg-stone-50 transition-colors"
+              >
+                {t('cancel') || 'Cancel'}
+              </button>
             </div>
           </div>
         </div>
@@ -722,18 +768,20 @@ export default function RecipeDetailPage() {
                   const he = orig ? (typeof orig === 'object' ? `${orig.amount ?? ''} ${orig.name ?? ''}`.trim() : orig) : ''
                   return (
                     <div key={i} className="grid grid-cols-2 gap-4 py-2 border-b border-stone-50 last:border-0">
-                      {ingredientLookupEnabled ? (
-                        <button
-                          type="button"
-                          onClick={() => openIngredientAlternatives(pl)}
-                          className="text-left text-sm text-stone-700 hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                          title={t('ingredientAlternatives')}
-                        >
-                          {pl}
-                        </button>
-                      ) : (
-                        <span className="text-sm text-stone-700">{pl}</span>
-                      )}
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="text-sm text-stone-700 break-words">{pl}</span>
+                        {ingredientLookupEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => openIngredientAlternatives(pl, i)}
+                            className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                            title={t('ingredientAlternatives')}
+                            aria-label={t('ingredientAlternatives')}
+                          >
+                            ⇄
+                          </button>
+                        )}
+                      </div>
                       <span dir="rtl" className="text-sm text-stone-400 text-right">{he}</span>
                     </div>
                   )
@@ -748,18 +796,20 @@ export default function RecipeDetailPage() {
                       <span className="w-5 h-5 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                         {i + 1}
                       </span>
-                      {ingredientLookupEnabled ? (
-                        <button
-                          type="button"
-                          onClick={() => openIngredientAlternatives(label)}
-                          className="text-left hover:bg-amber-50 hover:text-amber-800 rounded-lg px-2 py-0.5 -mx-2 transition-colors cursor-pointer border border-transparent hover:border-amber-200"
-                          title={t('ingredientAlternatives')}
-                        >
-                          {label}
-                        </button>
-                      ) : (
-                        <span className="text-left">{label}</span>
-                      )}
+                      <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
+                        <span className="text-left break-words">{label}</span>
+                        {ingredientLookupEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => openIngredientAlternatives(label, i)}
+                            className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                            title={t('ingredientAlternatives')}
+                            aria-label={t('ingredientAlternatives')}
+                          >
+                            ⇄
+                          </button>
+                        )}
+                      </div>
                     </li>
                   )
                 })}
