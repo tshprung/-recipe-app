@@ -7,6 +7,14 @@ import { api } from '../api/client'
 // Use Cloudflare test key so widget always shows when no real key is set
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
+const COLORS = {
+  bg: '#111111',
+  card: '#1c1c1c',
+  text: '#F8F8F6',
+  accent: '#C96A4A',
+  secondary: '#8FAF8F',
+}
+
 const COUNTRIES = [
   { code: 'PL', name: 'Poland' },
   { code: 'IL', name: 'Israel' },
@@ -182,33 +190,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative blobs */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-200/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-orange-200/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-rose-200/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: COLORS.bg, color: COLORS.text }}>
+      {/* Subtle background accents (match landing) */}
+      <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-[30%] -left-48 h-[480px] w-[480px] rounded-full blur-3xl" style={{ backgroundColor: COLORS.accent, opacity: 0.08 }} />
+        <div className="absolute -bottom-40 right-[-120px] h-[520px] w-[520px] rounded-full blur-3xl" style={{ backgroundColor: COLORS.secondary, opacity: 0.06 }} />
+      </div>
 
-      <div className="relative bg-white rounded-3xl shadow-2xl shadow-orange-100 w-full max-w-md p-8">
+      <div className="relative w-full max-w-md rounded-3xl shadow-2xl ring-1 ring-white/10 p-8" style={{ backgroundColor: COLORS.card }}>
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-lg shadow-orange-200 text-3xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl ring-1 ring-white/10 text-3xl mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
             🍳
           </div>
-          <h1 className="text-2xl font-bold text-stone-800">{t('appTitle')}</h1>
-          <p className="text-stone-400 text-sm mt-1">{t('tagline')}</p>
+          <h1 className="text-2xl font-bold text-white/95">{t('appTitle')}</h1>
+          <p className="text-white/60 text-sm mt-1">{t('tagline')}</p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex bg-stone-100 rounded-2xl p-1 mb-6">
+        <div className="flex rounded-2xl p-1 mb-6 ring-1 ring-white/10" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}>
           {['login', 'register'].map(tabKey => (
             <button
               key={tabKey}
               onClick={() => { setTab(tabKey); setError('') }}
               className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all ${
                 tab === tabKey
-                  ? 'bg-white text-stone-800 shadow-sm'
-                  : 'text-stone-400 hover:text-stone-600'
+                  ? 'text-stone-900 shadow-sm'
+                  : 'text-white/60 hover:text-white/80'
               }`}
+              style={tab === tabKey ? { backgroundColor: COLORS.accent } : {}}
             >
               {tabKey === 'login' ? t('login') : t('register')}
             </button>
@@ -217,7 +227,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('email')}</label>
+            <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('email')}</label>
             <input
               type="email"
               value={email}
@@ -225,11 +235,11 @@ export default function LoginPage() {
               required
               autoFocus
               placeholder="you@example.com"
-              className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+              className="w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('password')}</label>
+            <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('password')}</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -238,13 +248,13 @@ export default function LoginPage() {
                 required
                 autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
                 placeholder="••••••••"
-                className="w-full border border-stone-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                className="w-full rounded-xl pl-4 pr-11 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
                 aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-                className="absolute inset-y-0 right-0 px-3 flex items-center text-stone-500 hover:text-stone-700"
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-white/50 hover:text-white/80"
               >
                 <EyeIcon open={showPassword} />
               </button>
@@ -252,7 +262,7 @@ export default function LoginPage() {
           </div>
           {tab === 'register' && (
             <div>
-              <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('confirmPassword')}</label>
+              <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('confirmPassword')}</label>
               <div className="relative">
                 <input
                   type={showPasswordConfirm ? "text" : "password"}
@@ -261,13 +271,13 @@ export default function LoginPage() {
                   required={tab === 'register'}
                   autoComplete="new-password"
                   placeholder="••••••••"
-                  className="w-full border border-stone-200 rounded-xl pl-4 pr-11 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                  className="w-full rounded-xl pl-4 pr-11 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasswordConfirm(v => !v)}
                   aria-label={showPasswordConfirm ? t('hidePassword') : t('showPassword')}
-                  className="absolute inset-y-0 right-0 px-3 flex items-center text-stone-500 hover:text-stone-700"
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-white/50 hover:text-white/80"
                 >
                   <EyeIcon open={showPasswordConfirm} />
                 </button>
@@ -278,70 +288,70 @@ export default function LoginPage() {
           {tab === 'register' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-semibold text-stone-600 mb-1.5">Site language</label>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">Site language</label>
                 <select
                   value={uiLanguage}
                   onChange={e => setUiLanguage(e.target.value)}
-                  className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                  className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                 >
-                  <option value="en">English</option>
-                  <option value="he">עברית</option>
-                  <option value="pl">Polski</option>
+                  <option value="en" className="bg-stone-800 text-white">English</option>
+                  <option value="he" className="bg-stone-800 text-white">עברית</option>
+                  <option value="pl" className="bg-stone-800 text-white">Polski</option>
                 </select>
-                <p className="text-xs text-stone-400 mt-1.5">You can change this later in Settings.</p>
+                <p className="text-xs text-white/50 mt-1.5">You can change this later in Settings.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('translateTo')}</label>
+                  <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('translateTo')}</label>
                   <select
                     value={targetLanguage}
                     onChange={e => setTargetLanguage(e.target.value)}
-                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                     required
                   >
                     {TARGET_LANGUAGES.map(l => (
-                      <option key={l.code} value={l.code}>{l.name}</option>
+                      <option key={l.code} value={l.code} className="bg-stone-800 text-white">{l.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('country')}</label>
+                  <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('country')}</label>
                   <select
                     value={targetCountry}
                     onChange={e => setTargetCountry(e.target.value)}
-                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                     required
                   >
                     {COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                      <option key={c.code} value={c.code} className="bg-stone-800 text-white">{c.code} — {c.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-stone-600 mb-1.5">ZIP</label>
+                  <label className="block text-sm font-semibold text-white/80 mb-1.5">ZIP</label>
                   <input
                     value={targetZip}
                     onChange={e => setTargetZip(e.target.value)}
                     onBlur={resolveZipToCity}
                     placeholder="e.g. 50-001"
-                    className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                    className="w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                     required
                   />
-                  {zipStatus === 'loading' && <p className="text-xs text-stone-400 mt-1">Looking up city…</p>}
-                  {zipStatus === 'error' && <p className="text-xs text-red-600 mt-1">Could not resolve city from ZIP.</p>}
+                  {zipStatus === 'loading' && <p className="text-xs text-white/50 mt-1">Looking up city…</p>}
+                  {zipStatus === 'error' && <p className="text-xs text-red-400 mt-1">Could not resolve city from ZIP.</p>}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('city')}</label>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('city')}</label>
                 <input
                   value={targetCity}
                   onChange={e => setTargetCity(e.target.value)}
                   placeholder={t('hintCity')}
-                  className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                  className="w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                   required
                 />
-                <p className="text-xs text-stone-400 mt-1.5">Auto-filled from ZIP. You can adjust if needed.</p>
+                <p className="text-xs text-white/50 mt-1.5">Auto-filled from ZIP. You can adjust if needed.</p>
               </div>
             </div>
           )}
@@ -351,7 +361,7 @@ export default function LoginPage() {
           )}
 
           {error && (
-            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-red-300 bg-red-500/20 border border-red-500/30 rounded-xl px-4 py-3">
               <span className="flex-shrink-0">⚠️</span>
               <span>{error}</span>
             </div>
@@ -360,7 +370,8 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-amber-200 mt-2"
+            className="w-full rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:opacity-95 active:scale-[0.98] mt-2 text-black shadow"
+            style={{ backgroundColor: COLORS.accent }}
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">

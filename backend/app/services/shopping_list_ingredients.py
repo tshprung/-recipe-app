@@ -27,11 +27,21 @@ COOKING_PHRASES = [
     r",\s*at\s+room\s+temperature\s*$",
     r",\s*softened\s*$",
     r",\s*melted\s*$",
+    r"\s+melted\s*$",
+    r"^\s*melted\s+",
     r"\s+for\s+coating\s*$",
     r",\s*for\s+coating\s*$",
     # "for sauce", "for shallow frying", etc. — usage, not buying info
     r",\s*for\s+[\w\s]+\s*$",
     r"\s+for\s+[\w\s]+\s*$",
+    # Prep parentheticals (do not strip "(local name, Language)" — that has comma and language word)
+    r",\s*chopped\s*\(minus\s+a\s+handful\)\s*$",
+    r",\s*\(minus\s+a\s+handful\)\s*$",
+    r"\s*\(minus\s+a\s+handful\)\s*$",
+    r",\s*\(to\s+taste\)\s*$",
+    r"\s*\(to\s+taste\)\s*$",
+    r",\s*\(optional\)\s*$",
+    r"\s*\(optional\)\s*$",
 ]
 
 # When the name part is entirely one of these (e.g. after splitting on comma), treat as empty
@@ -71,6 +81,17 @@ TABLESPOON_TSP_TO_TABLESPOONS = {
     "teaspoon": 1 / 3, "teaspoons": 1 / 3, "tsp": 1 / 3,
 }
 
+# Minimum volume for tbsp/tsp display (avoid "0 tablespoons")
+MIN_TABLESPOONS = 1 / 3  # 1 teaspoon
+
+# Oil-like names merged under one key; round up to at least 1 cup when in volume
+OIL_NAME_KEY = "oil"
+OIL_NAMES = {"oil", "olive oil", "vegetable oil", "cooking oil", "sunflower oil", "canola oil", "rapeseed oil"}
+MIN_OIL_CUPS = 1.0
+
+# Adjectives to strip for aggregation so "2 medium onions" + "1 onion" → "3 onions"
+SIZE_ADJECTIVES = {"medium", "large", "small", "ripe", "fresh", "whole", "big", "little"}
+
 
 def strip_cooking_instructions(name: str) -> str:
     """Remove cooking/prep phrases from ingredient name for shopping list."""
@@ -98,15 +119,66 @@ def _normalize_amount_range(amount: str) -> str:
     return amount
 
 
+def _extract_weight_from_parenthetical(amount: str, name: str) -> tuple[str, str]:
+    """If amount or name contains '(N g)' or '(N grams)', use that as amount. E.g. '3 tablespoons (45 grams)' + 'melted butter' → ('45 grams', 'melted butter')."""
+    combined = f"{amount} {name}"
+    match = re.search(r"\((\d+(?:\.\d+)?)\s*(g|grams?)\s*\)", combined, re.IGNORECASE)
+    if not match:
+        return amount, name
+    num, u = match.group(1), match.group(2).lower()
+    weight = f"{num} g" if u == "g" else f"{num} grams"
+    new_amount = re.sub(r"\s*\(\d+(?:\.\d+)?\s*(?:g|grams?)\s*\)\s*", " ", amount, flags=re.IGNORECASE).strip()
+    new_name = re.sub(r"\s*\(\d+(?:\.\d+)?\s*(?:g|grams?)\s*\)\s*", " ", name, flags=re.IGNORECASE).strip()
+    # Prefer weight when we found it (use it as amount and drop the volume part)
+    return weight, new_name
+
+
+# Common singulars so "onions" + "onion" merge
+_SINGULAR_PLURAL: dict[str, str] = {
+    "onions": "onion", "tomatoes": "tomato", "potatoes": "potato", "peppers": "pepper",
+    "cucumbers": "cucumber", "carrots": "carrot", "apples": "apple", "eggs": "egg",
+    "cloves": "clove", "sprigs": "sprig", "pieces": "piece", "slices": "slice",
+    "lemons": "lemon", "limes": "lime", "garlic": "garlic",
+}
+
+
+def _normalize_name_for_aggregation(name_rest: str, unit: str) -> str:
+    """Canonical name for merging: strip size adjectives, merge oil names, singularize countables."""
+    name = (name_rest or "").strip().lower()
+    if not name:
+        return (unit or "").strip().lower() or ""
+    # Merge oil variants into one key
+    if name in OIL_NAMES:
+        return OIL_NAME_KEY
+    for oil in OIL_NAMES:
+        if name.endswith(" " + oil) or name == oil:
+            return OIL_NAME_KEY
+    # Strip leading size adjectives: "medium onions" → "onions", "ripe tomatoes" → "tomatoes"
+    words = name.split()
+    while words and words[0] in SIZE_ADJECTIVES:
+        words.pop(0)
+    name = " ".join(words) if words else name
+    # Singularize for key so "onions" and "onion" merge
+    if name in _SINGULAR_PLURAL:
+        return _SINGULAR_PLURAL[name]
+    if name.endswith("s") and not name.endswith("ss") and len(name) > 2:
+        singular = name[:-1]
+        if singular in _SINGULAR_PLURAL.values():
+            return singular
+    return name
+
+
 def normalize_ingredient_for_shopping(amount: str, name: str) -> tuple[str, str]:
     """
     Normalize (amount, name) for shopping: strip cooking instructions,
-    convert 'for coating' to estimated amount 'some', and "X to Y" → Y.
+    convert 'for coating' to estimated amount 'some', "X to Y" → Y (upper bound),
+    and prefer weight in parentheses e.g. "3 tbsp (45 g)" → "45 grams".
     Returns (amount, normalized_name).
     """
     raw_name = (name or "").strip()
     amount = (amount or "").strip()
     amount = _normalize_amount_range(amount)
+    amount, raw_name = _extract_weight_from_parenthetical(amount, raw_name)
     had_for_coating = bool(re.search(r"for\s+coating", raw_name + " " + (amount or ""), re.IGNORECASE))
 
     name = strip_cooking_instructions(raw_name)
@@ -197,6 +269,18 @@ def _aggregation_key(unit: str, name_rest: str) -> tuple[str, str]:
     return (unit.strip().lower(), name.strip().lower())
 
 
+def _is_plain_water(label: str) -> bool:
+    """True if this ingredient is plain water (exclude from shopping list). Keeps special waters (sparkling, coconut, mineral, etc.)."""
+    label = (label or "").strip()
+    if not label:
+        return False
+    if label.lower() == "water":
+        return True
+    value, unit, name_rest = _tokenize_amount_and_rest(label)
+    name = ((name_rest or "").strip() or (unit or "").strip()).lower()
+    return name == "water"
+
+
 def _format_quantity(value: float, unit: str, name_rest: str) -> str:
     """Format (value, unit, name_rest) back to a single ingredient string."""
     name = (name_rest or "").strip() or unit
@@ -238,12 +322,10 @@ def aggregate_ingredients(ingredient_labels: list[str]) -> list[str]:
     Merge same ingredient and sum quantities.
     E.g. ["1 egg", "1 egg", "1/2 tablespoon salt", "1/2 tablespoon salt"]
     → ["2 eggs", "1 tablespoon salt"].
-    Volume units (tbsp + tsp) are converted and merged (e.g. 1 tbsp + 1/2 tsp salt → 1.5 tbsp salt).
-    Ingredients that cannot be parsed (e.g. "some flour") are kept as-is and not merged.
+    Volume units (tbsp + tsp) are converted and merged; minimum 1 tsp for spices.
+    Oil is merged and rounded up to at least 1 cup. "2 medium onions" + "1 onion" → "3 onions".
     """
-    # Volume ingredients: key ("_vol_tbsp", name) -> list of values in tablespoons
     volume_groups: dict[str, list[float]] = defaultdict(list)
-    # Non-volume: key (unit, name) -> list of values
     other_groups: dict[tuple[str, str], list[float]] = defaultdict(list)
     unparseable: list[str] = []
 
@@ -252,38 +334,45 @@ def aggregate_ingredients(ingredient_labels: list[str]) -> list[str]:
         if value is None:
             unparseable.append(label)
             continue
-        name_key = ((name_rest or "").strip() or (unit or "").strip()).lower()
-        if not name_key:
+        raw_name = ((name_rest or "").strip() or (unit or "").strip()).lower()
+        if not raw_name:
             unparseable.append(label)
             continue
+        name_key = _normalize_name_for_aggregation(raw_name, unit)
 
         tbsp = _tablespoon_or_teaspoon_to_tablespoons(value, unit) if unit else None
         if tbsp is not None:
             volume_groups[name_key].append(tbsp)
         else:
-            key = _aggregation_key(unit, name_rest)
+            key = (unit.strip().lower(), name_key)
             if not key[1]:
-                key = (key[0], (name_rest or unit or "").strip().lower())
+                key = (key[0], raw_name)
             other_groups[key].append(value)
 
     out: list[str] = []
     for name_key, values in volume_groups.items():
         total_tbsp = sum(values)
-        # Round to 0.25 for readability (1.17 → 1.25, 1.5 stays 1.5)
+        if total_tbsp < MIN_TABLESPOONS:
+            total_tbsp = MIN_TABLESPOONS
+        if name_key == OIL_NAME_KEY and total_tbsp < MIN_OIL_CUPS * 16:
+            total_tbsp = MIN_OIL_CUPS * 16
         total_tbsp = round(total_tbsp * 4) / 4
         out.append(_format_quantity(total_tbsp, "tablespoon", name_key))
 
     for (unit, name), values in other_groups.items():
         total = sum(values)
+        if name == OIL_NAME_KEY and unit in ("cup", "cups") and total < MIN_OIL_CUPS:
+            total = MIN_OIL_CUPS
         name_display = name
-        if unit and name and name != unit:
-            name_display = name
-        elif not unit and name:
-            name_display = name
+        if name in _SINGULAR_PLURAL.values() and total != 1:
+            plural = next((p for p, s in _SINGULAR_PLURAL.items() if s == name), name + "s")
+            name_display = plural
         out.append(_format_quantity(total, unit, name_display))
 
     out.extend(unparseable)
-    return [x for x in out if x]
+    # Exclude plain water (tap water); keep special waters e.g. sparkling, coconut, mineral
+    out = [x for x in out if x and not _is_plain_water(x)]
+    return out
 
 
 def normalize_and_aggregate(ingredient_labels: list[str]) -> list[str]:

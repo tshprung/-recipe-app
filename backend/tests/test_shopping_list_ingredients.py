@@ -80,3 +80,46 @@ def test_aggregate_tablespoon_and_teaspoon():
 def test_aggregate_sugar_tablespoons():
     result = aggregate_ingredients(["1/2 tablespoon sugar", "3 tablespoons sugar"])
     assert result == ["3.5 tablespoons sugar"]
+
+
+def test_strip_minus_a_handful():
+    assert strip_cooking_instructions("cilantro, chopped (minus a handful)") == "cilantro"
+    assert strip_cooking_instructions("cilantro (kolendra, Polish), chopped (minus a handful)") == "cilantro (kolendra, Polish)"
+
+
+def test_weight_in_parentheses():
+    amount, name = normalize_ingredient_for_shopping("3 tablespoons (45 grams)", "melted butter")
+    assert amount == "45 grams"
+    assert name == "butter"
+
+
+def test_minimum_tablespoon():
+    result = aggregate_ingredients(["1/4 teaspoon baharat"])
+    assert len(result) == 1
+    assert "baharat" in result[0]
+    assert "0 " not in result[0]
+    assert "1 teaspoon" in result[0] or "tablespoon" in result[0]
+
+
+def test_oil_minimum_one_cup():
+    result = aggregate_ingredients(["1/2 cup olive oil"])
+    assert len(result) == 1
+    assert "oil" in result[0].lower()
+    assert "1 cup" in result[0]
+
+
+def test_merge_onions_and_tomatoes():
+    result = aggregate_ingredients(["2 medium onions", "1 onion", "4 ripe tomatoes", "6 tomatoes"])
+    assert any("3 onion" in s for s in result)
+    assert any("10 tomato" in s for s in result)
+
+
+def test_plain_water_excluded():
+    from app.services.shopping_list_ingredients import _is_plain_water
+    result = aggregate_ingredients(["2 cups water", "1 cup water", "1/2 cup milk"])
+    assert not any(_is_plain_water(s) for s in result)
+    assert any("milk" in s for s in result)
+    result2 = aggregate_ingredients(["1 cup coconut water"])
+    assert any("coconut water" in s for s in result2)
+    assert not _is_plain_water("1 cup coconut water")
+    assert _is_plain_water("3 cups water")
