@@ -1,10 +1,13 @@
 import logging
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -199,3 +202,194 @@ def resend_verification(
         ) from e
 
     return {"detail": "Verification email has been resent."}
+
+
+# --- OAuth (Google, Facebook) ---
+
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+FACEBOOK_AUTH_URL = "https://www.facebook.com/v18.0/dialog/oauth"
+FACEBOOK_TOKEN_URL = "https://graph.facebook.com/v18.0/oauth/access_token"
+FACEBOOK_USERINFO_URL = "https://graph.facebook.com/me?fields=id,email,name"
+
+
+def _oauth_redirect_uri(provider: str) -> str:
+    base = (os.getenv("OAUTH_REDIRECT_BASE") or "").rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/api/auth/{provider}/callback"
+
+
+def _frontend_url(path: str = "", query: dict | None = None) -> str:
+    base = (os.getenv("FRONTEND_URL") or "").rstrip("/")
+    if not base:
+        return ""
+    url = f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
+    if query:
+        url += "?" + urlencode(query)
+    return url
+
+
+def _get_or_create_oauth_user(db: Session, email: str, name: str | None) -> models.User:
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user:
+        return user
+    # New user via OAuth: no email verification needed (provider already verified). Placeholder password so they cannot log in with email/password until they set one.
+    placeholder = secrets.token_urlsafe(32)
+    user = models.User(
+        email=email,
+        password_hash=hash_password_from_prehashed(placeholder),
+        is_verified=True,  # OAuth provider verified the email
+        ui_language="en",
+        target_language="pl",
+        target_country="PL",
+        target_city="Wrocław",
+        target_zip=None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# ----- Google -----
+
+@router.get("/google")
+def google_login(request: Request):
+    """Redirect to Google OAuth consent screen."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    redirect_uri = _oauth_redirect_uri("google")
+    if not client_id or not redirect_uri:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Google login is not configured")
+    state = secrets.token_urlsafe(16)
+    # Store state in something durable if you need to verify it in callback (e.g. redis).
+    # For minimal setup we skip state verification; in production you should verify state.
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+    return RedirectResponse(url=url)
+
+
+@router.get("/google/callback")
+def google_callback(code: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
+    if error or not code:
+        front = _frontend_url("/login", {"error": "google_denied"})
+        return RedirectResponse(url=front if front else "/login")
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    redirect_uri = _oauth_redirect_uri("google")
+    if not all([client_id, client_secret, redirect_uri]):
+        front = _frontend_url("/login", {"error": "config"})
+        return RedirectResponse(url=front if front else "/login")
+    try:
+        resp = httpx.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "code": code,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            headers={"Accept": "application/json"},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        access_token = data.get("access_token")
+        if not access_token:
+            raise ValueError("No access_token in response")
+        user_resp = httpx.get(
+            GOOGLE_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10.0,
+        )
+        user_resp.raise_for_status()
+        info = user_resp.json()
+        email = (info.get("email") or "").strip()
+        if not email:
+            raise ValueError("Google did not return email")
+        name = (info.get("name") or "").strip() or None
+    except Exception as e:
+        logger.warning("Google OAuth error: %s", e)
+        front = _frontend_url("/login", {"error": "google_failed"})
+        return RedirectResponse(url=front if front else "/login")
+    user = _get_or_create_oauth_user(db, email, name)
+    token = create_access_token(user.id)
+    front = _frontend_url("/login", {"token": token})
+    return RedirectResponse(url=front if front else "/login")
+
+
+# ----- Facebook -----
+
+@router.get("/facebook")
+def facebook_login(request: Request):
+    """Redirect to Facebook OAuth consent screen."""
+    app_id = os.getenv("FACEBOOK_APP_ID")
+    redirect_uri = _oauth_redirect_uri("facebook")
+    if not app_id or not redirect_uri:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Facebook login is not configured")
+    params = {
+        "client_id": app_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "email,public_profile",
+    }
+    url = f"{FACEBOOK_AUTH_URL}?{urlencode(params)}"
+    return RedirectResponse(url=url)
+
+
+@router.get("/facebook/callback")
+def facebook_callback(code: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
+    if error or not code:
+        front = _frontend_url("/login", {"error": "facebook_denied"})
+        return RedirectResponse(url=front if front else "/login")
+    app_id = os.getenv("FACEBOOK_APP_ID")
+    app_secret = os.getenv("FACEBOOK_APP_SECRET")
+    redirect_uri = _oauth_redirect_uri("facebook")
+    if not all([app_id, app_secret, redirect_uri]):
+        front = _frontend_url("/login", {"error": "config"})
+        return RedirectResponse(url=front if front else "/login")
+    try:
+        token_resp = httpx.post(
+            FACEBOOK_TOKEN_URL,
+            data={
+                "client_id": app_id,
+                "client_secret": app_secret,
+                "redirect_uri": redirect_uri,
+                "code": code,
+            },
+            headers={"Accept": "application/json"},
+            timeout=10.0,
+        )
+        token_resp.raise_for_status()
+        data = token_resp.json()
+        access_token = data.get("access_token")
+        if not access_token:
+            raise ValueError("No access_token in response")
+        user_resp = httpx.get(
+            f"{FACEBOOK_USERINFO_URL}&access_token={access_token}",
+            timeout=10.0,
+        )
+        user_resp.raise_for_status()
+        info = user_resp.json()
+        email = (info.get("email") or "").strip()
+        if not email:
+            raise ValueError("Facebook did not return email")
+        name = (info.get("name") or "").strip() or None
+    except Exception as e:
+        logger.warning("Facebook OAuth error: %s", e)
+        front = _frontend_url("/login", {"error": "facebook_failed"})
+        return RedirectResponse(url=front if front else "/login")
+    user = _get_or_create_oauth_user(db, email, name)
+    token = create_access_token(user.id)
+    front = _frontend_url("/login", {"token": token})
+    return RedirectResponse(url=front if front else "/login")

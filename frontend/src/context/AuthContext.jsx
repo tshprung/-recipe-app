@@ -29,30 +29,50 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = getToken()
     if (token) {
       api.get('/users/me')
         .then(me => {
           setUser(me)
           syncUiLanguageToStorage(me)
         })
-        .catch(() => localStorage.removeItem('token'))
+        .catch(() => clearToken())
         .finally(() => setLoading(false))
     } else {
       setLoading(false)
     }
   }, [])
 
-  async function login(email, password) {
+  function getToken() {
+    const usePersistent = typeof localStorage !== 'undefined' && localStorage.getItem('recipe_app_remember_me') === '1'
+    if (usePersistent) return localStorage.getItem('token')
+    return sessionStorage.getItem('token')
+  }
+
+  function clearToken() {
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
+    localStorage.setItem('recipe_app_remember_me', '0')
+  }
+
+  async function login(email, password, rememberMe = true) {
     const password_hash = await hashPasswordForTransport(password)
     const data = await api.post('/auth/login', { email, password_hash })
-    localStorage.setItem('token', data.access_token)
+    const token = data.access_token
+    localStorage.setItem('recipe_app_remember_me', rememberMe ? '1' : '0')
+    if (rememberMe) {
+      localStorage.setItem('token', token)
+      sessionStorage.removeItem('token')
+    } else {
+      sessionStorage.setItem('token', token)
+      localStorage.removeItem('token')
+    }
     const me = await api.get('/users/me')
     setUser(me)
     syncUiLanguageToStorage(me)
   }
 
-  async function register(email, password, captchaToken = null, settings) {
+  async function register(email, password, captchaToken = null, settings, rememberMe = true) {
     const password_hash = await hashPasswordForTransport(password)
     const body = {
       email,
@@ -61,16 +81,30 @@ export function AuthProvider({ children }) {
     }
     if (captchaToken) body.captcha_token = captchaToken
     await api.post('/auth/register', body)
-    await login(email, password)
+    await login(email, password, rememberMe)
   }
 
   function logout() {
-    localStorage.removeItem('token')
+    clearToken()
     setUser(null)
   }
 
+  async function setTokenFromOAuth(accessToken) {
+    if (!accessToken || typeof accessToken !== 'string') return
+    localStorage.setItem('recipe_app_remember_me', '1')
+    localStorage.setItem('token', accessToken)
+    sessionStorage.removeItem('token')
+    try {
+      const me = await api.get('/users/me')
+      setUser(me)
+      syncUiLanguageToStorage(me)
+    } catch (_) {
+      clearToken()
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, setTokenFromOAuth, loading }}>
       {children}
     </AuthContext.Provider>
   )

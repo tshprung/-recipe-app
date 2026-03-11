@@ -2,8 +2,12 @@ const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
 const LANG_STORAGE_KEY = 'recipe-app-lang'
 
+const REMEMBER_ME_KEY = 'recipe_app_remember_me'
+
 function getToken() {
-  return localStorage.getItem('token')
+  const usePersistent = localStorage.getItem(REMEMBER_ME_KEY) === '1'
+  if (usePersistent) return localStorage.getItem('token')
+  return sessionStorage.getItem('token')
 }
 
 function getLang() {
