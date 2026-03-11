@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
@@ -42,6 +43,7 @@ const TARGET_LANGUAGES = [
 
 export default function LoginPage() {
   const { t } = useLanguage()
+  const location = useLocation()
   const [tab, setTab] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,6 +62,14 @@ export default function LoginPage() {
   const { login, register } = useAuth()
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
+
+  // Allow deep-linking to Register tab: /login?tab=register
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '')
+    const next = (params.get('tab') || '').toLowerCase()
+    if (next === 'register') setTab('register')
+    if (next === 'login') setTab('login')
+  }, [location.search])
 
   // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register.
   // Script is loaded synchronously in index.html (no defer) so window.turnstile is available; we poll briefly if needed.

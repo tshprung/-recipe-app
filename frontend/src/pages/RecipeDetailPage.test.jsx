@@ -50,7 +50,23 @@ const MOCK_VEGAN_VARIANT = {
   created_at: '2024-01-01T00:00:00Z',
 }
 
+const DEFAULT_USER = {
+  id: 1,
+  email: 'u@u.com',
+  ui_language: 'en',
+  target_language: 'pl',
+  target_country: 'PL',
+  target_city: 'Wrocław',
+  target_zip: null,
+  transformations_used: 0,
+  transformations_limit: 5,
+  is_verified: true,
+  account_tier: 'free',
+  created_at: '2024-01-01T00:00:00Z',
+}
+
 function renderPage(id = '1') {
+  localStorage.setItem('token', 'test-token')
   return render(
     <AuthProvider>
       <LanguageProvider>
@@ -67,9 +83,10 @@ function renderPage(id = '1') {
 describe('RecipeDetailPage — adaptation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    api.get.mockImplementation(path =>
-      path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
-    )
+    api.get.mockImplementation(path => {
+      if (path === '/users/me') return Promise.resolve(DEFAULT_USER)
+      return path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
+    })
   })
 
   it('shows Original badge on the original recipe', async () => {
@@ -190,6 +207,7 @@ describe('RecipeDetailPage — re-localize', () => {
 describe('RecipeDetailPage — error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.setItem('token', 'test-token')
   })
 
   it('shows the actual API error message when the recipe fetch fails', async () => {

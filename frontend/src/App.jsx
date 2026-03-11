@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { LanguageProvider, useLanguage } from './context/LanguageContext'
 import { ShoppingListProvider } from './context/ShoppingListContext'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
 import RecipeListPage from './pages/RecipeListPage'
@@ -75,8 +76,10 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/verify" element={<VerifyPage />} />
-        <Route path="*" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )
   }
@@ -96,6 +99,7 @@ function AppRoutes() {
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
               <Route path="/settings"    element={<SettingsPage />} />
               <Route path="/verify"      element={<VerifyPage />} />
+              <Route path="/login"       element={<Navigate to="/" replace />} />
               <Route path="*"            element={<Navigate to="/" replace />} />
             </Routes>
           </main>
