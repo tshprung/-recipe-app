@@ -113,7 +113,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero - very simple, food-first */}
+      {/* Hero - food-first with strong overlay for readability */}
       <section
         className="relative overflow-hidden"
         style={{
@@ -122,12 +122,12 @@ export default function LandingPage() {
           backgroundPosition: 'center',
         }}
       >
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/80 to-black/85" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/80 via-black/85 to-black/90" />
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-16 sm:pb-24">
-          <div className="max-w-2xl">
+          <div className="max-w-2xl rounded-3xl bg-black/60 backdrop-blur-sm px-5 sm:px-7 py-6 sm:py-8 shadow-xl shadow-black/40">
             <div
               className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs text-white/80 ring-1 ring-white/10"
-              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS.accent }} />
               AI that understands real home cooking

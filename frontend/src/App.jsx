@@ -86,7 +86,7 @@ function AppRoutes() {
 
   return (
     <ShoppingListProvider>
-      <div className="min-h-screen bg-stone-50">
+      <div className="min-h-screen bg-[#111111] text-stone-50">
         <FoodBackground />
         {/* Wrap content in relative z-[1] so it sits above the fixed background */}
         <div className="relative" style={{ zIndex: 1 }}>

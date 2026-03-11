@@ -104,14 +104,15 @@ def get_shopping_list(
         return {"recipe_ids": [], "items": _EMPTY_ITEMS.copy()}
 
     snapshot = sorted(recipe_ids)
-    cached = (
+    # We cannot reliably compare JSON arrays directly in Postgres (no json = json operator in some setups),
+    # so fetch this user's cache rows and match the snapshot in Python.
+    cached_rows = (
         db.query(models.ShoppingListCache)
-        .filter(
-            models.ShoppingListCache.user_id == current_user.id,
-            models.ShoppingListCache.recipe_ids_snapshot == snapshot,
-        )
-        .first()
+        .filter(models.ShoppingListCache.user_id == current_user.id)
+        .order_by(models.ShoppingListCache.updated_at.desc())
+        .all()
     )
+    cached = next((row for row in cached_rows if row.recipe_ids_snapshot == snapshot), None)
     if cached:
         return {"recipe_ids": recipe_ids, "items": cached.items}
 
