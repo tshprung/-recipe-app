@@ -21,8 +21,9 @@ export function AuthProvider({ children }) {
   async function refreshUser() {
     try {
       const me = await api.get('/users/me')
-      setUser(me)
-      syncUiLanguageToStorage(me)
+      const user = storeRenewedToken(me)
+      setUser(user)
+      syncUiLanguageToStorage(user)
     } catch (_) {
       /* ignore */
     }
@@ -33,8 +34,9 @@ export function AuthProvider({ children }) {
     if (token) {
       api.get('/users/me')
         .then(me => {
-          setUser(me)
-          syncUiLanguageToStorage(me)
+          const user = storeRenewedToken(me)
+          setUser(user)
+          syncUiLanguageToStorage(user)
         })
         .catch(() => clearToken())
         .finally(() => setLoading(false))
@@ -55,6 +57,15 @@ export function AuthProvider({ children }) {
     localStorage.setItem('recipe_app_remember_me', '0')
   }
 
+  function storeRenewedToken(me) {
+    if (!me || !me.renewed_token) return me
+    const usePersistent = localStorage.getItem('recipe_app_remember_me') === '1'
+    if (usePersistent) localStorage.setItem('token', me.renewed_token)
+    else sessionStorage.setItem('token', me.renewed_token)
+    const { renewed_token: _, ...rest } = me
+    return rest
+  }
+
   async function login(email, password, rememberMe = true) {
     const password_hash = await hashPasswordForTransport(password)
     const data = await api.post('/auth/login', { email, password_hash })
@@ -68,8 +79,9 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('token')
     }
     const me = await api.get('/users/me')
-    setUser(me)
-    syncUiLanguageToStorage(me)
+    const user = storeRenewedToken(me)
+    setUser(user)
+    syncUiLanguageToStorage(user)
   }
 
   async function register(email, password, captchaToken = null, settings, rememberMe = true) {
@@ -96,8 +108,9 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('token')
     try {
       const me = await api.get('/users/me')
-      setUser(me)
-      syncUiLanguageToStorage(me)
+      const user = storeRenewedToken(me)
+      setUser(user)
+      syncUiLanguageToStorage(user)
     } catch (_) {
       clearToken()
     }

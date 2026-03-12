@@ -279,7 +279,7 @@ def google_login(request: Request):
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
-        "prompt": "consent",
+        # No "prompt": returning users who already approved may skip the consent screen and stay logged in
     }
     url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
     return RedirectResponse(url=url)

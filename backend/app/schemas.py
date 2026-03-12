@@ -53,6 +53,7 @@ class UserOut(BaseModel):
     account_tier: str
     created_at: datetime
     is_admin: bool = False
+    renewed_token: str | None = None  # set by backend on GET /users/me to slide expiry; client stores and does not put in user state
 
     model_config = {"from_attributes": True}
 

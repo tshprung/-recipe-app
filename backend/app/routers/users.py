@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import get_current_user
+from ..auth import get_current_user, create_access_token
 from ..database import get_db
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -19,6 +19,8 @@ def _admin_emails() -> set[str]:
 def get_me(current_user: models.User = Depends(get_current_user)):
     data = schemas.UserOut.model_validate(current_user).model_dump()
     data["is_admin"] = (current_user.email or "").strip().lower() in _admin_emails()
+    # Sliding expiry: issue a new token on every visit so the counter resets
+    data["renewed_token"] = create_access_token(current_user.id)
     return schemas.UserOut(**data)
 
 
