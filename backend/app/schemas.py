@@ -411,3 +411,16 @@ class AdminUpgradeUserRequest(BaseModel):
     email: EmailStr
     new_limit: int
     transformations_used: int | None = None  # optional reset of used count
+
+
+class AdminTrialIpWhitelistIn(BaseModel):
+    ip_address: str
+    label: str | None = None
+
+
+class AdminTrialIpWhitelistOut(BaseModel):
+    id: int
+    ip_address: str
+    label: str | None = None
+
+    model_config = {"from_attributes": True}

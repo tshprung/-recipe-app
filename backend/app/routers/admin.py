@@ -73,6 +73,52 @@ def upgrade_user(
     return {"detail": "User upgraded.", "email": user.email, "new_limit": user.transformations_limit}
 
 
+@router.get("/trial-ip-whitelist", response_model=list[schemas.AdminTrialIpWhitelistOut])
+def list_trial_ip_whitelist(
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_admin),
+):
+    rows = db.query(models.TrialIpWhitelist).order_by(models.TrialIpWhitelist.id).all()
+    return [schemas.AdminTrialIpWhitelistOut.model_validate(r) for r in rows]
+
+
+@router.post("/trial-ip-whitelist", response_model=schemas.AdminTrialIpWhitelistOut)
+def add_trial_ip_whitelist(
+    payload: schemas.AdminTrialIpWhitelistIn,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_admin),
+):
+    ip = (payload.ip_address or "").strip()
+    if not ip:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ip_address is required")
+    existing = db.query(models.TrialIpWhitelist).filter(models.TrialIpWhitelist.ip_address == ip).first()
+    if existing:
+        existing.label = payload.label
+        db.commit()
+        db.refresh(existing)
+        return schemas.AdminTrialIpWhitelistOut.model_validate(existing)
+
+    row = models.TrialIpWhitelist(ip_address=ip, label=payload.label)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return schemas.AdminTrialIpWhitelistOut.model_validate(row)
+
+
+@router.delete("/trial-ip-whitelist/{row_id}")
+def delete_trial_ip_whitelist(
+    row_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_admin),
+):
+    row = db.get(models.TrialIpWhitelist, row_id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Whitelist entry not found")
+    db.delete(row)
+    db.commit()
+    return {"detail": "Whitelist entry deleted."}
+
+
 @router.post("/users/{user_id}/block")
 def block_user(
     user_id: int,

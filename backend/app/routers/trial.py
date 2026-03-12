@@ -71,17 +71,24 @@ def trial_start(request: Request, db: Session = Depends(get_db)):
     # IP guard: last 24h
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     if client_ip:
-        count = db.scalar(
-            select(func.count(models.TrialSession.id)).where(
-                models.TrialSession.ip_address == client_ip,
-                models.TrialSession.created_at >= cutoff,
+        # Allow whitelisted IPs to bypass per-IP trial limits (for admin/dev use).
+        whitelisted = db.scalar(
+            select(models.TrialIpWhitelist.id).where(
+                models.TrialIpWhitelist.ip_address == client_ip
             )
-        ) or 0
-        if count >= MAX_TRIAL_SESSIONS_PER_IP_24H:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many trial sessions from this device.",
-            )
+        )
+        if not whitelisted:
+            count = db.scalar(
+                select(func.count(models.TrialSession.id)).where(
+                    models.TrialSession.ip_address == client_ip,
+                    models.TrialSession.created_at >= cutoff,
+                )
+            ) or 0
+            if count >= MAX_TRIAL_SESSIONS_PER_IP_24H:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many trial sessions from this device.",
+                )
 
     token_id = secrets.token_urlsafe(16)[:32]
     now = datetime.now(timezone.utc)

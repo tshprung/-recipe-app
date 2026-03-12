@@ -227,6 +227,16 @@ class TrialSession(Base):
     )
 
 
+class TrialIpWhitelist(Base):
+    """IP addresses exempt from trial per-IP limits (admin-managed)."""
+
+    __tablename__ = "trial_ip_whitelist"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ip_address: Mapped[str] = mapped_column(String(45), unique=True, nullable=False, index=True)
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+
 class IngredientSubstitution(Base):
     __tablename__ = "ingredient_substitutions"
 
