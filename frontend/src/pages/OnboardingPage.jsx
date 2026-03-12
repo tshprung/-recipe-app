@@ -83,7 +83,7 @@ const defaultOnboarding = () => ({
 
 export default function OnboardingPage() {
   const { t } = useLanguage()
-  const { login, register, setTokenFromOAuth } = useAuth()
+  const { login, register, setTokenFromOAuth, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [data, setData] = useState(defaultOnboarding)
@@ -267,6 +267,7 @@ export default function OnboardingPage() {
       if (claimToken) {
         try {
           await api.post('/users/me/claim-starter-recipes', buildClaimPayload())
+          await refreshUser?.()
         } catch (_) {}
       }
       navigate('/', { replace: true })
@@ -348,6 +349,18 @@ export default function OnboardingPage() {
                   />
                 </div>
                 {zipResolving && <p className="text-white/50 text-xs mt-1">Looking up city…</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">App / website language</label>
+                <select
+                  value={data.ui_language}
+                  onChange={(e) => set('ui_language')(e.target.value)}
+                  className={inputCls}
+                >
+                  {TARGET_LANGUAGES.slice(0, 8).map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-1.5">Recipe language</label>

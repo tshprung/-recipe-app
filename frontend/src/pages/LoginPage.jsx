@@ -71,7 +71,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
-  const { login, register, setTokenFromOAuth } = useAuth()
+  const { login, register, setTokenFromOAuth, refreshUser } = useAuth()
   const navigate = useNavigate()
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
@@ -89,6 +89,7 @@ export default function LoginPage() {
             const payload = JSON.parse(raw)
             await api.post('/users/me/claim-starter-recipes', payload)
             sessionStorage.removeItem('onboarding_claim')
+            await refreshUser?.()
           }
         } catch (_) {}
         navigate('/', { replace: true })

@@ -180,7 +180,7 @@ export default function SettingsPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <SettingsCard icon="🗣️" title={t('language')}>
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('appLanguage')}</label>
             <select
               value={form.ui_language}
               onChange={e => setForm(f => ({ ...f, ui_language: e.target.value }))}
@@ -195,7 +195,7 @@ export default function SettingsPage() {
 
         <SettingsCard icon="🌐" title={t('translateTo')}>
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('language')}</label>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('recipeLanguage')}</label>
             <select
               value={form.target_language}
               onChange={e => setForm(f => ({ ...f, target_language: e.target.value }))}

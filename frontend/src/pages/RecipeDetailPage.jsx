@@ -118,10 +118,6 @@ export default function RecipeDetailPage() {
   const [adaptError, setAdaptError] = useState(null)
   const dropdownRef = useRef(null)
 
-  // Re-localize state
-  const [relocalizeLoading, setRelocalizeLoading] = useState(false)
-  const [relocalizeToast, setRelocalizeToast] = useState(null)
-
   // Ingredient alternatives: off by default so users don't waste credits by accident
   const [ingredientLookupEnabled, setIngredientLookupEnabled] = useState(false)
   const [altIngredient, setAltIngredient] = useState(null)
@@ -130,13 +126,6 @@ export default function RecipeDetailPage() {
   const [altLoading, setAltLoading] = useState(false)
   const [altData, setAltData] = useState(null)
   const [altError, setAltError] = useState(null)
-
-  const needsRelocalize =
-    user &&
-    recipe &&
-    (recipe.target_language !== user.target_language ||
-      recipe.target_country !== user.target_country ||
-      (recipe.target_city || '').trim() !== (user.target_city || '').trim())
 
   useEffect(() => {
     Promise.all([
@@ -304,24 +293,6 @@ export default function RecipeDetailPage() {
     }
   }
 
-  async function handleRelocalize() {
-    setRelocalizeLoading(true)
-    setAdaptDropdownOpen(false)
-    try {
-      const updated = await api.post(`/recipes/${id}/relocalize`, {})
-      setRecipe(updated)
-      setActiveTab('original')
-      setRelocalizeToast(t('relocalized'))
-      setTimeout(() => setRelocalizeToast(null), 2500)
-      await refreshUser()
-    } catch (e) {
-      setRelocalizeToast(e.message || t('failedToRelocalize'))
-      setTimeout(() => setRelocalizeToast(null), 3500)
-    } finally {
-      setRelocalizeLoading(false)
-    }
-  }
-
   if (loading) return (
     <div className="flex justify-center py-20">
       <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -348,12 +319,6 @@ export default function RecipeDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
-      {relocalizeToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-stone-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg pointer-events-none">
-          {relocalizeToast}
-        </div>
-      )}
-
       {/* Ingredient alternatives modal */}
       {altOpen && (
         <div
@@ -439,22 +404,6 @@ export default function RecipeDetailPage() {
         >
           ← {t('back')}
         </button>
-
-        {needsRelocalize && (
-          <button
-            onClick={handleRelocalize}
-            disabled={relocalizeLoading || adaptLoading}
-            className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
-            title={t('relocalizeHint')}
-          >
-            {relocalizeLoading ? (
-              <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
-            ) : (
-              '🌍'
-            )}
-            {t('relocalize')}
-          </button>
-        )}
 
         {/* Adapt dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -585,6 +534,16 @@ export default function RecipeDetailPage() {
             </div>
           )}
 
+          {/* Diet tags (e.g. Kosher — recipe fits this diet) */}
+          {recipe.diet_tags?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {recipe.diet_tags.map((key, i) => (
+                <span key={i} className="text-xs font-semibold rounded-full px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </span>
+              ))}
+            </div>
+          )}
           {/* Tags */}
           {recipe.tags?.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -687,10 +646,24 @@ export default function RecipeDetailPage() {
             </p>
             {recipe.title_original && activeTab === 'original' && (
               <button
-                onClick={() => setShowOriginal(v => !v)}
+                onClick={() => {
+                  const w = window.open('', '_blank', 'noopener,noreferrer')
+                  if (!w) return
+                  const lang = (recipe.detected_language || 'en').substring(0, 5)
+                  const escaped = (recipe.raw_input || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                  const title = (recipe.title_original || 'Original recipe').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  w.document.write(
+                    `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1c1917;} pre{white-space:pre-wrap;word-wrap:break-word;}</style></head><body><h1>${title}</h1><pre>${escaped}</pre></body></html>`
+                  )
+                  w.document.close()
+                }}
                 className="text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors bg-stone-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg border border-stone-100"
               >
-                {showOriginal ? `✕ ${t('hideOriginal')}` : `⇔ ${t('showOriginal')}`}
+                ⇔ {t('showOriginal')}
               </button>
             )}
           </div>

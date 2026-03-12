@@ -241,16 +241,20 @@ def ensure_starter_recipes_for_user(user, db) -> None:
         dish_preferences=user.dish_preferences or None,
         diet_filters=user.diet_filters or None,
     )
-    add_starter_recipes_to_user(user, recipes_data, db)
+    add_starter_recipes_to_user(user, recipes_data, db, diet_filters=user.diet_filters or None)
 
 
-def add_starter_recipes_to_user(user, recipes_data: list[dict], db) -> None:
+def add_starter_recipes_to_user(
+    user, recipes_data: list[dict], db, diet_filters: list[str] | None = None
+) -> None:
     """
     Create Recipe rows from recipes_data and attach to user; set starter_recipes_added=True.
+    If diet_filters is set (e.g. ["kosher"]), set recipe.diet_tags so the UI can show a diet badge.
     Used by ensure_starter_recipes_for_user and by onboarding claim.
     """
     from .. import models
 
+    diet_tags = list(diet_filters) if diet_filters else []
     for r in recipes_data:
         title = (r.get("title") or "").strip() or "Recipe"
         ingredients = r.get("ingredients") or []
@@ -280,6 +284,7 @@ def add_starter_recipes_to_user(user, recipes_data: list[dict], db) -> None:
             author_name=(r.get("author_name") or "").strip() or None,
             author_bio=(r.get("author_bio") or "").strip() or None,
             author_image_url=(r.get("author_image_url") or "").strip() or None,
+            diet_tags=diet_tags,
         )
         db.add(recipe)
     user.starter_recipes_added = True

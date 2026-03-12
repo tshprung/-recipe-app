@@ -59,6 +59,16 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
           </p>
         )}
 
+        {/* Diet tags (e.g. Kosher) */}
+        {recipe.diet_tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {recipe.diet_tags.map((key, i) => (
+              <span key={`d-${i}`} className="text-xs font-medium rounded-full px-2.5 py-0.5 bg-emerald-100 text-emerald-800">
+                {key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              </span>
+            ))}
+          </div>
+        )}
         {/* Tags */}
         {recipe.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2 mb-3">

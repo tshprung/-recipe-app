@@ -64,7 +64,7 @@ export default function LandingPage() {
             <nav className="hidden md:flex items-center gap-6 text-sm text-white/75">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-              <Link to="/onboarding" className="hover:text-white transition-colors">Sign In</Link>
+              <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
             </nav>
 
             <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ export default function LandingPage() {
               >
                 <a onClick={() => setMobileOpen(false)} href="#features" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Features</a>
                 <a onClick={() => setMobileOpen(false)} href="#pricing" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Pricing</a>
-                <Link onClick={() => setMobileOpen(false)} to="/onboarding" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Sign In</Link>
+                <Link onClick={() => setMobileOpen(false)} to="/login" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Sign In</Link>
                 <Link
                   onClick={() => setMobileOpen(false)}
                   to="/onboarding"
@@ -150,7 +150,7 @@ export default function LandingPage() {
                 Start Free
               </Link>
               <Link
-                to="/onboarding"
+                to="/login"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
                 style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
               >
@@ -362,7 +362,7 @@ export default function LandingPage() {
                 Start Free
               </Link>
               <Link
-                to="/onboarding"
+                to="/login"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
               >

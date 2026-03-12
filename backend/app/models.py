@@ -84,6 +84,9 @@ class Recipe(Base):
     author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Diet compliance tags (e.g. ["kosher"] for starter recipes created with that diet)
+    diet_tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
     # Times + rating (user-owned)
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cook_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)

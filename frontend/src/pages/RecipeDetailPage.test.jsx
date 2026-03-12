@@ -195,14 +195,6 @@ describe('RecipeDetailPage — re-localize', () => {
     })
   })
 
-  it('shows Re-localize button and calls POST /recipes/1/relocalize', async () => {
-    api.post.mockResolvedValue({ ...MOCK_RECIPE, title_pl: 'Zupa Pomidorowa 2' })
-    renderPage()
-    await screen.findByText('Zupa Pomidorowa')
-    const relocalizeBtn = await screen.findByRole('button', { name: /Re-localize/i })
-    await userEvent.click(relocalizeBtn)
-    expect(api.post).toHaveBeenCalledWith('/recipes/1/relocalize', {})
-  })
 })
 
 describe('RecipeDetailPage — error handling', () => {

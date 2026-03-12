@@ -52,6 +52,8 @@ Plans, bugs, and improvements deferred to a later release.
 
 - **Difficulty or "beginner-friendly"** — Tag or filter recipes by difficulty or time (e.g. under 30 min) so they can pick by busy vs relaxed days.
 
+- **Update existing recipe after changing location/language** — Option to re-localize or update an existing recipe when the user changes their location or recipe language in Settings (Re-localize button removed from UI for now; add back as a dedicated flow or per-recipe "Update to my current settings" action).
+
 - **Ingredient alternatives — credits** — Surface and enforce that using ingredient alternatives consumes credits (e.g. 1 token per lookup). Show remaining credits in the alternatives flow and handle “insufficient credits” (e.g. message or upgrade prompt). Currently the feature ignores credit cost.
 
 ---

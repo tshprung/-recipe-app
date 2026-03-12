@@ -124,7 +124,10 @@ def claim_starter_recipes(
     if not current_user.starter_recipes_added:
         count = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).count()
         if count == 0:
-            add_starter_recipes_to_user(current_user, row.recipes_data, db)
+            add_starter_recipes_to_user(
+                current_user, row.recipes_data, db,
+                diet_filters=payload.diet_filters or None,
+            )
     db.delete(row)
     db.commit()
     return None
