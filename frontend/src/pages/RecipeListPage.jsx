@@ -40,7 +40,7 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
 
   return (
     <div
-      onClick={() => navigate(`/recipes/${recipe.id}`)}
+      onClick={() => navigate(`/recipes/${recipe.id}`, { state: { recipe } })}
       className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-stone-100 overflow-hidden cursor-pointer transition-all duration-200 group hover:-translate-y-1 flex flex-col"
     >
       {/* Accent strip */}
@@ -254,8 +254,8 @@ export default function RecipeListPage() {
           prep_time_minutes: null,
           cook_time_minutes: null,
           user_rating: null,
-          diet_tags: [],
-          image_url: null,
+          diet_tags: r.diet_tags ?? [],
+          image_url: r.image_url ?? null,
         }))
         setRecipes(mapped)
       } else {

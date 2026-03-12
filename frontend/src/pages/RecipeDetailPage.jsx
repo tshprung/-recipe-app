@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api, getRecipeImageUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -98,6 +98,7 @@ function variantDisplayLabel(variantType, t) {
 export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, refreshUser } = useAuth()
   const { t } = useLanguage()
 
@@ -133,6 +134,17 @@ export default function RecipeDetailPage() {
   const fileInputRef = useRef(null)
 
   useEffect(() => {
+    // If we navigated here with a trial starter recipe (negative id) in location.state,
+    // use that data directly and avoid backend calls that require authentication.
+    const stateRecipe = location.state && location.state.recipe
+    if (stateRecipe && typeof stateRecipe.id === 'number' && stateRecipe.id < 0) {
+      setRecipe(stateRecipe)
+      setNotes(stateRecipe.user_notes ?? '')
+      setVariants([])
+      setLoading(false)
+      return
+    }
+
     Promise.all([
       api.get(`/recipes/${id}`),
       api.get(`/recipes/${id}/variants`),
@@ -144,7 +156,7 @@ export default function RecipeDetailPage() {
       })
       .catch(e => setError(e.message || t('recipeNotFound')))
       .finally(() => setLoading(false))
-  }, [id, t])
+  }, [id, t, location.state])
 
   // Close dropdown when clicking outside
   useEffect(() => {
