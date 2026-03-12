@@ -24,13 +24,31 @@ Plans, bugs, and improvements deferred to a later release.
 
 - **Dish-type preferences at registration** — After the language/location step, add a page where the user selects types of dishes they like (e.g. pasta, pizza, beef, chicken, soups, salads, baking, breakfast). Store and use for suggestions/starter recipes.
 
-- **Allergens page** — A page (or section) where the user can declare allergens they are sensitive to or do not want in their diet. Use when suggesting or adapting recipes so results exclude or flag those ingredients.
+- ~~**Allergens page**~~ — Done: “Cooking & diet” section in Settings stores allergen codes + free-text avoid terms; used in “What can I make” suggestions (best effort).
 
 - **Settings: centralise preferences** — All of the above (location, languages, dish-type preferences, allergens) should be editable from the Settings page, not only at registration.
 
 - **Discover / find recipes from internet or AI** — A page or tab where the user can choose recipe type, diet, restrictions (and optionally a specific or famous cook) and get suggestions from the web or AI. Parameters to consider: dish type, diet, allergens, cuisine, cook name, max time, ingredients to include/avoid. Ideas: search by famous cook; exclude specific ingredients; "what's in season"; limit to one source (e.g. trusted sites). Decide what NOT to allow (e.g. unsafe sources, unclear licensing).
 
-- **Serving size / number of people** — In settings and/or when opening a recipe, let the user set how many people they are cooking for. Scale recipe quantities accordingly and show "Serves N" in the recipe.
+- ~~**Serving size / number of people**~~ — Done (partial): user-level “I usually cook for N people” stored in Settings. Next: ingredient quantity scaling + per-recipe override.
+
+- **Adapt recipe for kids** — Let the user take any recipe and get a kid-friendly version: safe (no choking hazards, no honey under 1, food-safe) and healthier (less salt/sugar, age-appropriate portions and textures). Optional: store "cooking for kids" and age range(s) (e.g. 1 and 4) in settings; use in adaptation and in "find recipe" filters.
+
+- **Recipe notes: high sugar / high salt / spicy etc.** — Allow notes or tags on each recipe (or per variant) such as high sugar, high salt, spicy, so users can see at a glance and filter. Could be AI-derived on import or user-set.
+
+- **Household profiles / per-recipe serving override** — Optional profiles (e.g. different allergens per person) or at least override "cooking for N" per recipe when different from default.
+
+- **Meal plan (week view)** — Plan which recipes to cook on which days; feed into shopping and reduce "what's for dinner" decisions.
+
+- **"Would make again" / simple rating** — Partially done: per-recipe 1–5 star rating exists. Next: “Would make again” toggle and list/filter surfaces.
+
+- **Leftovers note** — Optional note or tag that a recipe keeps well or how to reheat, for next-day planning.
+
+- **Shopping list by store section** — Group shopping list by store section (dairy, produce, etc.) so the list matches the way they walk the store.
+
+- **"What I have" vs "what I need" on recipe** — Show missing ingredients or "you have 12 of 15" on the recipe card so they can decide to swap or go to the store.
+
+- **Difficulty or "beginner-friendly"** — Tag or filter recipes by difficulty or time (e.g. under 30 min) so they can pick by busy vs relaxed days.
 
 - **Ingredient alternatives — credits** — Surface and enforce that using ingredient alternatives consumes credits (e.g. 1 token per lookup). Show remaining credits in the alternatives flow and handle “insufficient credits” (e.g. message or upgrade prompt). Currently the feature ignores credit cost.
 
