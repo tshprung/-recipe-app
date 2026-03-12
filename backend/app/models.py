@@ -28,6 +28,7 @@ class User(Base):
     starter_recipes_added: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Cooking preferences
+    dish_preferences: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # e.g. ["pasta", "soups", "chicken"]
     default_servings: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
     allergens: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     custom_allergens_text: Mapped[str | None] = mapped_column(Text, nullable=True)

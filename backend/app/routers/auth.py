@@ -73,6 +73,9 @@ def register(
         target_country=payload.target_country,
         target_city=payload.target_city,
         target_zip=payload.target_zip,
+        dish_preferences=payload.dish_preferences or [],
+        default_servings=payload.default_servings if payload.default_servings is not None else 4,
+        allergens=payload.allergens or [],
     )
 
     # Generate verification token (24h expiry)

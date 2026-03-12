@@ -787,12 +787,8 @@ def ingredient_alternatives(
     ):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="You have reached the free recipes limit. Contact the administrator.",
+            detail="Insufficient credits. Ingredient alternatives use one credit. Contact the administrator or upgrade.",
         )
-
-    if not _has_unlimited_quota(current_user):
-        user_for_update.transformations_used += 1
-    db.commit()
 
     target_lang = (current_user.target_language or "").strip() or "en"
     try:
@@ -804,6 +800,10 @@ def ingredient_alternatives(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+
+    if not _has_unlimited_quota(current_user):
+        user_for_update.transformations_used += 1
+    db.commit()
 
     return schemas.IngredientAlternativesOut(
         alternatives=[schemas.IngredientAlternativeOut(name=a["name"], notes=a.get("notes")) for a in alternatives],

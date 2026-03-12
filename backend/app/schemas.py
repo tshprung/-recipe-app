@@ -50,6 +50,24 @@ class UserRegister(BaseModel):
     target_country: str
     target_city: str
     target_zip: str | None = None
+    dish_preferences: list[str] | None = None
+    default_servings: int | None = None
+    allergens: list[str] | None = None
+
+    @field_validator("allergens")
+    @classmethod
+    def validate_register_allergens(cls, v: list[str] | None) -> list[str]:
+        if v is None:
+            return []
+        cleaned: list[str] = []
+        for raw in v:
+            code = (raw or "").strip().lower()
+            if not code or code in cleaned:
+                continue
+            if code not in ALLOWED_ALLERGEN_CODES:
+                raise ValueError(f"Unknown allergen code: {code}")
+            cleaned.append(code)
+        return cleaned
 
 
 class UserLogin(BaseModel):
@@ -70,6 +88,7 @@ class UserSettings(BaseModel):
     target_country: str
     target_city: str
     target_zip: str | None = None
+    dish_preferences: list[str] = Field(default_factory=list)
     default_servings: int = Field(default=4, ge=1, le=24)
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
@@ -109,6 +128,7 @@ class UserOut(BaseModel):
     created_at: datetime
     is_admin: bool = False
     renewed_token: str | None = None  # set by backend on GET /users/me to slide expiry; client stores and does not put in user state
+    dish_preferences: list[str] = Field(default_factory=list)
     default_servings: int = 4
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
