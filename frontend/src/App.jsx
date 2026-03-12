@@ -61,7 +61,7 @@ function FoodBackground() {
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth()
+  const { user, trialToken, loading } = useAuth()
   const { t } = useLanguage()
 
   if (loading) {
@@ -75,7 +75,7 @@ function AppRoutes() {
     )
   }
 
-  if (!user) {
+  if (!user && !trialToken) {
     return (
       <Routes>
         <Route path="/admin" element={<AdminPage />} />
