@@ -652,7 +652,7 @@ export default function OnboardingPage() {
               <button type="button" onClick={() => setStep(2)} className="text-sm text-white/60 hover:text-white/80">
                 Back
               </button>
-              <Link to="/login" className="text-sm text-white/60 hover:text-white/80">Already have an account? Sign in here</Link>
+              <Link to="/signin" className="text-sm text-white/60 hover:text-white/80">Already have an account? Sign in here</Link>
             </div>
           </>
         )}

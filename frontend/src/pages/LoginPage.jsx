@@ -1,11 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
-
-// Use Cloudflare test key so widget always shows when no real key is set
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 const API_BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
 const COLORS = {
@@ -53,25 +50,14 @@ const TARGET_LANGUAGES = [
 export default function LoginPage() {
   const { t } = useLanguage()
   const location = useLocation()
-  const [tab, setTab] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [passwordConfirm, setPasswordConfirm] = useState('')
-  const [uiLanguage, setUiLanguage] = useState('en')
-  const [targetLanguage, setTargetLanguage] = useState('pl')
-  const [targetCountry, setTargetCountry] = useState('PL')
-  const [targetCity, setTargetCity] = useState('Wrocław')
-  const [targetZip, setTargetZip] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
-  const [turnstileToken, setTurnstileToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
-  const { login, register, setTokenFromOAuth, refreshUser } = useAuth()
+  const { login, setTokenFromOAuth, refreshUser } = useAuth()
   const navigate = useNavigate()
-  const turnstileContainerRef = useRef(null)
-  const turnstileWidgetIdRef = useRef(null)
 
   // Handle OAuth callback: ?token=... or ?error=... (claim onboarding starter recipes if user came from onboarding)
   useEffect(() => {
@@ -100,66 +86,9 @@ export default function LoginPage() {
           ? 'Sign-in failed. Try again or use email.'
           : 'Something went wrong.'
       setError(msg)
-      navigate('/login', { replace: true })
+      navigate('/signin', { replace: true })
     }
   }, [location.search, setTokenFromOAuth, navigate])
-
-  // Allow deep-linking to Register tab: /login?tab=register
-  useEffect(() => {
-    const params = new URLSearchParams(location.search || '')
-    const next = (params.get('tab') || '').toLowerCase()
-    if (next === 'register') setTab('register')
-    if (next === 'login') setTab('login')
-  }, [location.search])
-
-  // On Register tab mount: fetch geo once for registration defaults (no visible location fields)
-  useEffect(() => {
-    if (tab !== 'register') return
-    let cancelled = false
-    api.get('/meta/geo').then((data) => {
-      if (cancelled) return
-      if (data?.country_code) setTargetCountry(data.country_code)
-      if (data?.city) setTargetCity(data.city)
-      if (data?.zip != null) setTargetZip(data.zip || '')
-      if (data?.region && !data?.city) setTargetCity(data.region)
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [tab])
-
-  // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register.
-  // Script is loaded synchronously in index.html (no defer) so window.turnstile is available; we poll briefly if needed.
-  useEffect(() => {
-    if (tab !== 'register' || !turnstileContainerRef.current) return
-
-    const renderWidget = () => {
-      if (!window.turnstile || !turnstileContainerRef.current) return
-      if (turnstileWidgetIdRef.current != null) return // already rendered
-      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: (token) => setTurnstileToken(token),
-      })
-    }
-
-    if (window.turnstile) {
-      renderWidget()
-    } else {
-      const check = setInterval(() => {
-        if (window.turnstile) {
-          clearInterval(check)
-          renderWidget()
-        }
-      }, 50)
-      return () => clearInterval(check)
-    }
-
-    return () => {
-      if (window.turnstile && turnstileWidgetIdRef.current != null) {
-        window.turnstile.remove(turnstileWidgetIdRef.current)
-        turnstileWidgetIdRef.current = null
-      }
-      setTurnstileToken('')
-    }
-  }, [tab])
 
   const EyeIcon = ({ open }) => (
     <svg
@@ -191,30 +120,9 @@ export default function LoginPage() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (tab === 'register') {
-      if (password.length < 8) {
-        setError(t('passwordTooShort') || 'Password must be at least 8 characters')
-        return
-      }
-      if (password !== passwordConfirm) {
-        setError(t('passwordsMismatch'))
-        return
-      }
-    }
     setLoading(true)
     try {
-      if (tab === 'login') {
-        await login(email, password, rememberMe)
-      } else {
-        await register(email, password, turnstileToken || null, {
-          ui_language: uiLanguage,
-          target_language: targetLanguage,
-          target_country: targetCountry || 'PL',
-          target_city: targetCity || 'Wrocław',
-          target_zip: targetZip || null,
-        }, rememberMe)
-        alert(t('verificationEmailSent'))
-      }
+      await login(email, password, rememberMe)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -238,24 +146,6 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-white/95">{t('appTitle')}</h1>
           <p className="text-white/60 text-sm mt-1">{t('tagline')}</p>
-        </div>
-
-        {/* Tab switcher */}
-        <div className="flex rounded-2xl p-1 mb-6 ring-1 ring-white/10" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}>
-          {['login', 'register'].map(tabKey => (
-            <button
-              key={tabKey}
-              onClick={() => { setTab(tabKey); setError('') }}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all ${
-                tab === tabKey
-                  ? 'text-stone-900 shadow-sm'
-                  : 'text-white/60 hover:text-white/80'
-              }`}
-              style={tab === tabKey ? { backgroundColor: COLORS.accent } : {}}
-            >
-              {tabKey === 'login' ? t('login') : t('register')}
-            </button>
-          ))}
         </div>
 
         <div className="flex flex-col gap-2 mb-4">
@@ -301,7 +191,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                autoComplete="current-password"
                 placeholder="••••••••"
                 className="w-full rounded-xl pl-4 pr-11 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
               />
@@ -315,31 +205,6 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-          {tab === 'register' && (
-            <div>
-              <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('confirmPassword')}</label>
-              <div className="relative">
-                <input
-                  type={showPasswordConfirm ? "text" : "password"}
-                  value={passwordConfirm}
-                  onChange={e => setPasswordConfirm(e.target.value)}
-                  required={tab === 'register'}
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  className="w-full rounded-xl pl-4 pr-11 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordConfirm(v => !v)}
-                  aria-label={showPasswordConfirm ? t('hidePassword') : t('showPassword')}
-                  className="absolute inset-y-0 right-0 px-3 flex items-center text-white/50 hover:text-white/80"
-                >
-                  <EyeIcon open={showPasswordConfirm} />
-                </button>
-              </div>
-            </div>
-          )}
-
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -349,42 +214,6 @@ export default function LoginPage() {
             />
             <span className="text-sm text-white/75">Keep me logged in</span>
           </label>
-
-          {tab === 'register' && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">Site language</label>
-                <select
-                  value={uiLanguage}
-                  onChange={e => setUiLanguage(e.target.value)}
-                  className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                >
-                  <option value="en" className="bg-stone-800 text-white">English</option>
-                  <option value="he" className="bg-stone-800 text-white">עברית</option>
-                  <option value="pl" className="bg-stone-800 text-white">Polski</option>
-                </select>
-                <p className="text-xs text-white/50 mt-1.5">You can change this later in Settings.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('translateTo')}</label>
-                <select
-                  value={targetLanguage}
-                  onChange={e => setTargetLanguage(e.target.value)}
-                  className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                  required
-                >
-                  {TARGET_LANGUAGES.map(l => (
-                    <option key={l.code} value={l.code} className="bg-stone-800 text-white">{l.name}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-white/50 mt-1.5">Recipe language. Location is guessed from your IP; you can change it in Settings.</p>
-              </div>
-            </div>
-          )}
-
-          {tab === 'register' && (
-            <div className="flex justify-center min-h-[65px]" ref={turnstileContainerRef} />
-          )}
 
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-300 bg-red-500/20 border border-red-500/30 rounded-xl px-4 py-3">
@@ -398,13 +227,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-xl py-3 text-sm font-bold disabled:opacity-50 transition-all hover:opacity-95 active:scale-[0.98] mt-2 text-black shadow"
             style={{ backgroundColor: COLORS.accent }}
-          >
+            >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 {t('loading')}
               </span>
-            ) : tab === 'login' ? t('logInButton') : t('createAccountButton')}
+            ) : t('logInButton')}
           </button>
 
           <p className="mt-6 text-xs text-white/55 text-center leading-relaxed">

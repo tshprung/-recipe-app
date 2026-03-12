@@ -80,8 +80,10 @@ function AppRoutes() {
       <Routes>
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/" element={<LandingPage />} />
+        <Route path="/signin" element={<LoginPage />} />
+        <Route path="/register" element={<OnboardingPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Navigate to="/signin" replace />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

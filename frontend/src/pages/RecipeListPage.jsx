@@ -200,9 +200,8 @@ export default function RecipeListPage() {
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
   const fetchRecipes = useCallback(async (query = '') => {
-    // In pure trial mode (no user, only trial token), we don't have persisted recipes yet.
-    // Starter recipes are passed via navigation state from /trial/start.
-    if (!user && trialToken) {
+    // Only call API when user is logged in. Trial users have no GET /recipes/ access.
+    if (!user) {
       setLoading(false)
       return
     }
@@ -216,13 +215,22 @@ export default function RecipeListPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, trialToken])
+  }, [user])
 
   useEffect(() => {
-    if (!user && trialToken) {
+    // Trial mode (no user): use starter recipes from state or sessionStorage; never call GET /api/recipes/
+    if (!user) {
+      setLoading(false)
       const state = location.state as { trialRecipes?: any[] } | null
-      if (state?.trialRecipes?.length) {
-        const mapped = state.trialRecipes.map((r, idx) => ({
+      let raw = state?.trialRecipes
+      if (!raw?.length) {
+        try {
+          const stored = sessionStorage.getItem('trial_recipes')
+          raw = stored ? JSON.parse(stored) : null
+        } catch (_) {}
+      }
+      if (raw?.length) {
+        const mapped = raw.map((r, idx) => ({
           id: -(idx + 1), // temporary negative ids in trial mode
           title_pl: r.title,
           title_original: r.title,
@@ -250,12 +258,13 @@ export default function RecipeListPage() {
           image_url: null,
         }))
         setRecipes(mapped)
-        setLoading(false)
-        return
+      } else {
+        setRecipes([])
       }
+      return
     }
     fetchRecipes(appliedSearch)
-  }, [fetchRecipes, appliedSearch, user, trialToken, location.state])
+  }, [fetchRecipes, appliedSearch, user, location.state])
 
   function handleSearchSubmit(e) {
     e.preventDefault()

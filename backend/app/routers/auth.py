@@ -295,14 +295,14 @@ def google_login(request: Request):
 @router.get("/google/callback")
 def google_callback(code: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if error or not code:
-        front = _frontend_url("/login", {"error": "google_denied"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "google_denied"})
+        return RedirectResponse(url=front if front else "/signin")
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = _oauth_redirect_uri("google")
     if not all([client_id, client_secret, redirect_uri]):
-        front = _frontend_url("/login", {"error": "config"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "config"})
+        return RedirectResponse(url=front if front else "/signin")
     try:
         resp = httpx.post(
             GOOGLE_TOKEN_URL,
@@ -334,14 +334,14 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
         name = (info.get("name") or "").strip() or None
     except Exception as e:
         logger.warning("Google OAuth error: %s", e)
-        front = _frontend_url("/login", {"error": "google_failed"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "google_failed"})
+        return RedirectResponse(url=front if front else "/signin")
     user = _get_or_create_oauth_user(db, email, name)
     # Do not run ensure_starter_recipes here — it can take several seconds (AI call) and delays redirect.
     # Users from onboarding claim pre-fetched recipes on the frontend; others can use "Fetch starter recipes" in Settings.
     token = create_access_token(user.id)
-    front = _frontend_url("/login", {"token": token})
-    return RedirectResponse(url=front if front else "/login")
+    front = _frontend_url("/signin", {"token": token})
+    return RedirectResponse(url=front if front else "/signin")
 
 
 # ----- Facebook -----
@@ -366,14 +366,14 @@ def facebook_login(request: Request):
 @router.get("/facebook/callback")
 def facebook_callback(code: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
     if error or not code:
-        front = _frontend_url("/login", {"error": "facebook_denied"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "facebook_denied"})
+        return RedirectResponse(url=front if front else "/signin")
     app_id = os.getenv("FACEBOOK_APP_ID")
     app_secret = os.getenv("FACEBOOK_APP_SECRET")
     redirect_uri = _oauth_redirect_uri("facebook")
     if not all([app_id, app_secret, redirect_uri]):
-        front = _frontend_url("/login", {"error": "config"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "config"})
+        return RedirectResponse(url=front if front else "/signin")
     try:
         token_resp = httpx.post(
             FACEBOOK_TOKEN_URL,
@@ -403,10 +403,10 @@ def facebook_callback(code: str | None = None, error: str | None = None, db: Ses
         name = (info.get("name") or "").strip() or None
     except Exception as e:
         logger.warning("Facebook OAuth error: %s", e)
-        front = _frontend_url("/login", {"error": "facebook_failed"})
-        return RedirectResponse(url=front if front else "/login")
+        front = _frontend_url("/signin", {"error": "facebook_failed"})
+        return RedirectResponse(url=front if front else "/signin")
     user = _get_or_create_oauth_user(db, email, name)
     # Do not run ensure_starter_recipes here — keeps OAuth redirect fast (see Google comment).
     token = create_access_token(user.id)
-    front = _frontend_url("/login", {"token": token})
-    return RedirectResponse(url=front if front else "/login")
+    front = _frontend_url("/signin", {"token": token})
+    return RedirectResponse(url=front if front else "/signin")
