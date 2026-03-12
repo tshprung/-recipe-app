@@ -337,10 +337,8 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
         front = _frontend_url("/login", {"error": "google_failed"})
         return RedirectResponse(url=front if front else "/login")
     user = _get_or_create_oauth_user(db, email, name)
-    try:
-        ensure_starter_recipes_for_user(user, db)
-    except Exception as e:
-        logger.warning("Starter recipes on Google login failed: %s", e)
+    # Do not run ensure_starter_recipes here — it can take several seconds (AI call) and delays redirect.
+    # Users from onboarding claim pre-fetched recipes on the frontend; others can use "Fetch starter recipes" in Settings.
     token = create_access_token(user.id)
     front = _frontend_url("/login", {"token": token})
     return RedirectResponse(url=front if front else "/login")
@@ -408,10 +406,7 @@ def facebook_callback(code: str | None = None, error: str | None = None, db: Ses
         front = _frontend_url("/login", {"error": "facebook_failed"})
         return RedirectResponse(url=front if front else "/login")
     user = _get_or_create_oauth_user(db, email, name)
-    try:
-        ensure_starter_recipes_for_user(user, db)
-    except Exception as e:
-        logger.warning("Starter recipes on Facebook login failed: %s", e)
+    # Do not run ensure_starter_recipes here — keeps OAuth redirect fast (see Google comment).
     token = create_access_token(user.id)
     front = _frontend_url("/login", {"token": token})
     return RedirectResponse(url=front if front else "/login")

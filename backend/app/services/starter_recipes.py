@@ -17,7 +17,7 @@ Output valid JSON only — no markdown, no prose. Use the output_language for al
 USER_PROMPT_TEMPLATE = """\
 Country: {country_name}
 Output language: {output_lang}
-{dish_types_line}
+{dish_types_line}{diet_constraint_line}
 
 Return exactly this JSON (array of 3 recipes from famous cooks in that country):
 {{
@@ -135,10 +135,13 @@ def get_starter_recipes(
     target_country: str,
     target_language: str,
     dish_preferences: list[str] | None = None,
+    diet_filters: list[str] | None = None,
 ) -> list[dict]:
     """
     Return 3 starter recipes for the given country and language.
     Optionally prefer recipe types matching dish_preferences (e.g. ["pasta", "soups"]).
+    If diet_filters (e.g. ["kosher", "vegetarian"]) are set, all recipes MUST comply with those diets
+    (either choose compliant recipes or adapt ingredients/steps so the recipe is compliant).
     Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional).
     Uses OpenAI when available; falls back to static recipes on failure.
     """
@@ -153,10 +156,20 @@ def get_starter_recipes(
     if dish_preferences:
         types_str = ", ".join(dish_preferences[:10])  # limit for prompt
         dish_types_line = f"Prefer recipes that match these types (if possible): {types_str}.\n"
+    diet_constraint_line = ""
+    if diet_filters:
+        diets_str = ", ".join(diet_filters[:8])
+        diet_constraint_line = (
+            f"CRITICAL: The user's diet requirements are: {diets_str}. "
+            "Every recipe MUST be compliant with these diets: either choose recipes that already comply, "
+            "or adapt ingredients and steps so the recipe is fully compliant (e.g. for kosher: no pork, "
+            "no mixing meat and dairy; for vegetarian/vegan: no meat/fish). No exceptions.\n"
+        )
     prompt = USER_PROMPT_TEMPLATE.format(
         country_name=country_name,
         output_lang=output_lang,
         dish_types_line=dish_types_line,
+        diet_constraint_line=diet_constraint_line,
     )
 
     try:
@@ -226,6 +239,7 @@ def ensure_starter_recipes_for_user(user, db) -> None:
         user.target_country,
         user.target_language,
         dish_preferences=user.dish_preferences or None,
+        diet_filters=user.diet_filters or None,
     )
     add_starter_recipes_to_user(user, recipes_data, db)
 

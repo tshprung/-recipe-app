@@ -31,6 +31,7 @@ def prepare_starter_recipes(
         payload.target_country,
         payload.target_language,
         dish_preferences=payload.dish_preferences or None,
+        diet_filters=payload.diet_filters or None,
     )
     claim_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)

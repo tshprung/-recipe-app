@@ -93,6 +93,7 @@ class OnboardingPrepareRequest(BaseModel):
     target_city: str | None = None
     target_zip: str | None = None
     dish_preferences: list[str] = Field(default_factory=list)
+    diet_filters: list[str] = Field(default_factory=list)
     default_servings: int = Field(default=4, ge=1, le=24)
 
 

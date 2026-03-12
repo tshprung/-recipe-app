@@ -100,26 +100,69 @@ export default function OnboardingPage() {
   const [rememberMe, setRememberMe] = useState(true)
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
+  const [locationDetecting, setLocationDetecting] = useState(false)
+  const [locationError, setLocationError] = useState(null)
+  const [zipResolving, setZipResolving] = useState(false)
+  const [prepareLoading, setPrepareLoading] = useState(false)
 
   const set = (key) => (value) => setData((d) => ({ ...d, [key]: value }))
 
-  // Step 2: when we have step 1 data, call prepare in background
+  // Step 1: try geo on mount to pre-fill location
   useEffect(() => {
-    if (step !== 2 || claimToken) return
-    const payload = {
-      target_country: data.target_country,
-      target_language: data.target_language,
-      target_city: data.target_city || null,
-      target_zip: data.target_zip || null,
-      dish_preferences: data.dish_preferences || [],
-      default_servings: data.default_servings ?? 4,
+    if (step !== 1) return
+    let cancelled = false
+    setLocationDetecting(true)
+    setLocationError(null)
+    api.get('/meta/geo')
+      .then((res) => {
+        if (cancelled) return
+        if (res?.country_code && COUNTRIES.some((c) => c.code === res.country_code)) {
+          setData((d) => ({
+            ...d,
+            target_country: res.country_code,
+            target_city: res.city || d.target_city,
+            target_zip: res.zip || d.target_zip,
+          }))
+        }
+      })
+      .catch(() => { if (!cancelled) setLocationError(null) })
+      .finally(() => { if (!cancelled) setLocationDetecting(false) })
+    return () => { cancelled = true }
+  }, [step])
+
+  async function detectLocation() {
+    setLocationError(null)
+    setLocationDetecting(true)
+    try {
+      const res = await api.get('/meta/geo')
+      if (res?.country_code && COUNTRIES.some((c) => c.code === res.country_code)) {
+        setData((d) => ({
+          ...d,
+          target_country: res.country_code,
+          target_city: res.city || d.target_city,
+          target_zip: res.zip || d.target_zip,
+        }))
+      }
+    } catch (e) {
+      setLocationError(e?.message || 'Could not detect location')
+    } finally {
+      setLocationDetecting(false)
     }
-    setPrepareError(null)
-    api
-      .post('/onboarding/prepare-starter-recipes', payload)
-      .then((res) => setClaimToken(res.claim_token))
-      .catch((e) => setPrepareError(e?.message || 'Could not prepare recipes'))
-  }, [step, data.target_country, data.target_language, data.target_city, data.target_zip, data.dish_preferences, data.default_servings, claimToken])
+  }
+
+  async function resolveZipToCity() {
+    const zip = (data.target_zip || '').trim()
+    const country = (data.target_country || '').trim()
+    if (!zip || !country) return
+    setZipResolving(true)
+    try {
+      const res = await api.get(`/meta/resolve-city?country=${encodeURIComponent(country)}&zip=${encodeURIComponent(zip)}`)
+      if (res?.city) setData((d) => ({ ...d, target_city: res.city }))
+    } catch (_) {}
+    setZipResolving(false)
+  }
+
+  // Prepare is triggered when user clicks Next on step 2 so diet_filters (e.g. kosher) are included
 
   // Turnstile for step 3 register
   useEffect(() => {
@@ -262,31 +305,31 @@ export default function OnboardingPage() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">Country</label>
-                <select
-                  value={data.target_country}
-                  onChange={(e) => set('target_country')(e.target.value)}
-                  className={inputCls}
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">Location</label>
+                <div className="flex gap-2 flex-wrap">
+                  <select
+                    value={data.target_country}
+                    onChange={(e) => set('target_country')(e.target.value)}
+                    className={inputCls}
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    disabled={locationDetecting}
+                    className="rounded-xl px-4 py-3 text-sm font-medium text-stone-900 transition disabled:opacity-50 shrink-0"
+                    style={{ backgroundColor: COLORS.accent }}
+                  >
+                    {locationDetecting ? 'Detecting…' : 'Use my location'}
+                  </button>
+                </div>
+                {locationError && <p className="text-amber-400 text-xs mt-1">{locationError}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">Recipe language</label>
-                <select
-                  value={data.target_language}
-                  onChange={(e) => set('target_language')(e.target.value)}
-                  className={inputCls}
-                >
-                  {TARGET_LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">City / ZIP (optional)</label>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">City or ZIP (optional — enter ZIP and we’ll find the city)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -299,10 +342,24 @@ export default function OnboardingPage() {
                     type="text"
                     value={data.target_zip}
                     onChange={(e) => set('target_zip')(e.target.value)}
+                    onBlur={resolveZipToCity}
                     placeholder="ZIP"
                     className={inputCls}
                   />
                 </div>
+                {zipResolving && <p className="text-white/50 text-xs mt-1">Looking up city…</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">Recipe language</label>
+                <select
+                  value={data.target_language}
+                  onChange={(e) => set('target_language')(e.target.value)}
+                  className={inputCls}
+                >
+                  {TARGET_LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-2">What type of recipes interest you? (optional)</label>
@@ -343,9 +400,8 @@ export default function OnboardingPage() {
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-white/95">Household & diet</h1>
-              <p className="text-white/60 text-sm mt-1">All optional — we’ll use this to tailor recipes and servings</p>
-              {prepareError && <p className="text-amber-400 text-xs mt-2">Recipes will load after sign-up if needed.</p>}
-              {!claimToken && !prepareError && <p className="text-white/50 text-xs mt-2">Preparing your starter recipes…</p>}
+              <p className="text-white/60 text-sm mt-1">All optional — we’ll use this to tailor recipes and servings. Your diet choices (e.g. Kosher) will be applied to your 3 starter recipes.</p>
+              {prepareError && <p className="text-amber-400 text-xs mt-2">{prepareError}</p>}
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -436,17 +492,40 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white ring-1 ring-white/10 hover:ring-white/20 transition"
+                disabled={prepareLoading}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white ring-1 ring-white/10 hover:ring-white/20 transition disabled:opacity-50"
               >
                 Back
               </button>
               <button
                 type="button"
-                onClick={() => setStep(3)}
-                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-stone-900 shadow transition hover:opacity-95"
+                disabled={prepareLoading}
+                onClick={async () => {
+                  setPrepareError(null)
+                  setPrepareLoading(true)
+                  try {
+                    const payload = {
+                      target_country: data.target_country,
+                      target_language: data.target_language,
+                      target_city: data.target_city || null,
+                      target_zip: data.target_zip || null,
+                      dish_preferences: data.dish_preferences || [],
+                      diet_filters: data.diet_filters || [],
+                      default_servings: data.default_servings ?? 4,
+                    }
+                    const res = await api.post('/onboarding/prepare-starter-recipes', payload)
+                    setClaimToken(res.claim_token)
+                    setStep(3)
+                  } catch (e) {
+                    setPrepareError(e?.message || 'Could not prepare recipes. You can still sign in and add recipes from Settings.')
+                  } finally {
+                    setPrepareLoading(false)
+                  }
+                }}
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-stone-900 shadow transition hover:opacity-95 disabled:opacity-50"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                Next
+                {prepareLoading ? 'Preparing your recipes…' : 'Next'}
               </button>
             </div>
           </>
