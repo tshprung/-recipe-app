@@ -26,6 +26,28 @@ _BASE_DIR = os.getenv(
 STATIC_URL_PREFIX = "/static/recipe-images"
 
 
+def get_storage_dir() -> str:
+    """Return the directory path for recipe images (for user uploads)."""
+    _ensure_storage_dir()
+    return _BASE_DIR
+
+
+def save_user_upload(recipe_id: int, content: bytes, extension: str) -> str:
+    """
+    Save user-uploaded image to disk. Returns the URL path to store on the recipe.
+    Does not update cache. extension should be e.g. 'jpg' or 'png'.
+    """
+    _ensure_storage_dir()
+    ext = (extension or "jpg").lower().lstrip(".")
+    if ext not in ("jpg", "jpeg", "png"):
+        ext = "jpg"
+    filename = f"{recipe_id}-user.{ext}"
+    filepath = os.path.join(_BASE_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(content)
+    return f"{STATIC_URL_PREFIX}/{filename}"
+
+
 def _normalize_cache_key(title: str, target_language: str | None = None) -> str:
     """Normalize recipe title to a stable cache key: lowercase, collapse spaces, alphanumeric + underscore."""
     if not title or not isinstance(title, str):
@@ -92,7 +114,10 @@ def get_or_create_recipe_image(
         return
     # Cache miss: generate and save
     title = recipe.title_pl or recipe.title_original or "Dish"
-    prompt = f"Appetizing photo of {title}, food photography, simple plate, professional lighting, no text."
+    prompt = (
+        f"Realistic food photo of {title}, plated dish only, natural lighting, close-up, "
+        "high quality, no people, no hands, no text, no logos."
+    )
     image_bytes = _generate_image_via_openai(prompt)
     if not image_bytes:
         return

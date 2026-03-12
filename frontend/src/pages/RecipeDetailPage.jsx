@@ -127,6 +127,8 @@ export default function RecipeDetailPage() {
   const [altData, setAltData] = useState(null)
   const [altError, setAltError] = useState(null)
   const [generateImageLoading, setGenerateImageLoading] = useState(false)
+  const [uploadImageLoading, setUploadImageLoading] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     Promise.all([
@@ -183,7 +185,7 @@ export default function RecipeDetailPage() {
   }
 
   async function handleGenerateImage() {
-    if (!recipe?.id || recipe.image_url) return
+    if (!recipe?.id) return
     setGenerateImageLoading(true)
     try {
       const updated = await api.post(`/recipes/${id}/generate-image`)
@@ -192,6 +194,30 @@ export default function RecipeDetailPage() {
       console.error(e)
     } finally {
       setGenerateImageLoading(false)
+    }
+  }
+
+  async function handleUploadImage(file) {
+    if (!file || !recipe?.id) return
+    setUploadImageLoading(true)
+    try {
+      const updated = await api.uploadRecipeImage(id, file)
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUploadImageLoading(false)
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleRemoveImage() {
+    if (!recipe?.id) return
+    try {
+      const updated = await api.delete(`/recipes/${id}/image`)
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -698,16 +724,45 @@ export default function RecipeDetailPage() {
                     <span className="text-6xl text-stone-300" aria-hidden>🍽</span>
                   )}
                 </div>
-                {!recipe.image_url && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {!recipe.image_url && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateImage}
+                      disabled={generateImageLoading}
+                      className="text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                    >
+                      {generateImageLoading ? '…' : t('generateRecipePhoto')}
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (f) handleUploadImage(f)
+                    }}
+                  />
                   <button
                     type="button"
-                    onClick={handleGenerateImage}
-                    disabled={generateImageLoading}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadImageLoading}
                     className="text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50"
                   >
-                    {generateImageLoading ? '…' : t('addRecipePhoto')}
+                    {uploadImageLoading ? '…' : t('uploadRecipePhoto')}
                   </button>
-                )}
+                  {recipe.image_url && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="text-xs font-medium text-stone-400 hover:text-red-600"
+                    >
+                      {t('removeRecipePhoto')}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

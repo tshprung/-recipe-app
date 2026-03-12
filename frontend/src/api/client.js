@@ -86,9 +86,30 @@ async function request(path, options = {}) {
   return data
 }
 
+async function uploadRecipeImage(recipeId, file) {
+  const headers = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${BASE}/recipes/${recipeId}/image-upload`, {
+    method: 'POST',
+    body: form,
+    headers,
+  })
+  const data = await res.json().catch(() => ({ detail: 'Unexpected server error' }))
+  if (!res.ok) {
+    const err = new Error(data.detail || 'Upload failed')
+    err.status = res.status
+    throw err
+  }
+  return data
+}
+
 export const api = {
   get:    (path)        => request(path),
   post:   (path, body)  => request(path, { method: 'POST',  body: JSON.stringify(body) }),
   patch:  (path, body)  => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (path, body)   => request(path, body != null ? { method: 'DELETE', body: JSON.stringify(body) } : { method: 'DELETE' }),
+  uploadRecipeImage,
 }

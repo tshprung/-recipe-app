@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..services.adaptation import adapt_recipe
 from ..services.ingredient_alternatives import get_ingredient_alternatives
-from ..services.recipe_image import get_or_create_recipe_image
+from ..services.recipe_image import get_or_create_recipe_image, save_user_upload
 from ..services.translation import translate_recipe
 from ..services.what_can_i_make_ai import suggest_recipe_from_ingredients
 
@@ -493,6 +493,65 @@ def generate_recipe_image(
         db.refresh(recipe)
     except Exception:
         pass
+    return recipe
+
+
+_MAX_IMAGE_UPLOAD_BYTES = 3 * 1024 * 1024  # 3 MB
+_ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png"}
+
+
+@router.post("/{recipe_id}/image-upload", response_model=schemas.RecipeOut)
+def upload_recipe_image(
+    recipe_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Upload a custom recipe image (replaces existing). Accepts JPEG or PNG, max 3 MB."""
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    content_type = (file.content_type or "").strip().lower()
+    if content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only JPEG or PNG images are allowed.",
+        )
+    content = file.file.read()
+    if len(content) > _MAX_IMAGE_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image must be 3 MB or smaller.",
+        )
+    if len(content) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
+    ext = "png" if content_type == "image/png" else "jpg"
+    try:
+        image_url = save_user_upload(recipe_id, content, ext)
+    except OSError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save image.",
+        ) from e
+    recipe.image_url = image_url
+    db.commit()
+    db.refresh(recipe)
+    return recipe
+
+
+@router.delete("/{recipe_id}/image", response_model=schemas.RecipeOut)
+def remove_recipe_image(
+    recipe_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Remove the recipe image (clears image_url)."""
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe.image_url = None
+    db.commit()
+    db.refresh(recipe)
     return recipe
 
 
