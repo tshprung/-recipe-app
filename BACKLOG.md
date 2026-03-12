@@ -30,7 +30,8 @@ Plans, bugs, and improvements deferred to a later release.
 
 - **Discover / find recipes from internet or AI** — A page or tab where the user can choose recipe type, diet, restrictions (and optionally a specific or famous cook) and get suggestions from the web or AI. Parameters to consider: dish type, diet, allergens, cuisine, cook name, max time, ingredients to include/avoid. Ideas: search by famous cook; exclude specific ingredients; "what's in season"; limit to one source (e.g. trusted sites). Decide what NOT to allow (e.g. unsafe sources, unclear licensing).
 
-- ~~**Serving size / number of people**~~ — Done (partial): user-level “I usually cook for N people” stored in Settings. Next: ingredient quantity scaling + per-recipe override.
+- ~~**Serving size / number of people**~~ — Done: user-level “I usually cook for N people” stored in Settings.
+- **Serving size scaling + per-recipe override** — Scale ingredient quantities to servings and allow overriding servings per recipe (ties into household profiles later).
 
 - **Adapt recipe for kids** — Let the user take any recipe and get a kid-friendly version: safe (no choking hazards, no honey under 1, food-safe) and healthier (less salt/sugar, age-appropriate portions and textures). Optional: store "cooking for kids" and age range(s) (e.g. 1 and 4) in settings; use in adaptation and in "find recipe" filters.
 
@@ -40,7 +41,8 @@ Plans, bugs, and improvements deferred to a later release.
 
 - **Meal plan (week view)** — Plan which recipes to cook on which days; feed into shopping and reduce "what's for dinner" decisions.
 
-- **"Would make again" / simple rating** — Partially done: per-recipe 1–5 star rating exists. Next: “Would make again” toggle and list/filter surfaces.
+- ~~**Simple rating (1–5)**~~ — Done: per-recipe 1–5 star rating exists.
+- **"Would make again" toggle + surfaces** — Add quick toggle and filter/list views (e.g. Favorites-like, or “Top rated / would make again”).
 
 - **Leftovers note** — Optional note or tag that a recipe keeps well or how to reheat, for next-day planning.
 

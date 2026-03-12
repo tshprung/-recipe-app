@@ -19,6 +19,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    dialect = bind.dialect.name if bind is not None else ""
+    allergens_default = (
+        sa.text("'[]'::json") if dialect in {"postgresql"} else sa.text("'[]'")
+    )
+
     # --- users ---
     op.add_column(
         "users",
@@ -26,7 +32,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "users",
-        sa.Column("allergens", sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
+        sa.Column("allergens", sa.JSON(), nullable=False, server_default=allergens_default),
     )
     op.add_column("users", sa.Column("custom_allergens_text", sa.Text(), nullable=True))
 
@@ -34,15 +40,20 @@ def upgrade() -> None:
     op.add_column("recipes", sa.Column("prep_time_minutes", sa.Integer(), nullable=True))
     op.add_column("recipes", sa.Column("cook_time_minutes", sa.Integer(), nullable=True))
     op.add_column("recipes", sa.Column("user_rating", sa.Integer(), nullable=True))
-    op.create_check_constraint(
-        "ck_recipes_user_rating_1_5",
-        "recipes",
-        "(user_rating IS NULL) OR (user_rating >= 1 AND user_rating <= 5)",
-    )
+    # SQLite can't ALTER TABLE to add constraints without batch mode.
+    if dialect not in {"sqlite"}:
+        op.create_check_constraint(
+            "ck_recipes_user_rating_1_5",
+            "recipes",
+            "(user_rating IS NULL) OR (user_rating >= 1 AND user_rating <= 5)",
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_recipes_user_rating_1_5", "recipes", type_="check")
+    bind = op.get_bind()
+    dialect = bind.dialect.name if bind is not None else ""
+    if dialect not in {"sqlite"}:
+        op.drop_constraint("ck_recipes_user_rating_1_5", "recipes", type_="check")
     op.drop_column("recipes", "user_rating")
     op.drop_column("recipes", "cook_time_minutes")
     op.drop_column("recipes", "prep_time_minutes")
