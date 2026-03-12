@@ -7,10 +7,12 @@ modules, so the app engine is created against the test DB.
 import base64
 import hashlib
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 # --- must happen before any app import ---
-os.environ["DATABASE_URL"] = "sqlite:///./test_recipe_app.db"
+_TEST_DB_PATH = Path(__file__).resolve().parent / "test_recipe_app.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH.as_posix()}"
 os.environ["SECRET_KEY"] = "test-secret-for-tests-only"
 os.environ["OPENAI_API_KEY"] = "test-openai-key"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
@@ -25,7 +27,7 @@ from app.database import Base, get_db
 from app.main import app
 from app import models
 
-TEST_DATABASE_URL = "sqlite:///./test_recipe_app.db"
+TEST_DATABASE_URL = f"sqlite:///{_TEST_DB_PATH.as_posix()}"
 
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -44,13 +46,19 @@ app.dependency_overrides[get_db] = override_get_db
 
 @pytest.fixture(scope="session", autouse=True)
 def create_tables():
+    # Ensure we always start from a clean schema (create_all won't alter existing tables).
+    try:
+        if _TEST_DB_PATH.exists():
+            _TEST_DB_PATH.unlink()
+    except PermissionError:
+        pass
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
     try:
-        if os.path.exists("./test_recipe_app.db"):
-            os.remove("./test_recipe_app.db")
+        if _TEST_DB_PATH.exists():
+            _TEST_DB_PATH.unlink()
     except PermissionError:
         pass  # Windows holds the file briefly; it will be overwritten next run
 

@@ -183,6 +183,15 @@ export default function RecipeDetailPage() {
     }
   }
 
+  async function handleSetRating(nextRating) {
+    try {
+      const updated = await api.patch(`/recipes/${id}/meta`, { rating: nextRating })
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   async function handleAdapt(typesOrSingle) {
     const types = Array.isArray(typesOrSingle) ? typesOrSingle : [typesOrSingle]
     const compositeKey = types.length === 1 ? types[0] : types.join(',')
@@ -595,6 +604,79 @@ export default function RecipeDetailPage() {
                   {tag.icon} {tag.label}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Time + rating — fast glance for busy cooks */}
+          {activeTab === 'original' && (
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              {(() => {
+                const prep = recipe.prep_time_minutes
+                const cook = recipe.cook_time_minutes
+                if (typeof prep === 'number' || typeof cook === 'number') {
+                  const total = (typeof prep === 'number' ? prep : 0) + (typeof cook === 'number' ? cook : 0)
+                  return (
+                    <>
+                      {typeof prep === 'number' && (
+                        <span className="text-xs font-semibold bg-stone-50 text-stone-600 border border-stone-200 rounded-full px-3 py-1">
+                          ⏱ Prep: {prep} min
+                        </span>
+                      )}
+                      {typeof cook === 'number' && (
+                        <span className="text-xs font-semibold bg-stone-50 text-stone-600 border border-stone-200 rounded-full px-3 py-1">
+                          🔥 Cook: {cook} min
+                        </span>
+                      )}
+                      {total > 0 && (
+                        <span className="text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-3 py-1">
+                          ⏳ Total: {total} min
+                        </span>
+                      )}
+                    </>
+                  )
+                }
+                // Fallback to existing notes (display as-is)
+                const prepLabel = recipe.notes?.czas_przygotowania
+                const cookLabel = recipe.notes?.czas_gotowania
+                if (prepLabel || cookLabel) {
+                  return (
+                    <>
+                      {prepLabel && (
+                        <span className="text-xs font-semibold bg-stone-50 text-stone-600 border border-stone-200 rounded-full px-3 py-1">
+                          ⏱ Prep: {String(prepLabel)}
+                        </span>
+                      )}
+                      {cookLabel && (
+                        <span className="text-xs font-semibold bg-stone-50 text-stone-600 border border-stone-200 rounded-full px-3 py-1">
+                          🔥 Cook: {String(cookLabel)}
+                        </span>
+                      )}
+                    </>
+                  )
+                }
+                return null
+              })()}
+
+              <div className="flex items-center gap-1 ml-auto">
+                {[1, 2, 3, 4, 5].map(n => {
+                  const active = (recipe.user_rating ?? 0) >= n
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handleSetRating(recipe.user_rating === n ? null : n)}
+                      className={`text-lg leading-none transition-transform hover:scale-110 ${active ? 'text-amber-400' : 'text-stone-200 hover:text-amber-300'}`}
+                      title={recipe.user_rating ? `Rating: ${recipe.user_rating}/5` : 'Rate this recipe'}
+                      aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
+                    >
+                      ★
+                    </button>
+                  )
+                })}
+                <span className="text-xs text-stone-400 ml-1">
+                  {recipe.user_rating ? `${recipe.user_rating}/5` : 'Rate'}
+                </span>
+              </div>
             </div>
           )}
 

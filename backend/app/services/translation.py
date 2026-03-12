@@ -47,6 +47,8 @@ Return a single JSON object with EXACTLY these keys:
 {{
   "title_pl": "<recipe title in {target_lang}>",
   "title_original": "<original recipe title as it appears in the source>",
+  "prep_time_minutes": <integer minutes or null>,
+  "cook_time_minutes": <integer minutes or null>,
   "ingredients_pl": [
     "<quantity + ingredient name in {target_lang}>" or "<quantity + name (local name in recipe script, recipe lang label)>",
     ...
@@ -75,6 +77,7 @@ Rules:
 - ingredients_original: copy each ingredient line exactly as in the source.
 - substitutions: in {target_lang}; localise for {target_country}.
 - notes: include ONLY keys explicitly mentioned in the source. Omit the rest.
+- prep_time_minutes / cook_time_minutes: if the recipe states prep/cook time, convert to TOTAL MINUTES as integers; otherwise null.
 - If the input is not a recipe, DO NOT invent steps. Keep output minimal and truthful.
 
 Recipe in {source_lang}:

@@ -27,6 +27,11 @@ class User(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     starter_recipes_added: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Cooking preferences
+    default_servings: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
+    allergens: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    custom_allergens_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Login security
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lockout_until: Mapped[datetime | None] = mapped_column(
@@ -74,6 +79,11 @@ class Recipe(Base):
     author_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Times + rating (user-owned)
+    prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cook_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    user_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Target locale snapshot; source language is auto-detected
     detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)

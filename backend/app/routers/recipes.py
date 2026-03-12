@@ -158,6 +158,8 @@ def create_recipe(
         user_id=current_user.id,
         title_pl=translated.get("title_pl", "Untitled"),
         title_original=translated.get("title_original", (raw_input or "")[:100]),
+        prep_time_minutes=translated.get("prep_time_minutes"),
+        cook_time_minutes=translated.get("cook_time_minutes"),
         ingredients_pl=translated.get("ingredients_pl", []),
         ingredients_original=translated.get("ingredients_original", []),
         steps_pl=translated.get("steps_pl", []),
@@ -422,10 +424,18 @@ def _what_can_i_make_ai(
     db.commit()
 
     target_lang = (current_user.target_language or "").strip() or "en"
+    # Best-effort: treat selected allergen codes + free-text as hard avoid list for suggestions.
+    avoid_terms: list[str] = []
+    if current_user.custom_allergens_text:
+        raw = current_user.custom_allergens_text
+        parts = [p.strip() for p in raw.replace(";", ",").split(",")]
+        avoid_terms = [p for p in parts if p]
     try:
         suggestion = suggest_recipe_from_ingredients(
             ingredients=payload.ingredients or [],
             diet_filters=payload.diet_filters or None,
+            allergen_codes=current_user.allergens or None,
+            avoid_terms=avoid_terms or None,
             assume_pantry=payload.assume_pantry,
             target_language=target_lang,
         )
@@ -484,6 +494,30 @@ def toggle_favorite(
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     recipe.is_favorite = payload.is_favorite
+    db.commit()
+    db.refresh(recipe)
+    return recipe
+
+
+@router.patch("/{recipe_id}/meta", response_model=schemas.RecipeOut)
+def update_recipe_meta(
+    recipe_id: int,
+    payload: schemas.RecipeMetaUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if "rating" in updates:
+        recipe.user_rating = updates["rating"]
+    if "prep_time_minutes" in updates:
+        recipe.prep_time_minutes = updates["prep_time_minutes"]
+    if "cook_time_minutes" in updates:
+        recipe.cook_time_minutes = updates["cook_time_minutes"]
+
     db.commit()
     db.refresh(recipe)
     return recipe
@@ -575,6 +609,8 @@ def relocalize_recipe(
     recipe.tags = translated.get("tags", recipe.tags)
     recipe.substitutions = translated.get("substitutions", recipe.substitutions)
     recipe.notes = translated.get("notes", recipe.notes)
+    recipe.prep_time_minutes = translated.get("prep_time_minutes", recipe.prep_time_minutes)
+    recipe.cook_time_minutes = translated.get("cook_time_minutes", recipe.cook_time_minutes)
     recipe.detected_language = translated.get("detected_language", recipe.detected_language)
     recipe.target_language = current_user.target_language
     recipe.target_country = current_user.target_country

@@ -10,12 +10,16 @@ Respect their diet restrictions. Output valid JSON only — no markdown, no pros
 If they have basic pantry (salt, sugar, oil, etc.) assume those are available when assume_pantry is true.
 Return one recipe with title, ingredients (list of strings), and steps (list of strings).
 Optionally include "missing_ingredients": list of items they might need to buy if the recipe is close but not fully makeable.
+CRITICAL: If the user provided allergens/avoid terms, do NOT include those ingredients. Prefer a different recipe over suggesting something unsafe.
 """
 
 USER_PROMPT_TEMPLATE = """\
 Ingredients the user has: {ingredients}
 
 Diet restrictions: {diet_list}
+
+Allergens to avoid (codes): {allergen_codes}
+Other avoid terms (free text): {avoid_terms}
 
 Assume basic pantry (salt, sugar, oil, pepper, etc.): {assume_pantry}
 
@@ -56,6 +60,8 @@ def _output_lang_name(code: str) -> str:
 def suggest_recipe_from_ingredients(
     ingredients: list[str],
     diet_filters: list[str] | None = None,
+    allergen_codes: list[str] | None = None,
+    avoid_terms: list[str] | None = None,
     assume_pantry: bool = True,
     target_language: str = "en",
 ) -> dict:
@@ -71,11 +77,15 @@ def suggest_recipe_from_ingredients(
     if not ingredients_str:
         ingredients_str = "none specified"
     diet_list = ", ".join(diet_filters) if diet_filters else "none"
+    allergen_codes_str = ", ".join((s or "").strip() for s in (allergen_codes or []) if (s or "").strip()) or "none"
+    avoid_terms_str = ", ".join((s or "").strip() for s in (avoid_terms or []) if (s or "").strip()) or "none"
     output_lang = _output_lang_name(target_language)
 
     prompt = USER_PROMPT_TEMPLATE.format(
         ingredients=ingredients_str,
         diet_list=diet_list,
+        allergen_codes=allergen_codes_str,
+        avoid_terms=avoid_terms_str,
         assume_pantry="yes" if assume_pantry else "no",
         output_lang=output_lang,
     )

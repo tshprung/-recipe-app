@@ -3,7 +3,40 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Union
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
+
+ALLOWED_ALLERGEN_CODES = {
+    # EU/UK “top 14” allergens (stored as stable codes)
+    "gluten_cereals",
+    "crustaceans",
+    "eggs",
+    "fish",
+    "peanuts",
+    "soybeans",
+    "milk",
+    "tree_nuts",
+    "celery",
+    "mustard",
+    "sesame",
+    "sulphites",
+    "lupin",
+    "molluscs",
+}
+
+
+def sanitize_custom_allergens_text(text: str | None) -> str | None:
+    """
+    Best-effort sanitization for user-entered text that may later be shown in UI
+    and used for best-effort filtering prompts.
+    """
+    if text is None:
+        return None
+    cleaned = " ".join((text or "").split())
+    if not cleaned:
+        return None
+    # Keep it short to avoid prompt abuse / accidental huge payloads.
+    return cleaned[:500]
 
 
 # --- Auth ---
@@ -37,6 +70,28 @@ class UserSettings(BaseModel):
     target_country: str
     target_city: str
     target_zip: str | None = None
+    default_servings: int = Field(default=4, ge=1, le=24)
+    allergens: list[str] = Field(default_factory=list)
+    custom_allergens_text: str | None = None
+
+    @field_validator("allergens")
+    @classmethod
+    def validate_allergens(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for raw in v or []:
+            code = (raw or "").strip().lower()
+            if not code:
+                continue
+            if code not in ALLOWED_ALLERGEN_CODES:
+                raise ValueError(f"Unknown allergen code: {code}")
+            if code not in cleaned:
+                cleaned.append(code)
+        return cleaned
+
+    @field_validator("custom_allergens_text")
+    @classmethod
+    def validate_custom_allergens_text(cls, v: str | None) -> str | None:
+        return sanitize_custom_allergens_text(v)
 
 
 class UserOut(BaseModel):
@@ -54,6 +109,9 @@ class UserOut(BaseModel):
     created_at: datetime
     is_admin: bool = False
     renewed_token: str | None = None  # set by backend on GET /users/me to slide expiry; client stores and does not put in user state
+    default_servings: int = 4
+    allergens: list[str] = Field(default_factory=list)
+    custom_allergens_text: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -97,8 +155,17 @@ class RecipeOut(BaseModel):
     author_name: str | None = None
     author_bio: str | None = None
     author_image_url: str | None = None
+    prep_time_minutes: int | None = None
+    cook_time_minutes: int | None = None
+    user_rating: int | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RecipeMetaUpdate(BaseModel):
+    rating: int | None = Field(default=None, ge=1, le=5)
+    prep_time_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
+    cook_time_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
 
 
 class RecipeUserNotesUpdate(BaseModel):

@@ -38,6 +38,23 @@ const COUNTRIES = [
   { code: 'IT', name: 'Italy' },
 ]
 
+const ALLERGENS = [
+  { code: 'gluten_cereals', label: 'Gluten (cereals)' },
+  { code: 'crustaceans', label: 'Crustaceans' },
+  { code: 'eggs', label: 'Eggs' },
+  { code: 'fish', label: 'Fish' },
+  { code: 'peanuts', label: 'Peanuts' },
+  { code: 'soybeans', label: 'Soybeans' },
+  { code: 'milk', label: 'Milk' },
+  { code: 'tree_nuts', label: 'Tree nuts' },
+  { code: 'sesame', label: 'Sesame' },
+  { code: 'mustard', label: 'Mustard' },
+  { code: 'celery', label: 'Celery' },
+  { code: 'lupin', label: 'Lupin' },
+  { code: 'sulphites', label: 'Sulphites' },
+  { code: 'molluscs', label: 'Molluscs' },
+]
+
 function Field({ label, hint, value, onChange }) {
   return (
     <div>
@@ -79,6 +96,9 @@ export default function SettingsPage() {
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
     target_zip:      user?.target_zip      ?? '',
+    default_servings: user?.default_servings ?? 4,
+    allergens: user?.allergens ?? [],
+    custom_allergens_text: user?.custom_allergens_text ?? '',
   })
   const [zipStatus, setZipStatus] = useState(null) // null | 'loading' | 'ok' | 'error'
   const [saving, setSaving] = useState(false)
@@ -99,8 +119,11 @@ export default function SettingsPage() {
       target_country: user.target_country ?? 'PL',
       target_city: user.target_city ?? 'Wrocław',
       target_zip: user.target_zip ?? '',
+      default_servings: user.default_servings ?? 4,
+      allergens: user.allergens ?? [],
+      custom_allergens_text: user.custom_allergens_text ?? '',
     })
-  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip])
+  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.default_servings, user?.allergens, user?.custom_allergens_text])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -201,6 +224,70 @@ export default function SettingsPage() {
             {zipStatus === 'error' && <p className="text-xs text-red-600 mt-1">Could not resolve city from ZIP.</p>}
           </div>
           <Field label={t('city')}     hint={t('hintCity')} value={form.target_city}     onChange={set('target_city')}     />
+        </SettingsCard>
+
+        <SettingsCard icon="👨‍👩‍👧‍👦" title={t('cookingAndDiet')}>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+              {t('defaultServingsLabel')}
+              <span className="ml-1.5 text-xs font-normal text-stone-400">({t('people')})</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={24}
+              value={form.default_servings}
+              onChange={e => setForm(f => ({ ...f, default_servings: parseInt(e.target.value || '4', 10) }))}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            />
+            <p className="text-xs text-stone-400 mt-1.5">
+              {t('defaultServingsHint')}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-2">
+              {t('allergensToAvoid')}
+              <span className="ml-1.5 text-xs font-normal text-stone-400">({t('optional')})</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {ALLERGENS.map(a => {
+                const checked = (form.allergens || []).includes(a.code)
+                return (
+                  <label
+                    key={a.code}
+                    className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 cursor-pointer hover:bg-white transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={e => {
+                        const next = e.target.checked
+                          ? Array.from(new Set([...(form.allergens || []), a.code]))
+                          : (form.allergens || []).filter(x => x !== a.code)
+                        setForm(f => ({ ...f, allergens: next }))
+                      }}
+                      className="rounded border-stone-300 text-amber-600 focus:ring-amber-400"
+                    />
+                    <span>{a.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+                {t('otherAllergens')}
+                <span className="ml-1.5 text-xs font-normal text-stone-400">({t('optional')})</span>
+              </label>
+              <textarea
+                value={form.custom_allergens_text}
+                onChange={e => setForm(f => ({ ...f, custom_allergens_text: e.target.value }))}
+                rows={3}
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+                placeholder={t('otherAllergensPlaceholder')}
+              />
+              <p className="text-xs text-stone-400 mt-1.5">{t('otherAllergensHint')}</p>
+            </div>
+          </div>
         </SettingsCard>
 
         <p className="text-xs text-stone-400 px-1">

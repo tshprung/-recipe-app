@@ -32,6 +32,9 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
   const accent = CARD_ACCENTS[recipe.id % CARD_ACCENTS.length]
   const inList = isInList(recipe.id)
   const isActioning = actionLoadingId === recipe.id
+  const prep = recipe.prep_time_minutes
+  const cook = recipe.cook_time_minutes
+  const total = (typeof prep === 'number' ? prep : 0) + (typeof cook === 'number' ? cook : 0)
 
   return (
     <div
@@ -77,6 +80,20 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
 
         {/* Footer */}
         <div className="pt-3 border-t border-stone-100 mt-2 space-y-2">
+          {/* Quick glance: time + rating */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs text-stone-500 flex items-center gap-2">
+              {total > 0 && <span title="Total time">⏳ {total} min</span>}
+            </div>
+            {recipe.user_rating ? (
+              <div className="text-xs text-amber-600 font-semibold" title={`Rating: ${recipe.user_rating}/5`}>
+                {'★'.repeat(recipe.user_rating)}{'☆'.repeat(5 - recipe.user_rating)}
+              </div>
+            ) : (
+              <div className="text-xs text-stone-300">★★★★★</div>
+            )}
+          </div>
+
           {/* Add / Remove shopping list button */}
           <button
             onClick={e => {
