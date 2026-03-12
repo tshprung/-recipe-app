@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api, getRecipeImageUrl } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 import AddRecipeModal from '../components/AddRecipeModal'
@@ -186,6 +187,8 @@ function EmptyState({ onAdd }) {
 
 export default function RecipeListPage() {
   const { t } = useLanguage()
+  const { user, trialToken } = useAuth()
+  const location = useLocation()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -197,6 +200,12 @@ export default function RecipeListPage() {
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
   const fetchRecipes = useCallback(async (query = '') => {
+    // In pure trial mode (no user, only trial token), we don't have persisted recipes yet.
+    // Starter recipes are passed via navigation state from /trial/start.
+    if (!user && trialToken) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const path = query.trim() ? `/recipes/?q=${encodeURIComponent(query.trim())}` : '/recipes/'
@@ -207,9 +216,46 @@ export default function RecipeListPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user, trialToken])
 
-  useEffect(() => { fetchRecipes(appliedSearch) }, [fetchRecipes, appliedSearch])
+  useEffect(() => {
+    if (!user && trialToken) {
+      const state = location.state as { trialRecipes?: any[] } | null
+      if (state?.trialRecipes?.length) {
+        const mapped = state.trialRecipes.map((r, idx) => ({
+          id: -(idx + 1), // temporary negative ids in trial mode
+          title_pl: r.title,
+          title_original: r.title,
+          ingredients_pl: r.ingredients,
+          ingredients_original: r.ingredients,
+          steps_pl: r.steps,
+          tags: [],
+          substitutions: {},
+          notes: {},
+          user_notes: null,
+          is_favorite: false,
+          raw_input: '',
+          detected_language: null,
+          target_language: '',
+          target_country: '',
+          target_city: '',
+          created_at: new Date().toISOString(),
+          author_name: r.author_name ?? null,
+          author_bio: r.author_bio ?? null,
+          author_image_url: r.author_image_url ?? null,
+          prep_time_minutes: null,
+          cook_time_minutes: null,
+          user_rating: null,
+          diet_tags: [],
+          image_url: null,
+        }))
+        setRecipes(mapped)
+        setLoading(false)
+        return
+      }
+    }
+    fetchRecipes(appliedSearch)
+  }, [fetchRecipes, appliedSearch, user, trialToken, location.state])
 
   function handleSearchSubmit(e) {
     e.preventDefault()

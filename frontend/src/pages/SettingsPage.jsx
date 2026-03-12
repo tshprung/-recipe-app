@@ -87,7 +87,7 @@ function SettingsCard({ icon, title, children }) {
 }
 
 export default function SettingsPage() {
-  const { user, setUser, logout, refreshUser } = useAuth()
+  const { user, trialToken, setUser, logout, refreshUser } = useAuth()
   const { t, lang, setLang } = useLanguage()
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -100,7 +100,7 @@ export default function SettingsPage() {
     household_adults: user?.household_adults ?? null,
     household_kids: user?.household_kids ?? null,
     diet_filters: user?.diet_filters ?? [],
-    default_servings: user?.default_servings ?? 4,
+    default_servings: user?.default_servings ?? 1,
     allergens: user?.allergens ?? [],
     custom_allergens_text: user?.custom_allergens_text ?? '',
   })
@@ -129,7 +129,7 @@ export default function SettingsPage() {
       household_adults: user.household_adults ?? null,
       household_kids: user.household_kids ?? null,
       diet_filters: user.diet_filters ?? [],
-      default_servings: user.default_servings ?? 4,
+      default_servings: user.default_servings ?? 1,
       allergens: user.allergens ?? [],
       custom_allergens_text: user.custom_allergens_text ?? '',
     })
@@ -248,7 +248,7 @@ export default function SettingsPage() {
               min={1}
               max={24}
               value={form.default_servings}
-              onChange={e => setForm(f => ({ ...f, default_servings: parseInt(e.target.value || '4', 10) }))}
+              onChange={e => setForm(f => ({ ...f, default_servings: parseInt(e.target.value || '1', 10) }))}
               className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
             />
             <p className="text-xs text-stone-400 mt-1.5">
@@ -332,124 +332,128 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      {/* Account info */}
-      <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
-        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">{t('account')}</h3>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
-              {user?.email?.[0]?.toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-stone-700">{user?.email}</p>
-              <p className="text-xs text-stone-400">
-                {t('joined')}: {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-              </p>
-              <p className="text-xs text-stone-400 mt-1">
-                {user?.is_verified ? t('verified') : t('unverified')}
-              </p>
+      {/* Account info + admin actions (only for registered users, not pure trial) */}
+      {user && (
+        <>
+          <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">{t('account')}</h3>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
+                  {user.email?.[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-stone-700">{user.email}</p>
+                  <p className="text-xs text-stone-400">
+                    {t('joined')}: {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                  </p>
+                  <p className="text-xs text-stone-400 mt-1">
+                    {user.is_verified ? t('verified') : t('unverified')}
+                  </p>
+                </div>
+              </div>
+              {!user.is_verified && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await api.post('/auth/resend-verification')
+                      alert(t('resendVerification'))
+                    } catch (err) {
+                      alert(err.message || t('verifyError'))
+                    }
+                  }}
+                  className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl px-3 py-2 transition-colors"
+                >
+                  {t('resendVerification')}
+                </button>
+              )}
             </div>
           </div>
-          {!user?.is_verified && (
+
+          {/* Fetch starter recipes */}
+          <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">{t('fetchStarterRecipes')}</h3>
+            <p className="text-sm text-stone-600 mb-3">
+              {t('fetchStarterRecipesHint')}
+            </p>
+            {fetchStarterMessage && (
+              <p className={`text-sm mb-3 ${fetchStarterMessage.success ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {fetchStarterMessage.text}
+              </p>
+            )}
             <button
               type="button"
+              disabled={fetchStarterLoading}
               onClick={async () => {
+                setFetchStarterLoading(true)
+                setFetchStarterMessage(null)
                 try {
-                  await api.post('/auth/resend-verification')
-                  alert(t('resendVerification'))
+                  await api.post('/users/me/fetch-starter-recipes')
+                  setFetchStarterMessage({ success: true, text: t('fetchStarterRecipesDone') })
+                  refreshUser?.()
                 } catch (err) {
-                  alert(err.message || t('verifyError'))
+                  setFetchStarterMessage({ success: false, text: err.message || t('somethingWentWrong') })
+                } finally {
+                  setFetchStarterLoading(false)
                 }
               }}
-              className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl px-3 py-2 transition-colors"
+              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition"
             >
-              {t('resendVerification')}
+              {fetchStarterLoading ? t('loading') : t('fetchStarterRecipesButton')}
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Fetch starter recipes */}
-      <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
-        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">{t('fetchStarterRecipes')}</h3>
-        <p className="text-sm text-stone-600 mb-3">
-          {t('fetchStarterRecipesHint')}
-        </p>
-        {fetchStarterMessage && (
-          <p className={`text-sm mb-3 ${fetchStarterMessage.success ? 'text-emerald-600' : 'text-amber-600'}`}>
-            {fetchStarterMessage.text}
-          </p>
-        )}
-        <button
-          type="button"
-          disabled={fetchStarterLoading}
-          onClick={async () => {
-            setFetchStarterLoading(true)
-            setFetchStarterMessage(null)
-            try {
-              await api.post('/users/me/fetch-starter-recipes')
-              setFetchStarterMessage({ success: true, text: t('fetchStarterRecipesDone') })
-              refreshUser?.()
-            } catch (err) {
-              setFetchStarterMessage({ success: false, text: err.message || t('somethingWentWrong') })
-            } finally {
-              setFetchStarterLoading(false)
-            }
-          }}
-          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition"
-        >
-          {fetchStarterLoading ? t('loading') : t('fetchStarterRecipesButton')}
-        </button>
-      </div>
-
-      {/* Delete account */}
-      <div className="mt-8 bg-white rounded-2xl border border-red-100 shadow-sm p-5">
-        <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">{t('deleteAccount')}</h3>
-        <p className="text-sm text-stone-600 mb-3">
-          {t('deleteAccountConfirm')}
-        </p>
-        <div className="space-y-3">
-          <p className="text-sm text-stone-600">
-            {t('typeDelete')}
-          </p>
-          <input
-            type="text"
-            value={deleteConfirm}
-            onChange={e => setDeleteConfirm(e.target.value)}
-            placeholder="DELETE"
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
-          />
-          {deleteError && (
-            <p className="text-sm text-red-600">{deleteError}</p>
-          )}
-          <button
-            type="button"
-            disabled={deleteConfirm !== 'DELETE' || deleting}
-            onClick={async () => {
-              if (deleteConfirm !== 'DELETE') return
-              setDeleting(true)
-              setDeleteError('')
-              try {
-                await api.delete('/users/me')
-                logout()
-                navigate('/', { replace: true })
-              } catch (err) {
-                setDeleteError(err.message || t('verifyError'))
-              } finally {
-                setDeleting(false)
-              }
-            }}
-            className="bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-6 py-2.5 text-sm font-bold transition-all hover:shadow-lg hover:shadow-red-200 active:scale-95"
-          >
-            {deleting ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {t('deleting')}
-              </span>
-            ) : t('deleteAccountButton')}
-          </button>
-        </div>
-      </div>
+          {/* Delete account */}
+          <div className="mt-8 bg-white rounded-2xl border border-red-100 shadow-sm p-5">
+            <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">{t('deleteAccount')}</h3>
+            <p className="text-sm text-stone-600 mb-3">
+              {t('deleteAccountConfirm')}
+            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-stone-600">
+                {t('typeDelete')}
+              </p>
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={e => setDeleteConfirm(e.target.value)}
+                placeholder="DELETE"
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+              />
+              {deleteError && (
+                <p className="text-sm text-red-600">{deleteError}</p>
+              )}
+              <button
+                type="button"
+                disabled={deleteConfirm !== 'DELETE' || deleting}
+                onClick={async () => {
+                  if (deleteConfirm !== 'DELETE') return
+                  setDeleting(true)
+                  setDeleteError('')
+                  try {
+                    await api.delete('/users/me')
+                    logout()
+                    navigate('/', { replace: true })
+                  } catch (err) {
+                    setDeleteError(err.message || t('verifyError'))
+                  } finally {
+                    setDeleting(false)
+                  }
+                }}
+                className="bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-6 py-2.5 text-sm font-bold transition-all hover:shadow-lg hover:shadow-red-200 active:scale-95"
+              >
+                {deleting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {t('deleting')}
+                  </span>
+                ) : t('deleteAccountButton')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
