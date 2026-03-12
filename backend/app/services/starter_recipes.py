@@ -27,11 +27,14 @@ Return exactly this JSON (array of 3 recipes from famous cooks in that country):
       "ingredients": ["<ingredient 1>", "<ingredient 2>", ...],
       "steps": ["<step 1>", "<step 2>", ...],
       "author_name": "<full name of a real famous cook/chef from this country>",
-      "author_bio": "<1-2 sentences: e.g. TV show host, cookbook author, Michelin chef>"
+      "author_bio": "<1-2 sentences: e.g. TV show host, cookbook author, Michelin chef>",
+      "tags": ["<tag1 in {output_lang}>", "<tag2>", ...]
     }},
     ... (3 recipes total, each from a different well-known figure)
   ]
 }}
+
+For each recipe, include 2-4 short tags in {output_lang} (e.g. breakfast, lunch, dinner, dessert, easy, quick, traditional, vegetarian, soup, main course — whatever fits the recipe).
 """
 
 _LANG_NAMES = {
@@ -84,6 +87,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Klasyczna polska kuchnia.",
                 "author_image_url": None,
+                "tags": ["zupa", "łatwe", "obiad"],
             },
             {
                 "title": "Kotlet schabowy",
@@ -92,6 +96,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Tradycyjna polska potrawa.",
                 "author_image_url": None,
+                "tags": ["danie główne", "tradycyjne", "mięso"],
             },
             {
                 "title": "Sałatka jarzynowa",
@@ -100,6 +105,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Prosta sałatka na każdy dzień.",
                 "author_image_url": None,
+                "tags": ["sałatka", "łatwe", "na zimno"],
             },
         ]
     # Default English fallback
@@ -111,6 +117,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_name": "Home cooking",
             "author_bio": "Classic simple recipe.",
             "author_image_url": None,
+            "tags": ["soup", "easy", "lunch"],
         },
         {
             "title": "Grilled chicken",
@@ -119,6 +126,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_name": "Home cooking",
             "author_bio": "Quick and healthy.",
             "author_image_url": None,
+            "tags": ["main course", "easy", "quick"],
         },
         {
             "title": "Green salad",
@@ -127,6 +135,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_name": "Home cooking",
             "author_bio": "Fresh and easy.",
             "author_image_url": None,
+            "tags": ["salad", "easy", "side"],
         },
     ]
 
@@ -142,7 +151,7 @@ def get_starter_recipes(
     Optionally prefer recipe types matching dish_preferences (e.g. ["pasta", "soups"]).
     If diet_filters (e.g. ["kosher", "vegetarian"]) are set, all recipes MUST comply with those diets
     (either choose compliant recipes or adapt ingredients/steps so the recipe is compliant).
-    Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional).
+    Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional), tags (list of short strings, e.g. breakfast, easy, dessert).
     Uses OpenAI when available; falls back to static recipes on failure.
     """
     api_key = os.getenv("OPENAI_API_KEY")
@@ -207,6 +216,7 @@ def get_starter_recipes(
         author_name = (str(r.get("author_name") or "").strip()) or None
         author_bio = (str(r.get("author_bio") or "").strip()) or None
         author_image_url = (str(r.get("author_image_url") or "").strip()) or None
+        tags = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
         out.append({
             "title": title,
             "ingredients": ingredients,
@@ -214,6 +224,7 @@ def get_starter_recipes(
             "author_name": author_name,
             "author_bio": author_bio,
             "author_image_url": author_image_url,
+            "tags": tags,
         })
     if len(out) < 3:
         # Pad with fallback if AI returned fewer than 3
@@ -268,6 +279,7 @@ def add_starter_recipes_to_user(
             + "\n\nSteps:\n"
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
+        tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
         recipe = models.Recipe(
             user_id=user.id,
             title_pl=title,
@@ -275,7 +287,7 @@ def add_starter_recipes_to_user(
             ingredients_pl=ingredients,
             ingredients_original=ingredients,
             steps_pl=steps,
-            tags=[],
+            tags=tags_list,
             substitutions={},
             notes={},
             raw_input=raw_input,

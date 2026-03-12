@@ -751,7 +751,7 @@ export default function RecipeDetailPage() {
                     disabled={uploadImageLoading}
                     className="text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50"
                   >
-                    {uploadImageLoading ? '…' : t('uploadRecipePhoto')}
+                    {uploadImageLoading ? '…' : (recipe.image_url ? t('replaceRecipePhoto') : t('uploadRecipePhoto'))}
                   </button>
                   {recipe.image_url && (
                     <button

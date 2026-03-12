@@ -184,6 +184,7 @@ const translations = {
     addRecipePhoto: 'Add recipe photo',
     generateRecipePhoto: 'Generate photo',
     uploadRecipePhoto: 'Upload photo',
+    replaceRecipePhoto: 'Replace photo',
     removeRecipePhoto: 'Remove photo',
     // ShoppingListPanel
     recipe: 'recipe',
@@ -375,6 +376,7 @@ const translations = {
     addRecipePhoto: 'הוסף תמונת מתכון',
     generateRecipePhoto: 'צור תמונה',
     uploadRecipePhoto: 'העלה תמונה',
+    replaceRecipePhoto: 'החלף תמונה',
     removeRecipePhoto: 'הסר תמונה',
     recipe: 'מתכון',
     recipesCount: 'מתכונים',
@@ -565,6 +567,7 @@ const translations = {
     addRecipePhoto: 'Dodaj zdjęcie przepisu',
     generateRecipePhoto: 'Wygeneruj zdjęcie',
     uploadRecipePhoto: 'Prześlij zdjęcie',
+    replaceRecipePhoto: 'Zamień zdjęcie',
     removeRecipePhoto: 'Usuń zdjęcie',
     recipe: 'przepis',
     recipesCount: 'przepisy',
