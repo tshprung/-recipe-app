@@ -48,18 +48,44 @@ def save_user_upload(recipe_id: int, content: bytes, extension: str) -> str:
     return f"{STATIC_URL_PREFIX}/{filename}"
 
 
-def _normalize_cache_key(title: str, target_language: str | None = None) -> str:
-    """Normalize recipe title to a stable cache key: lowercase, collapse spaces, alphanumeric + underscore."""
+_DESSERT_KEYWORDS = (
+    "dessert", "cake", "sweet", "deser", "ciasto", "sernik", "cheesecake", "pie", "ciasta",
+    "tort", "brownie", "cookie", "cobbler", "crumble", "pudding", "custard", "baba", "makowiec",
+)
+
+
+def _is_dessert_or_cake(tags: list | None, title: str | None) -> bool:
+    """True if tags or title suggest dessert/cake so we use a separate cache key and prompt hint."""
+    if tags:
+        tags_lower = [str(t).strip().lower() for t in tags if t]
+        if any(k in tags_lower for k in _DESSERT_KEYWORDS):
+            return True
+    if title:
+        title_lower = (title or "").strip().lower()
+        if any(k in title_lower for k in _DESSERT_KEYWORDS):
+            return True
+    return False
+
+
+def _normalize_cache_key(
+    title: str,
+    target_language: str | None = None,
+    tags: list | None = None,
+) -> str:
+    """Normalize recipe title to a stable cache key. Include dessert hint so wrong savory cache is not reused."""
     if not title or not isinstance(title, str):
         return "untitled"
+    title_for_key = title
     # Normalize unicode (e.g. NFD -> NFC), lowercase, replace non-alphanumeric with space
-    s = unicodedata.normalize("NFKC", title.strip().lower())
+    s = unicodedata.normalize("NFKC", title_for_key.strip().lower())
     s = re.sub(r"[^a-z0-9\s\-]", " ", s)
     s = re.sub(r"\s+", "_", s).strip("_") or "untitled"
-    # Optional: append language so same dish in different locales can share or differ
     if target_language:
         s = f"{s}_{target_language}"
-    return s[:200]  # cap length
+    # Separate cache for dessert/cake so we don't reuse a savory image (e.g. sernik → cheesecake, not meat)
+    if _is_dessert_or_cake(tags, title_for_key):
+        s = f"{s}_dessert"
+    return s[:220]  # cap length (slightly higher to allow _dessert)
 
 
 def _ensure_storage_dir() -> None:
@@ -103,7 +129,12 @@ def get_or_create_recipe_image(
     """
     if recipe.image_url:
         return
-    cache_key = _normalize_cache_key(recipe.title_pl or recipe.title_original, recipe.target_language)
+    recipe_tags = getattr(recipe, "tags", None) or []
+    cache_key = _normalize_cache_key(
+        recipe.title_pl or recipe.title_original,
+        recipe.target_language,
+        recipe_tags,
+    )
     # Cache lookup
     cached = db.execute(
         select(models.RecipeImageCache).where(models.RecipeImageCache.cache_key == cache_key)
@@ -114,9 +145,12 @@ def get_or_create_recipe_image(
         return
     # Cache miss: generate and save
     title = recipe.title_pl or recipe.title_original or "Dish"
+    tag_hint = ""
+    if _is_dessert_or_cake(recipe_tags, title):
+        tag_hint = " This is a sweet dessert or cake — show the dessert/cake only, not meat or savory food. "
     prompt = (
-        f"Realistic food photo of {title}, plated dish only, natural lighting, close-up, "
-        "high quality, no people, no hands, no text, no logos."
+        f"Realistic food photo of {title}. The image must show exactly this dish: {title}.{tag_hint}"
+        " Plated dish only, natural lighting, close-up, high quality, no people, no hands, no text, no logos."
     )
     image_bytes = _generate_image_via_openai(prompt)
     if not image_bytes:
