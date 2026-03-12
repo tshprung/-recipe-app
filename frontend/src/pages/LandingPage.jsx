@@ -25,6 +25,15 @@ function Anchor({ id }) {
   return <span id={id} className="block scroll-mt-24" />
 }
 
+function Spinner({ className = 'w-4 h-4' }) {
+  return (
+    <span
+      className={cn('inline-block rounded-full border-2 border-current border-t-transparent animate-spin', className)}
+      aria-hidden
+    />
+  )
+}
+
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [trialLoading, setTrialLoading] = useState(false)
@@ -37,11 +46,20 @@ export default function LandingPage() {
     setTrialError('')
     setTrialLoading(true)
     try {
-      const data = await api.post('/trial/start', {})
+      const data = await Promise.race([
+        api.post('/trial/start', {}),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+        ),
+      ])
       setTrialToken(data.trial_token)
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
     } catch (err) {
-      setTrialError(err?.message || 'Could not start trial')
+      const message =
+        err?.message === 'TIMEOUT'
+          ? 'Request took too long. Check your connection and try again.'
+          : (err?.message || 'Could not start trial. Is the backend running?')
+      setTrialError(message)
     } finally {
       setTrialLoading(false)
     }
@@ -92,16 +110,17 @@ export default function LandingPage() {
                 type="button"
                 onClick={() => { setMobileOpen(false); handleTryForFree() }}
                 disabled={trialLoading}
-                className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95 disabled:opacity-60"
+                className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95 disabled:opacity-60"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                {trialLoading ? '…' : 'Try for free'}
+                {trialLoading && <Spinner className="w-3.5 h-3.5" />}
+                Try for free
               </button>
               <Link
-                to="/onboarding"
+                to="/login?tab=register"
                 className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
               >
-                Start Free
+                Register
               </Link>
               <button
                 type="button"
@@ -129,11 +148,11 @@ export default function LandingPage() {
                 <Link onClick={() => setMobileOpen(false)} to="/login" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Sign In</Link>
                 <Link
                   onClick={() => setMobileOpen(false)}
-                  to="/onboarding"
+                  to="/login?tab=register"
                   className="mt-1 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow"
                   style={{ backgroundColor: COLORS.accent }}
                 >
-                  Start Free
+                  Register
                 </Link>
               </div>
             </div>
@@ -174,17 +193,18 @@ export default function LandingPage() {
                 type="button"
                 onClick={handleTryForFree}
                 disabled={trialLoading}
-                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 disabled:opacity-60"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                {trialLoading ? 'Starting…' : 'Try for free'}
+                {trialLoading && <Spinner />}
+                Try for free
               </button>
               <Link
-                to="/onboarding"
+                to="/login?tab=register"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black/90 shadow-soft transition hover:opacity-95"
                 style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
               >
-                Start Free
+                Register
               </Link>
               <Link
                 to="/login"
@@ -194,7 +214,7 @@ export default function LandingPage() {
                 Sign In
               </Link>
             </div>
-            {trialError && <p className="mt-2 text-sm text-red-300">{trialError}</p>}
+            {trialError && <p className="mt-2 text-sm text-red-300" role="alert">{trialError}</p>}
 
             <p className="mt-3 text-xs text-white/70">
               Free to start — includes <span className="text-white font-semibold">5 AI recipe adaptations</span>.
@@ -274,11 +294,11 @@ export default function LandingPage() {
             </p>
           </div>
           <Link
-            to="/onboarding"
+            to="/login?tab=register"
             className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 w-full sm:w-auto"
             style={{ backgroundColor: COLORS.accent }}
           >
-            Start Free
+            Register
           </Link>
         </div>
 
@@ -339,11 +359,11 @@ export default function LandingPage() {
               <li className="flex items-start gap-2"><span style={{ color: COLORS.accent }}>✓</span> Unified shopping list</li>
             </ul>
             <Link
-              to="/onboarding"
+              to="/login?tab=register"
               className="mt-7 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
               style={{ backgroundColor: COLORS.accent }}
             >
-              Start Free
+              Register
             </Link>
             <p className="mt-3 text-xs text-white/55 text-center">No credit card required.</p>
           </div>
@@ -393,11 +413,11 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Link
-                to="/onboarding"
+                to="/login?tab=register"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                Start Free
+                Register
               </Link>
               <Link
                 to="/login"
