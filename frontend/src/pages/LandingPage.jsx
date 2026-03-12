@@ -46,20 +46,11 @@ export default function LandingPage() {
     setTrialError('')
     setTrialLoading(true)
     try {
-      const data = await Promise.race([
-        api.post('/trial/start', {}),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIMEOUT')), 15000)
-        ),
-      ])
+      const data = await api.post('/trial/start', {})
       setTrialToken(data.trial_token)
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
     } catch (err) {
-      const message =
-        err?.message === 'TIMEOUT'
-          ? 'Request took too long. Check your connection and try again.'
-          : (err?.message || 'Could not start trial. Is the backend running?')
-      setTrialError(message)
+      setTrialError(err?.message || 'Could not start trial. Is the backend running?')
     } finally {
       setTrialLoading(false)
     }
