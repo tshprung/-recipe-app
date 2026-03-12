@@ -12,6 +12,7 @@ from ..auth import get_current_user
 from ..database import get_db
 from ..services.adaptation import adapt_recipe
 from ..services.ingredient_alternatives import get_ingredient_alternatives
+from ..services.recipe_image import get_or_create_recipe_image
 from ..services.translation import translate_recipe
 from ..services.what_can_i_make_ai import suggest_recipe_from_ingredients
 
@@ -180,6 +181,11 @@ def create_recipe(
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
+    try:
+        get_or_create_recipe_image(recipe, db)
+        db.refresh(recipe)
+    except Exception:
+        pass  # do not fail create if image flow fails
     return recipe
 
 
@@ -218,6 +224,11 @@ def create_recipe_from_ai_suggestion(
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
+    try:
+        get_or_create_recipe_image(recipe, db)
+        db.refresh(recipe)
+    except Exception:
+        pass
     return recipe
 
 
@@ -464,6 +475,24 @@ def get_recipe(
     recipe = db.get(models.Recipe, recipe_id)
     if not recipe or recipe.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    return recipe
+
+
+@router.post("/{recipe_id}/generate-image", response_model=schemas.RecipeOut)
+def generate_recipe_image(
+    recipe_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Generate or assign a dish image for the recipe (cache lookup first, then OpenAI on miss)."""
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or recipe.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    try:
+        get_or_create_recipe_image(recipe, db)
+        db.refresh(recipe)
+    except Exception:
+        pass
     return recipe
 
 

@@ -64,6 +64,15 @@ def create_tables():
 
 
 @pytest.fixture(autouse=True)
+def _no_recipe_image_generation():
+    """Skip recipe image generation in tests (no OpenAI calls, no file I/O)."""
+    with patch("app.services.recipe_image.get_or_create_recipe_image"), patch(
+        "app.routers.recipes.get_or_create_recipe_image"
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def clean_tables():
     """Wipe all rows between tests so each test starts fresh."""
     yield

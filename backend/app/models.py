@@ -92,6 +92,9 @@ class Recipe(Base):
     cook_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Recipe photo (dish image); filled by image service (cache or generate)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # Target locale snapshot; source language is auto-detected
     detected_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     target_language: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -172,6 +175,21 @@ class PreparedStarterRecipes(Base):
     claim_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     recipes_data: Mapped[list] = mapped_column(JSON, nullable=False)  # list of recipe dicts
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RecipeImageCache(Base):
+    """Cache of recipe dish images by normalized title (and optional language). Reuse same image for multiple recipes."""
+
+    __tablename__ = "recipe_image_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cache_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
 
 class IngredientSubstitution(Base):

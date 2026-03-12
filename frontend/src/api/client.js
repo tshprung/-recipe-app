@@ -1,5 +1,19 @@
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
+/** Base URL for static assets (e.g. recipe images) served by the API. */
+export function getStaticBase() {
+  const u = import.meta.env.VITE_API_URL ?? ''
+  const base = u.replace(/\/api\/?$/, '') || (typeof window !== 'undefined' ? window.location.origin : '')
+  return base || ''
+}
+
+/** Full URL for a recipe image path (e.g. /static/recipe-images/1.jpg). */
+export function getRecipeImageUrl(imageUrl) {
+  if (!imageUrl) return null
+  const base = getStaticBase()
+  return base ? `${base}${imageUrl}` : imageUrl
+}
+
 const LANG_STORAGE_KEY = 'recipe-app-lang'
 
 const REMEMBER_ME_KEY = 'recipe_app_remember_me'

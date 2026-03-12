@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, getRecipeImageUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
@@ -126,6 +126,7 @@ export default function RecipeDetailPage() {
   const [altLoading, setAltLoading] = useState(false)
   const [altData, setAltData] = useState(null)
   const [altError, setAltError] = useState(null)
+  const [generateImageLoading, setGenerateImageLoading] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -178,6 +179,19 @@ export default function RecipeDetailPage() {
       setRecipe(updated)
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  async function handleGenerateImage() {
+    if (!recipe?.id || recipe.image_url) return
+    setGenerateImageLoading(true)
+    try {
+      const updated = await api.post(`/recipes/${id}/generate-image`)
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setGenerateImageLoading(false)
     }
   }
 
@@ -474,6 +488,8 @@ export default function RecipeDetailPage() {
       <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden mb-6">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400" />
         <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            <div className="flex-1 min-w-0">
           {showOriginal && activeTab === 'original' ? (
             <div className="grid grid-cols-2 gap-6 mb-4">
               <div>
@@ -665,6 +681,34 @@ export default function RecipeDetailPage() {
               >
                 ⇔ {t('showOriginal')}
               </button>
+            )}
+          </div>
+            </div>
+            {/* Recipe dish image: large on detail */}
+            {activeTab === 'original' && (
+              <div className="shrink-0 w-full md:w-64 flex flex-col gap-2">
+                <div className="aspect-square max-h-72 md:max-h-none rounded-2xl overflow-hidden bg-stone-100 flex items-center justify-center">
+                  {getRecipeImageUrl(recipe.image_url) ? (
+                    <img
+                      src={getRecipeImageUrl(recipe.image_url)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-6xl text-stone-300" aria-hidden>🍽</span>
+                  )}
+                </div>
+                {!recipe.image_url && (
+                  <button
+                    type="button"
+                    onClick={handleGenerateImage}
+                    disabled={generateImageLoading}
+                    className="text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                  >
+                    {generateImageLoading ? '…' : t('addRecipePhoto')}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

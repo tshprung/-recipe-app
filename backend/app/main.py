@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -84,6 +87,12 @@ app.include_router(substitutions.router)
 app.include_router(admin.router)
 app.include_router(meta.router)
 app.include_router(onboarding.router)
+
+# Recipe dish images (generated or cached); URL path /static/recipe-images/...
+_static_dir = Path(__file__).resolve().parent.parent / "static"
+_static_dir.mkdir(parents=True, exist_ok=True)
+(_static_dir / "recipe-images").mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 @app.get("/health")

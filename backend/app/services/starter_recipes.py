@@ -253,8 +253,10 @@ def add_starter_recipes_to_user(
     Used by ensure_starter_recipes_for_user and by onboarding claim.
     """
     from .. import models
+    from .recipe_image import get_or_create_recipe_image
 
     diet_tags = list(diet_filters) if diet_filters else []
+    created: list[models.Recipe] = []
     for r in recipes_data:
         title = (r.get("title") or "").strip() or "Recipe"
         ingredients = r.get("ingredients") or []
@@ -287,5 +289,11 @@ def add_starter_recipes_to_user(
             diet_tags=diet_tags,
         )
         db.add(recipe)
+        created.append(recipe)
     user.starter_recipes_added = True
     db.commit()
+    for recipe in created:
+        try:
+            get_or_create_recipe_image(recipe, db)
+        except Exception:
+            pass

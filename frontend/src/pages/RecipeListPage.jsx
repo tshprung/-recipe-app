@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, getRecipeImageUrl } from '../api/client'
 import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 import AddRecipeModal from '../components/AddRecipeModal'
@@ -35,6 +35,7 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
   const prep = recipe.prep_time_minutes
   const cook = recipe.cook_time_minutes
   const total = (typeof prep === 'number' ? prep : 0) + (typeof cook === 'number' ? cook : 0)
+  const imageUrl = getRecipeImageUrl(recipe.image_url)
 
   return (
     <div
@@ -45,6 +46,8 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
       <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
 
       <div className="p-5 flex flex-col flex-1">
+        <div className="flex gap-4 flex-1 min-h-0">
+          <div className="flex-1 min-w-0 flex flex-col">
         {/* Title */}
         <h3 className="font-bold text-stone-800 text-base leading-snug mb-1 line-clamp-2 group-hover:text-amber-700 transition-colors">
           {recipe.title_pl}
@@ -87,6 +90,16 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
         )}
 
         <div className="flex-1" />
+          </div>
+          {/* Recipe image: small thumbnail top-right */}
+          <div className="shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
+            {imageUrl ? (
+              <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl text-stone-300" aria-hidden>🍽</span>
+            )}
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="pt-3 border-t border-stone-100 mt-2 space-y-2">

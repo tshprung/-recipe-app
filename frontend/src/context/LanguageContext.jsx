@@ -181,6 +181,7 @@ const translations = {
     removeVariant: 'Remove version',
     showOriginal: 'Show original',
     hideOriginal: 'Hide original',
+    addRecipePhoto: 'Add recipe photo',
     // ShoppingListPanel
     recipe: 'recipe',
     recipesCount: 'recipes',
@@ -368,6 +369,7 @@ const translations = {
     removeVariant: 'הסר גרסה',
     showOriginal: 'הצג מקור',
     hideOriginal: 'הסתר מקור',
+    addRecipePhoto: 'הוסף תמונת מתכון',
     recipe: 'מתכון',
     recipesCount: 'מתכונים',
     listEmpty: 'הרשימה ריקה',
@@ -554,6 +556,7 @@ const translations = {
     removeVariant: 'Usuń wersję',
     showOriginal: 'Pokaż oryginał',
     hideOriginal: 'Ukryj oryginał',
+    addRecipePhoto: 'Dodaj zdjęcie przepisu',
     recipe: 'przepis',
     recipesCount: 'przepisy',
     listEmpty: 'Lista jest pusta',

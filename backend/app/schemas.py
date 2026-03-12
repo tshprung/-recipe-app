@@ -224,6 +224,7 @@ class RecipeOut(BaseModel):
     cook_time_minutes: int | None = None
     user_rating: int | None = None
     diet_tags: list[str] = Field(default_factory=list)
+    image_url: str | None = None
 
     model_config = {"from_attributes": True}
 
