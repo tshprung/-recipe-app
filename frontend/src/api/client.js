@@ -64,7 +64,9 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => ({ detail: 'Unexpected server error' }))
 
   if (!res.ok) {
-    throw new Error(data.detail || 'Request failed')
+    const err = new Error(data.detail || 'Request failed')
+    err.status = res.status
+    throw err
   }
 
   return data

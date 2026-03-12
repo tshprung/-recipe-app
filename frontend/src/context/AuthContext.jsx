@@ -38,7 +38,10 @@ export function AuthProvider({ children }) {
           setUser(user)
           syncUiLanguageToStorage(user)
         })
-        .catch(() => clearToken())
+        .catch(err => {
+          // Only clear token on 401 (invalid/expired); keep it on network errors so session persists
+          if (err && err.status === 401) clearToken()
+        })
         .finally(() => setLoading(false))
     } else {
       setLoading(false)
@@ -111,8 +114,9 @@ export function AuthProvider({ children }) {
       const user = storeRenewedToken(me)
       setUser(user)
       syncUiLanguageToStorage(user)
-    } catch (_) {
-      clearToken()
+    } catch (err) {
+      // Only clear on 401 (invalid token); keep stored token on network/5xx so user can retry
+      if (err && err.status === 401) clearToken()
     }
   }
 
