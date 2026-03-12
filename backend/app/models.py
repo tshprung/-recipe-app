@@ -62,7 +62,12 @@ class Recipe(Base):
     __tablename__ = "recipes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    trial_session_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("trial_sessions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     title_pl: Mapped[str] = mapped_column(String(500), nullable=False)
     title_original: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -107,7 +112,10 @@ class Recipe(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="recipes")
+    user: Mapped["User | None"] = relationship("User", back_populates="recipes")
+    trial_session: Mapped["TrialSession | None"] = relationship(
+        "TrialSession", back_populates="recipes"
+    )
     variants: Mapped[list["RecipeVariant"]] = relationship(
         "RecipeVariant", back_populates="recipe", cascade="all, delete-orphan"
     )
@@ -189,6 +197,33 @@ class RecipeImageCache(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+
+class TrialSession(Base):
+    """Anonymous trial session: 5 actions per token_id, IP-limited."""
+
+    __tablename__ = "trial_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    token_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
+    country: Mapped[str] = mapped_column(String(10), nullable=False)
+    language: Mapped[str] = mapped_column(String(10), nullable=False)
+    used_actions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    recipes: Mapped[list["Recipe"]] = relationship(
+        "Recipe", back_populates="trial_session", cascade="all, delete-orphan"
     )
 
 

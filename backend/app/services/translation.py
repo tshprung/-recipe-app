@@ -35,8 +35,8 @@ LANG_DISPLAY_NAMES = {
 }
 
 USER_PROMPT_TEMPLATE = """\
-Translate this recipe from {source_lang} to {target_lang} for a cook in {city}, {target_country}.
-Apply localisation rules for that market (ingredient names, brands, units).
+Translate this recipe from {source_lang} to {target_lang} for a cook in {target_country}.
+Apply localisation rules for that country's market (ingredient names, brands, units). Use country-level context (e.g. common supermarkets in Poland: Lidl, Biedronka, Carrefour) rather than a specific city.
 
 CRITICAL: The output language for ALL user-facing text (title, ingredients, steps, tags, substitutions) MUST be {target_lang}. The JSON key names (title_pl, ingredients_pl, steps_pl) are legacy and do NOT mean Polish — write in {target_lang} only. If target_lang is "en", output English. If target_lang is "pl", output Polish. No exceptions.
 
@@ -63,7 +63,7 @@ Return a single JSON object with EXACTLY these keys:
   ],
   "tags": ["<short tag in {target_lang}>", ...],
   "substitutions": {{
-    "<source ingredient>": "<target market equivalent + where to buy in {city}>"
+    "<source ingredient>": "<target market equivalent widely available in {target_country}>"
   }},
   "notes": {{
     "porcje": "<servings — only if stated>",
@@ -156,7 +156,6 @@ def translate_recipe(
                         source_lang=source_lang,
                         target_lang=target_language,
                         target_country=target_country,
-                        city=target_city,
                         raw_input=raw_input,
                         recipe_lang_name=recipe_lang_name,
                         local_lang_name=local_lang_name,

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { TrialExhaustedModal } from './TrialExhaustedModal'
 
 const INPUT_MODE = { PASTE: 'paste', URL: 'url' }
 
@@ -18,6 +19,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showTrialExhausted, setShowTrialExhausted] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -40,7 +42,8 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       await refreshUser()
       onCreated(recipe)
     } catch (err) {
-      setError(err.message || t('urlError'))
+      if (err.trialExhausted) setShowTrialExhausted(true)
+      else setError(err.message || t('urlError'))
     } finally {
       setLoading(false)
     }
@@ -146,6 +149,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
           </div>
         </form>
       </div>
+      <TrialExhaustedModal open={showTrialExhausted} onClose={() => setShowTrialExhausted(false)} />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api } from '../api/client'
+import { api, getTrialToken, setTrialTokenStorage } from '../api/client'
 import { hashPasswordForTransport } from '../auth/passwordHash'
 
 const AuthContext = createContext(null)
@@ -7,7 +7,13 @@ const LANG_STORAGE_KEY = 'recipe-app-lang'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [trialToken, setTrialTokenState] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  function setTrialToken(token) {
+    setTrialTokenStorage(token)
+    setTrialTokenState(token || null)
+  }
 
   function syncUiLanguageToStorage(u) {
     const l = u?.ui_language
@@ -31,6 +37,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = getToken()
+    const trial = getTrialToken()
+    if (trial) setTrialTokenState(trial)
     if (token) {
       api.get('/users/me')
         .then(me => {
@@ -73,6 +81,7 @@ export function AuthProvider({ children }) {
     const password_hash = await hashPasswordForTransport(password)
     const data = await api.post('/auth/login', { email, password_hash })
     const token = data.access_token
+    setTrialToken(null) // clear trial when user logs in
     localStorage.setItem('recipe_app_remember_me', rememberMe ? '1' : '0')
     if (rememberMe) {
       localStorage.setItem('token', token)
@@ -102,6 +111,7 @@ export function AuthProvider({ children }) {
   function logout() {
     clearToken()
     setUser(null)
+    setTrialToken(null)
   }
 
   async function setTokenFromOAuth(accessToken) {
@@ -121,7 +131,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, setTokenFromOAuth, loading }}>
+    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, setTokenFromOAuth, trialToken, setTrialToken, loading }}>
       {children}
     </AuthContext.Provider>
   )

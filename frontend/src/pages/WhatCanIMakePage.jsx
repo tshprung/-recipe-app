@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
 
 const DIET_OPTIONS = [
   { key: 'vegetarian', labelKey: 'vegetarian' },
@@ -29,6 +30,7 @@ export default function WhatCanIMakePage() {
   const [addedIngredients, setAddedIngredients] = useState([])
   const [addingRecipeId, setAddingRecipeId] = useState(null)
   const [addRecipeSuccess, setAddRecipeSuccess] = useState(null) // { id, title } when added
+  const [showTrialExhausted, setShowTrialExhausted] = useState(false)
 
   const ingredientsList = ingredientsText
     .split(/[\n,]+/)
@@ -62,7 +64,8 @@ export default function WhatCanIMakePage() {
         if (data?.source === 'ai') refreshUser()
       })
       .catch(e => {
-        setError(e.message || t('somethingWentWrong'))
+        if (e.trialExhausted) setShowTrialExhausted(true)
+        else setError(e.message || t('somethingWentWrong'))
         setLoading(false)
       })
   }
@@ -104,7 +107,8 @@ export default function WhatCanIMakePage() {
         setLoading(false)
       })
       .catch(e => {
-        setError(e.message || t('somethingWentWrong'))
+        if (e.trialExhausted) setShowTrialExhausted(true)
+        else setError(e.message || t('somethingWentWrong'))
         setLoading(false)
       })
   }
@@ -294,6 +298,7 @@ export default function WhatCanIMakePage() {
           )}
         </div>
       )}
+      <TrialExhaustedModal open={showTrialExhausted} onClose={() => setShowTrialExhausted(false)} />
     </div>
   )
 }

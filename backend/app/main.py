@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from .database import engine
-from .routers import auth, users, recipes, shopping_lists, substitutions, admin, meta, onboarding
+from .routers import auth, users, recipes, shopping_lists, substitutions, admin, meta, onboarding, trial
 
 # DB schema is managed via Alembic migrations (production) or test fixtures (tests).
 
@@ -86,6 +86,7 @@ app.include_router(shopping_lists.router)
 app.include_router(substitutions.router)
 app.include_router(admin.router)
 app.include_router(meta.router)
+app.include_router(trial.router)
 app.include_router(onboarding.router)
 
 # Recipe dish images (generated or cached); URL path /static/recipe-images/...

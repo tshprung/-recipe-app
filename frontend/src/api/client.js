@@ -24,6 +24,23 @@ function getToken() {
   return sessionStorage.getItem('token')
 }
 
+const TRIAL_TOKEN_KEY = 'trial_token'
+
+export function getTrialToken() {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(TRIAL_TOKEN_KEY) : null
+  } catch (_) {
+    return null
+  }
+}
+
+export function setTrialTokenStorage(token) {
+  try {
+    if (token) localStorage.setItem(TRIAL_TOKEN_KEY, token)
+    else localStorage.removeItem(TRIAL_TOKEN_KEY)
+  } catch (_) {}
+}
+
 function getLang() {
   try {
     const l = localStorage.getItem(LANG_STORAGE_KEY)
@@ -78,8 +95,10 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => ({ detail: 'Unexpected server error' }))
 
   if (!res.ok) {
-    const err = new Error(data.detail || 'Request failed')
+    const err = new Error(typeof data?.detail === 'string' ? data.detail : data?.message || 'Request failed')
     err.status = res.status
+    err.responseData = data
+    if (res.status === 402 && data?.code === 'trial_exhausted') err.trialExhausted = true
     throw err
   }
 

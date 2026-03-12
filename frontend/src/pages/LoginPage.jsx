@@ -61,10 +61,7 @@ export default function LoginPage() {
   const [targetLanguage, setTargetLanguage] = useState('pl')
   const [targetCountry, setTargetCountry] = useState('PL')
   const [targetCity, setTargetCity] = useState('Wrocław')
-  const [targetZip, setTargetZip] = useState('50-001')
-  const [zipStatus, setZipStatus] = useState(null) // null | 'loading' | 'ok' | 'error'
-  const [locationDetecting, setLocationDetecting] = useState(false)
-  const [locationError, setLocationError] = useState(null)
+  const [targetZip, setTargetZip] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState('')
@@ -115,6 +112,20 @@ export default function LoginPage() {
     if (next === 'login') setTab('login')
   }, [location.search])
 
+  // On Register tab mount: fetch geo once for registration defaults (no visible location fields)
+  useEffect(() => {
+    if (tab !== 'register') return
+    let cancelled = false
+    api.get('/meta/geo').then((data) => {
+      if (cancelled) return
+      if (data?.country_code) setTargetCountry(data.country_code)
+      if (data?.city) setTargetCity(data.city)
+      if (data?.zip != null) setTargetZip(data.zip || '')
+      if (data?.region && !data?.city) setTargetCity(data.region)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [tab])
+
   // Explicit render: widget is only in DOM when Register tab is active, so we must render it when tab switches to register.
   // Script is loaded synchronously in index.html (no defer) so window.turnstile is available; we poll briefly if needed.
   useEffect(() => {
@@ -149,25 +160,6 @@ export default function LoginPage() {
       setTurnstileToken('')
     }
   }, [tab])
-
-  async function detectLocation() {
-    setLocationError(null)
-    setLocationDetecting(true)
-    try {
-      const data = await api.get('/meta/geo')
-      if (data?.country_code) {
-        const code = data.country_code
-        if (COUNTRIES.some(c => c.code === code)) setTargetCountry(code)
-      }
-      if (data?.city) setTargetCity(data.city)
-      if (data?.zip) setTargetZip(data.zip)
-      if (data?.region && !data?.city) setTargetCity(data.region)
-    } catch (e) {
-      setLocationError(e?.message || 'Could not detect location')
-    } finally {
-      setLocationDetecting(false)
-    }
-  }
 
   const EyeIcon = ({ open }) => (
     <svg
@@ -217,8 +209,8 @@ export default function LoginPage() {
         await register(email, password, turnstileToken || null, {
           ui_language: uiLanguage,
           target_language: targetLanguage,
-          target_country: targetCountry,
-          target_city: targetCity,
+          target_country: targetCountry || 'PL',
+          target_city: targetCity || 'Wrocław',
           target_zip: targetZip || null,
         }, rememberMe)
         alert(t('verificationEmailSent'))
@@ -227,20 +219,6 @@ export default function LoginPage() {
       setError(err.message)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function resolveZipToCity() {
-    if (!targetZip.trim() || !targetCountry.trim()) return
-    setZipStatus('loading')
-    try {
-      const data = await api.get(`/meta/resolve-city?country=${encodeURIComponent(targetCountry)}&zip=${encodeURIComponent(targetZip.trim())}`)
-      if (data?.city) setTargetCity(data.city)
-      setZipStatus('ok')
-      setTimeout(() => setZipStatus(null), 2000)
-    } catch (_) {
-      setZipStatus('error')
-      setTimeout(() => setZipStatus(null), 3500)
     }
   }
 
@@ -387,71 +365,19 @@ export default function LoginPage() {
                 </select>
                 <p className="text-xs text-white/50 mt-1.5">You can change this later in Settings.</p>
               </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={detectLocation}
-                    disabled={locationDetecting}
-                    className="text-sm font-medium text-white/90 bg-white/10 hover:bg-white/15 border border-white/20 rounded-lg px-3 py-2 transition-colors disabled:opacity-60"
-                  >
-                    {locationDetecting ? 'Detecting…' : 'Use my location'}
-                  </button>
-                  {locationError && <span className="text-xs text-red-400">{locationError}</span>}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('translateTo')}</label>
-                  <select
-                    value={targetLanguage}
-                    onChange={e => setTargetLanguage(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                    required
-                  >
-                    {TARGET_LANGUAGES.map(l => (
-                      <option key={l.code} value={l.code} className="bg-stone-800 text-white">{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('country')}</label>
-                  <select
-                    value={targetCountry}
-                    onChange={e => setTargetCountry(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                    required
-                  >
-                    {COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code} className="bg-stone-800 text-white">{c.code} — {c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-white/80 mb-1.5">ZIP</label>
-                  <input
-                    value={targetZip}
-                    onChange={e => setTargetZip(e.target.value)}
-                    onBlur={resolveZipToCity}
-                    placeholder="e.g. 50-001"
-                    className="w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
-                    required
-                  />
-                  {zipStatus === 'loading' && <p className="text-xs text-white/50 mt-1">Looking up city…</p>}
-                  {zipStatus === 'error' && <p className="text-xs text-red-400 mt-1">Could not resolve city from ZIP.</p>}
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('city')}</label>
-                <input
-                  value={targetCity}
-                  onChange={e => setTargetCity(e.target.value)}
-                  placeholder={t('hintCity')}
-                  className="w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
+                <label className="block text-sm font-semibold text-white/80 mb-1.5">{t('translateTo')}</label>
+                <select
+                  value={targetLanguage}
+                  onChange={e => setTargetLanguage(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white"
                   required
-                />
-                <p className="text-xs text-white/50 mt-1.5">Auto-filled from ZIP. You can adjust if needed.</p>
+                >
+                  {TARGET_LANGUAGES.map(l => (
+                    <option key={l.code} value={l.code} className="bg-stone-800 text-white">{l.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-white/50 mt-1.5">Recipe language. Location is guessed from your IP; you can change it in Settings.</p>
               </div>
             </div>
           )}

@@ -84,6 +84,25 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+# --- Trial (anonymous try-for-free) ---
+
+class TrialRecipeOut(BaseModel):
+    title: str
+    ingredients: list[str]
+    steps: list[str]
+    author_name: str | None = None
+    author_bio: str | None = None
+    author_image_url: str | None = None
+
+
+class TrialStartOut(BaseModel):
+    trial_token: str
+    country: str
+    language: str
+    recipes: list[TrialRecipeOut]
+    remaining_actions: int
+
+
 # --- Onboarding (guest pre-fetch + claim) ---
 
 class OnboardingPrepareRequest(BaseModel):
@@ -200,7 +219,7 @@ class RecipeCreate(BaseModel):
 
 class RecipeOut(BaseModel):
     id: int
-    user_id: int
+    user_id: int | None = None
     title_pl: str
     title_original: str
     ingredients_pl: list

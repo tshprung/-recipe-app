@@ -194,6 +194,7 @@ export default function SettingsPage() {
         </SettingsCard>
 
         <SettingsCard icon="🌐" title={t('translateTo')}>
+          <p className="text-sm text-stone-500 mb-3">We guessed your location; you can change it here.</p>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('recipeLanguage')}</label>
             <select

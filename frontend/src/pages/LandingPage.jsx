@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { api } from '../api/client'
 
 const COLORS = {
   bg: '#111111',
@@ -25,7 +27,25 @@ function Anchor({ id }) {
 
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [trialLoading, setTrialLoading] = useState(false)
+  const [trialError, setTrialError] = useState('')
   const year = useMemo(() => new Date().getFullYear(), [])
+  const navigate = useNavigate()
+  const { setTrialToken } = useAuth()
+
+  async function handleTryForFree() {
+    setTrialError('')
+    setTrialLoading(true)
+    try {
+      const data = await api.post('/trial/start', {})
+      setTrialToken(data.trial_token)
+      navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
+    } catch (err) {
+      setTrialError(err?.message || 'Could not start trial')
+    } finally {
+      setTrialLoading(false)
+    }
+  }
 
   useEffect(() => {
     document.documentElement.style.scrollBehavior = 'smooth'
@@ -68,10 +88,18 @@ export default function LandingPage() {
             </nav>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); handleTryForFree() }}
+                disabled={trialLoading}
+                className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95 disabled:opacity-60"
+                style={{ backgroundColor: COLORS.accent }}
+              >
+                {trialLoading ? '…' : 'Try for free'}
+              </button>
               <Link
                 to="/onboarding"
-                className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95"
-                style={{ backgroundColor: COLORS.accent }}
+                className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
               >
                 Start Free
               </Link>
@@ -142,10 +170,19 @@ export default function LandingPage() {
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 sm:items-center">
+              <button
+                type="button"
+                onClick={handleTryForFree}
+                disabled={trialLoading}
+                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 disabled:opacity-60"
+                style={{ backgroundColor: COLORS.accent }}
+              >
+                {trialLoading ? 'Starting…' : 'Try for free'}
+              </button>
               <Link
                 to="/onboarding"
-                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
-                style={{ backgroundColor: COLORS.accent }}
+                className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black/90 shadow-soft transition hover:opacity-95"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
               >
                 Start Free
               </Link>
@@ -157,6 +194,7 @@ export default function LandingPage() {
                 Sign In
               </Link>
             </div>
+            {trialError && <p className="mt-2 text-sm text-red-300">{trialError}</p>}
 
             <p className="mt-3 text-xs text-white/70">
               Free to start — includes <span className="text-white font-semibold">5 AI recipe adaptations</span>.

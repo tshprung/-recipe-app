@@ -3,13 +3,14 @@ import re
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_optional
 from ..database import get_db
+from ..quota import enforce_trial_or_user_quota
 from ..services.adaptation import adapt_recipe
 from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.recipe_image import get_or_create_recipe_image, save_user_upload
@@ -106,10 +107,12 @@ def _fetch_and_extract_text(url: str) -> str:
 @router.post("/", response_model=schemas.RecipeOut, status_code=status.HTTP_201_CREATED)
 def create_recipe(
     payload: schemas.RecipeCreate,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    if not current_user.is_verified:
+    trial_session = enforce_trial_or_user_quota(request, db, current_user)
+    if current_user is not None and not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Verify your email before using the app.",
@@ -120,24 +123,25 @@ def create_recipe(
     else:
         raw_input = _sanitize_text(payload.raw_input or "", max_len=10000)
 
-    # Quota check (before OpenAI cost, but do not consume quota yet)
-    user_for_update = (
-        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
-    )
-    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
-        user_for_update.transformations_used >= user_for_update.transformations_limit
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="You have reached the free recipes limit. Contact the administrator.",
+    if current_user is not None:
+        user_for_update = (
+            db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
         )
 
     try:
+        if current_user is not None:
+            target_language = current_user.target_language
+            target_country = current_user.target_country
+            target_city = current_user.target_city
+        else:
+            target_language = trial_session.language
+            target_country = trial_session.country
+            target_city = ""
         translated = translate_recipe(
             raw_input=raw_input,
-            target_language=current_user.target_language,
-            target_country=current_user.target_country,
-            target_city=current_user.target_city,
+            target_language=target_language,
+            target_country=target_country,
+            target_city=target_city,
         )
     except ValueError as e:
         msg = str(e) or ""
@@ -156,7 +160,8 @@ def create_recipe(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Translation failed: {e}")
 
     recipe = models.Recipe(
-        user_id=current_user.id,
+        user_id=current_user.id if current_user is not None else None,
+        trial_session_id=trial_session.id if trial_session is not None else None,
         title_pl=translated.get("title_pl", "Untitled"),
         title_original=translated.get("title_original", (raw_input or "")[:100]),
         prep_time_minutes=translated.get("prep_time_minutes"),
@@ -169,13 +174,13 @@ def create_recipe(
         notes=translated.get("notes", {}),
         raw_input=raw_input,
         detected_language=translated.get("detected_language"),
-        target_language=current_user.target_language,
-        target_country=current_user.target_country,
-        target_city=current_user.target_city,
+        target_language=target_language,
+        target_country=target_country,
+        target_city=target_city,
     )
 
-    # Consume quota only for valid recipe creation (unless unlimited)
-    if not _has_unlimited_quota(current_user):
+    # Consume user quota only when logged in (trial already incremented in enforce_trial_or_user_quota)
+    if current_user is not None and not _has_unlimited_quota(current_user):
         user_for_update.transformations_used += 1
 
     db.add(recipe)
@@ -381,17 +386,26 @@ def _what_can_i_make_my_recipes(
 )
 def what_can_i_make(
     payload: schemas.WhatCanIMakeRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
     """Find recipes the user can make from their ingredients (my_recipes) or return AI suggestions (ai)."""
+    trial_session = enforce_trial_or_user_quota(request, db, current_user)
     if payload.source == "ai":
-        return _what_can_i_make_ai(payload, current_user, db)
-    recipes = (
-        db.query(models.Recipe)
-        .filter(models.Recipe.user_id == current_user.id)
-        .all()
-    )
+        return _what_can_i_make_ai(payload, current_user, trial_session, db)
+    if current_user is not None:
+        recipes = (
+            db.query(models.Recipe)
+            .filter(models.Recipe.user_id == current_user.id)
+            .all()
+        )
+    else:
+        recipes = (
+            db.query(models.Recipe)
+            .filter(models.Recipe.trial_session_id == trial_session.id)
+            .all()
+        )
     matches_result = _what_can_i_make_my_recipes(
         recipes,
         payload.ingredients or [],
@@ -411,41 +425,41 @@ def what_can_i_make(
 
 def _what_can_i_make_ai(
     payload: schemas.WhatCanIMakeRequest,
-    current_user: models.User,
+    current_user: models.User | None,
+    trial_session: models.TrialSession | None,
     db: Session,
 ) -> schemas.WhatCanIMakeAIOut:
-    """AI path: generate recipe suggestion from ingredients + diet. Consumes 1 token."""
-    if not current_user.is_verified:
+    """AI path: generate recipe suggestion from ingredients + diet. Quota already consumed by caller."""
+    if current_user is not None and not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Verify your email before using the app.",
         )
-    user_for_update = (
-        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
-    )
-    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
-        user_for_update.transformations_used >= user_for_update.transformations_limit
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="You have reached the free recipes limit. Contact the administrator.",
+    if current_user is not None:
+        user_for_update = (
+            db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
         )
-    if not _has_unlimited_quota(current_user):
-        user_for_update.transformations_used += 1
-    db.commit()
+        if not _has_unlimited_quota(current_user):
+            user_for_update.transformations_used += 1
+        db.commit()
 
-    target_lang = (current_user.target_language or "").strip() or "en"
-    # Best-effort: treat selected allergen codes + free-text as hard avoid list for suggestions.
-    avoid_terms: list[str] = []
-    if current_user.custom_allergens_text:
-        raw = current_user.custom_allergens_text
-        parts = [p.strip() for p in raw.replace(";", ",").split(",")]
-        avoid_terms = [p for p in parts if p]
+    if current_user is not None:
+        target_lang = (current_user.target_language or "").strip() or "en"
+        avoid_terms = []
+        if current_user.custom_allergens_text:
+            raw = current_user.custom_allergens_text
+            parts = [p.strip() for p in raw.replace(";", ",").split(",")]
+            avoid_terms = [p for p in parts if p]
+        allergen_codes = current_user.allergens or None
+    else:
+        target_lang = (trial_session.language or "").strip() or "en"
+        avoid_terms = []
+        allergen_codes = None
     try:
         suggestion = suggest_recipe_from_ingredients(
             ingredients=payload.ingredients or [],
             diet_filters=payload.diet_filters or None,
-            allergen_codes=current_user.allergens or None,
+            allergen_codes=allergen_codes,
             avoid_terms=avoid_terms or None,
             assume_pantry=payload.assume_pantry,
             target_language=target_lang,
@@ -717,18 +731,28 @@ def _normalize_adapt_types(payload: schemas.AdaptRequest) -> list[str]:
     return [payload.variant_type] if payload.variant_type else []
 
 
+def _recipe_owned_by(recipe: models.Recipe, current_user: models.User | None, trial_session: models.TrialSession | None) -> bool:
+    if current_user is not None and recipe.user_id == current_user.id:
+        return True
+    if trial_session is not None and recipe.trial_session_id == trial_session.id:
+        return True
+    return False
+
+
 @router.post("/{recipe_id}/adapt")
 def adapt_recipe_endpoint(
     recipe_id: int,
     payload: schemas.AdaptRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
+    trial_session = enforce_trial_or_user_quota(request, db, current_user)
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
 
-    if not current_user.is_verified:
+    if current_user is not None and not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Verify your email before using the app.",
@@ -737,9 +761,10 @@ def adapt_recipe_endpoint(
     types = _normalize_adapt_types(payload)
     composite_key = ",".join(types)
 
-    user_for_update = (
-        db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
-    )
+    if current_user is not None:
+        user_for_update = (
+            db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+        )
 
     # For standard (non-custom) adaptations, check cache first (don't consume quota)
     if not payload.custom_instruction:
@@ -755,15 +780,7 @@ def adapt_recipe_endpoint(
                 "alternatives": [],
             }
 
-    if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
-        user_for_update.transformations_used >= user_for_update.transformations_limit
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="You have reached the free recipes limit. Contact the administrator.",
-        )
-
-    if not _has_unlimited_quota(current_user):
+    if current_user is not None and not _has_unlimited_quota(current_user):
         user_for_update.transformations_used += 1
     db.commit()
 
@@ -773,7 +790,12 @@ def adapt_recipe_endpoint(
         else None
     )
 
-    target_lang = (current_user.target_language or "").strip() or "en"
+    if current_user is not None:
+        target_lang = (current_user.target_language or "").strip() or "en"
+        target_country = current_user.target_country
+    else:
+        target_lang = (trial_session.language or "").strip() or "en"
+        target_country = trial_session.country
 
     try:
         if len(types) > 1:
@@ -782,7 +804,7 @@ def adapt_recipe_endpoint(
             for t in types:
                 result = adapt_recipe(
                     current, t, custom_instruction=None, target_language=target_lang,
-                    target_country=current_user.target_country,
+                    target_country=target_country,
                 )
                 if not result.get("can_adapt"):
                     return {
@@ -803,7 +825,7 @@ def adapt_recipe_endpoint(
             single_type = types[0]
             result = adapt_recipe(
                 recipe, single_type, custom_instruction, target_language=target_lang,
-                target_country=current_user.target_country,
+                target_country=target_country,
             )
             if not result.get("can_adapt"):
                 return {

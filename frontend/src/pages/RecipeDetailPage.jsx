@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api, getRecipeImageUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
 
 const TAG_COLORS = [
   'bg-amber-100 text-amber-700',
@@ -116,6 +117,7 @@ export default function RecipeDetailPage() {
   const [alternatives, setAlternatives] = useState(null)
   const [pendingVariantType, setPendingVariantType] = useState(null)
   const [adaptError, setAdaptError] = useState(null)
+  const [showTrialExhausted, setShowTrialExhausted] = useState(false)
   const dropdownRef = useRef(null)
 
   // Ingredient alternatives: off by default so users don't waste credits by accident
@@ -248,7 +250,8 @@ export default function RecipeDetailPage() {
         if (types.length > 1) setPendingVariantType(types[types.length - 1])
       }
     } catch (e) {
-      setAdaptError(e.message || t('failedToAdapt'))
+      if (e.trialExhausted) setShowTrialExhausted(true)
+      else setAdaptError(e.message || t('failedToAdapt'))
     } finally {
       setAdaptLoading(false)
     }
@@ -280,8 +283,8 @@ export default function RecipeDetailPage() {
         await refreshUser()
       }
     } catch (e) {
-      console.error('[handleAdaptAlternative] ERROR:', e)
-      setAdaptError(e.message || t('failedToGenerateVariant'))
+      if (e.trialExhausted) setShowTrialExhausted(true)
+      else setAdaptError(e.message || t('failedToGenerateVariant'))
     } finally {
       setAdaptLoading(false)
     }
@@ -1053,6 +1056,7 @@ export default function RecipeDetailPage() {
         </Card>
       </Section>
 
+      <TrialExhaustedModal open={showTrialExhausted} onClose={() => setShowTrialExhausted(false)} />
     </div>
   )
 }

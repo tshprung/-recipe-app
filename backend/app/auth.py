@@ -50,6 +50,32 @@ def create_access_token(user_id: int) -> str:
     return jwt.encode({"sub": str(user_id), "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# Trial tokens: 7-day expiry, type "trial", sub = token_id (<=32 chars)
+TRIAL_TOKEN_EXPIRE_DAYS = 7
+
+
+def create_trial_token(token_id: str) -> str:
+    if len(token_id) > 32:
+        raise ValueError("token_id must be <= 32 characters")
+    expire = datetime.now(timezone.utc) + timedelta(days=TRIAL_TOKEN_EXPIRE_DAYS)
+    return jwt.encode(
+        {"sub": token_id, "type": "trial", "exp": expire},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_trial_token(token: str) -> dict | None:
+    """Verify signature and algorithm, ensure type == 'trial'. Return payload or None."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "trial":
+            return None
+        return payload
+    except JWTError:
+        return None
+
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -82,17 +108,23 @@ def get_current_user_optional(
     token: str | None = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db),
 ) -> models.User | None:
-    """Return the current user if a valid JWT is present, else None. Does not raise on missing/invalid token."""
+    """Return the current user if a valid user JWT is present, else None. Trial tokens are treated as no user (quota handled separately)."""
     if not token or not token.strip():
         return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") == "trial":
+            return None  # Trial token: no user, quota enforced via enforce_trial_or_user_quota
         user_id: str | None = payload.get("sub")
         if user_id is None:
             return None
     except JWTError:
         return None
-    user = db.get(models.User, int(user_id))
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    user = db.get(models.User, uid)
     if user is None or user.is_blocked:
         return None
     return user
