@@ -48,7 +48,10 @@ export function AuthProvider({ children }) {
         })
         .catch(err => {
           // Only clear token on 401 (invalid/expired); keep it on network errors so session persists
-          if (err && err.status === 401) clearToken()
+          if (err && err.status === 401) {
+            clearToken()
+            setUser(null)
+          }
         })
         .finally(() => setLoading(false))
     } else {

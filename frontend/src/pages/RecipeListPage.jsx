@@ -200,8 +200,8 @@ export default function RecipeListPage() {
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
   const fetchRecipes = useCallback(async (query = '') => {
-    // Only call API when user is logged in. Trial users have no GET /recipes/ access.
-    if (!user) {
+    // Never call GET /recipes/ in trial mode (no auth). If trialToken is set, use trial recipes only.
+    if (!user || trialToken) {
       setLoading(false)
       return
     }
@@ -215,13 +215,13 @@ export default function RecipeListPage() {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, trialToken])
 
   useEffect(() => {
-    // Trial mode (no user): use starter recipes from state or sessionStorage; never call GET /api/recipes/
-    if (!user) {
+    // Trial mode (no user or trialToken set): use starter recipes from state/sessionStorage; never call GET /api/recipes/
+    if (!user || trialToken) {
       setLoading(false)
-      const state = location.state as { trialRecipes?: any[] } | null
+      const state = location.state
       let raw = state?.trialRecipes
       if (!raw?.length) {
         try {
@@ -264,7 +264,7 @@ export default function RecipeListPage() {
       return
     }
     fetchRecipes(appliedSearch)
-  }, [fetchRecipes, appliedSearch, user, location.state])
+  }, [fetchRecipes, appliedSearch, user, trialToken, location.state])
 
   function handleSearchSubmit(e) {
     e.preventDefault()
