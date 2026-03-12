@@ -145,12 +145,32 @@ def get_or_create_recipe_image(
         return
     # Cache miss: generate and save
     title = recipe.title_pl or recipe.title_original or "Dish"
+    # Use tags + key ingredients to steer the image toward the actual dish
     tag_hint = ""
     if _is_dessert_or_cake(recipe_tags, title):
         tag_hint = " This is a sweet dessert or cake — show the dessert/cake only, not meat or savory food. "
+    ingredients = getattr(recipe, "ingredients_pl", None) or []
+    # Flatten simple ingredient structures to text
+    ing_texts: list[str] = []
+    for ing in ingredients[:8]:
+        if isinstance(ing, str):
+            ing_texts.append(ing)
+        elif isinstance(ing, dict):
+            name = str(ing.get("name") or "").strip()
+            amount = str(ing.get("amount") or "").strip()
+            if name or amount:
+                ing_texts.append(f"{amount} {name}".strip())
+    ingredients_clause = ""
+    if ing_texts:
+        ingredients_clause = " Key ingredients: " + ", ".join(ing_texts) + "."
+    tags_clause = ""
+    if recipe_tags:
+        tags_clause = " Tags for this recipe: " + ", ".join(str(t) for t in recipe_tags[:8]) + "."
     prompt = (
-        f"Realistic food photo of {title}. The image must show exactly this dish: {title}.{tag_hint}"
-        " Plated dish only, natural lighting, close-up, high quality, no people, no hands, no text, no logos."
+        f"Realistic food photo of the finished dish '{title}'. The image must match this recipe exactly."
+        f"{ingredients_clause}{tags_clause}{tag_hint}"
+        " Show the cooked/plated dish only (no raw ingredients on their own), on a plate or in a bowl."
+        " Natural lighting, close-up, high quality, no people, no hands, no text, no logos."
     )
     image_bytes = _generate_image_via_openai(prompt)
     if not image_bytes:
