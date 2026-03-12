@@ -17,6 +17,7 @@ Output valid JSON only — no markdown, no prose. Use the output_language for al
 USER_PROMPT_TEMPLATE = """\
 Country: {country_name}
 Output language: {output_lang}
+{dish_types_line}
 
 Return exactly this JSON (array of 3 recipes from famous cooks in that country):
 {{
@@ -130,9 +131,14 @@ def _fallback_recipes(target_language: str) -> list[dict]:
     ]
 
 
-def get_starter_recipes(target_country: str, target_language: str) -> list[dict]:
+def get_starter_recipes(
+    target_country: str,
+    target_language: str,
+    dish_preferences: list[str] | None = None,
+) -> list[dict]:
     """
     Return 3 starter recipes for the given country and language.
+    Optionally prefer recipe types matching dish_preferences (e.g. ["pasta", "soups"]).
     Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional).
     Uses OpenAI when available; falls back to static recipes on failure.
     """
@@ -143,9 +149,14 @@ def get_starter_recipes(target_country: str, target_language: str) -> list[dict]
 
     country_name = _country_name(target_country)
     output_lang = _output_lang_name(target_language)
+    dish_types_line = ""
+    if dish_preferences:
+        types_str = ", ".join(dish_preferences[:10])  # limit for prompt
+        dish_types_line = f"Prefer recipes that match these types (if possible): {types_str}.\n"
     prompt = USER_PROMPT_TEMPLATE.format(
         country_name=country_name,
         output_lang=output_lang,
+        dish_types_line=dish_types_line,
     )
 
     try:
@@ -211,7 +222,21 @@ def ensure_starter_recipes_for_user(user, db) -> None:
     count = db.query(models.Recipe).filter(models.Recipe.user_id == user.id).count()
     if count > 0:
         return
-    recipes_data = get_starter_recipes(user.target_country, user.target_language)
+    recipes_data = get_starter_recipes(
+        user.target_country,
+        user.target_language,
+        dish_preferences=user.dish_preferences or None,
+    )
+    add_starter_recipes_to_user(user, recipes_data, db)
+
+
+def add_starter_recipes_to_user(user, recipes_data: list[dict], db) -> None:
+    """
+    Create Recipe rows from recipes_data and attach to user; set starter_recipes_added=True.
+    Used by ensure_starter_recipes_for_user and by onboarding claim.
+    """
+    from .. import models
+
     for r in recipes_data:
         title = (r.get("title") or "").strip() or "Recipe"
         ingredients = r.get("ingredients") or []

@@ -76,13 +76,23 @@ export default function LoginPage() {
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
 
-  // Handle OAuth callback: ?token=... or ?error=...
+  // Handle OAuth callback: ?token=... or ?error=... (claim onboarding starter recipes if user came from onboarding)
   useEffect(() => {
     const params = new URLSearchParams(location.search || '')
     const token = params.get('token')
     const oauthError = params.get('error')
     if (token) {
-      setTokenFromOAuth(token).then(() => navigate('/', { replace: true }))
+      setTokenFromOAuth(token).then(async () => {
+        try {
+          const raw = sessionStorage.getItem('onboarding_claim')
+          if (raw) {
+            const payload = JSON.parse(raw)
+            await api.post('/users/me/claim-starter-recipes', payload)
+            sessionStorage.removeItem('onboarding_claim')
+          }
+        } catch (_) {}
+        navigate('/', { replace: true })
+      })
       return
     }
     if (oauthError) {

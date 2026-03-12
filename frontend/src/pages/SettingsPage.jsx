@@ -87,7 +87,7 @@ function SettingsCard({ icon, title, children }) {
 }
 
 export default function SettingsPage() {
-  const { user, setUser, logout } = useAuth()
+  const { user, setUser, logout, refreshUser } = useAuth()
   const { t, lang, setLang } = useLanguage()
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -96,6 +96,10 @@ export default function SettingsPage() {
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
     target_zip:      user?.target_zip      ?? '',
+    dish_preferences: user?.dish_preferences ?? [],
+    household_adults: user?.household_adults ?? null,
+    household_kids: user?.household_kids ?? null,
+    diet_filters: user?.diet_filters ?? [],
     default_servings: user?.default_servings ?? 4,
     allergens: user?.allergens ?? [],
     custom_allergens_text: user?.custom_allergens_text ?? '',
@@ -107,6 +111,8 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [fetchStarterLoading, setFetchStarterLoading] = useState(false)
+  const [fetchStarterMessage, setFetchStarterMessage] = useState(null)
 
   const set = key => v => setForm(f => ({ ...f, [key]: v }))
 
@@ -119,11 +125,15 @@ export default function SettingsPage() {
       target_country: user.target_country ?? 'PL',
       target_city: user.target_city ?? 'Wrocław',
       target_zip: user.target_zip ?? '',
+      dish_preferences: user.dish_preferences ?? [],
+      household_adults: user.household_adults ?? null,
+      household_kids: user.household_kids ?? null,
+      diet_filters: user.diet_filters ?? [],
       default_servings: user.default_servings ?? 4,
       allergens: user.allergens ?? [],
       custom_allergens_text: user.custom_allergens_text ?? '',
     })
-  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.default_servings, user?.allergens, user?.custom_allergens_text])
+  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.allergens, user?.custom_allergens_text])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -356,6 +366,39 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Fetch starter recipes */}
+      <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">{t('fetchStarterRecipes')}</h3>
+        <p className="text-sm text-stone-600 mb-3">
+          {t('fetchStarterRecipesHint')}
+        </p>
+        {fetchStarterMessage && (
+          <p className={`text-sm mb-3 ${fetchStarterMessage.success ? 'text-emerald-600' : 'text-amber-600'}`}>
+            {fetchStarterMessage.text}
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={fetchStarterLoading}
+          onClick={async () => {
+            setFetchStarterLoading(true)
+            setFetchStarterMessage(null)
+            try {
+              await api.post('/users/me/fetch-starter-recipes')
+              setFetchStarterMessage({ success: true, text: t('fetchStarterRecipesDone') })
+              refreshUser?.()
+            } catch (err) {
+              setFetchStarterMessage({ success: false, text: err.message || t('somethingWentWrong') })
+            } finally {
+              setFetchStarterLoading(false)
+            }
+          }}
+          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition"
+        >
+          {fetchStarterLoading ? t('loading') : t('fetchStarterRecipesButton')}
+        </button>
       </div>
 
       {/* Delete account */}

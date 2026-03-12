@@ -4,6 +4,7 @@ import { LanguageProvider, useLanguage } from './context/LanguageContext'
 import { ShoppingListProvider } from './context/ShoppingListContext'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
@@ -79,6 +80,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/" element={<LandingPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/terms" element={<TermsPage />} />

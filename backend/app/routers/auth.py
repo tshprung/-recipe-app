@@ -76,6 +76,10 @@ def register(
         dish_preferences=payload.dish_preferences or [],
         default_servings=payload.default_servings if payload.default_servings is not None else 4,
         allergens=payload.allergens or [],
+        custom_allergens_text=payload.custom_allergens_text,
+        household_adults=payload.household_adults,
+        household_kids=payload.household_kids,
+        diet_filters=payload.diet_filters or [],
     )
 
     # Generate verification token (24h expiry)

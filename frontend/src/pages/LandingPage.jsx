@@ -64,12 +64,12 @@ export default function LandingPage() {
             <nav className="hidden md:flex items-center gap-6 text-sm text-white/75">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-              <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
+              <Link to="/onboarding" className="hover:text-white transition-colors">Sign In</Link>
             </nav>
 
             <div className="flex items-center gap-2">
               <Link
-                to="/login?tab=register"
+                to="/onboarding"
                 className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
@@ -98,10 +98,10 @@ export default function LandingPage() {
               >
                 <a onClick={() => setMobileOpen(false)} href="#features" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Features</a>
                 <a onClick={() => setMobileOpen(false)} href="#pricing" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Pricing</a>
-                <Link onClick={() => setMobileOpen(false)} to="/login" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Sign In</Link>
+                <Link onClick={() => setMobileOpen(false)} to="/onboarding" className="rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white transition">Sign In</Link>
                 <Link
                   onClick={() => setMobileOpen(false)}
-                  to="/login?tab=register"
+                  to="/onboarding"
                   className="mt-1 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-black shadow"
                   style={{ backgroundColor: COLORS.accent }}
                 >
@@ -143,14 +143,14 @@ export default function LandingPage() {
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 sm:items-center">
               <Link
-                to="/login?tab=register"
+                to="/onboarding"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
                 Start Free
               </Link>
               <Link
-                to="/login"
+                to="/onboarding"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
                 style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
               >
@@ -236,7 +236,7 @@ export default function LandingPage() {
             </p>
           </div>
           <Link
-            to="/login?tab=register"
+            to="/onboarding"
             className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 w-full sm:w-auto"
             style={{ backgroundColor: COLORS.accent }}
           >
@@ -301,7 +301,7 @@ export default function LandingPage() {
               <li className="flex items-start gap-2"><span style={{ color: COLORS.accent }}>✓</span> Unified shopping list</li>
             </ul>
             <Link
-              to="/login?tab=register"
+              to="/onboarding"
               className="mt-7 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
               style={{ backgroundColor: COLORS.accent }}
             >
@@ -330,7 +330,7 @@ export default function LandingPage() {
               <li className="flex items-start gap-2"><span style={{ color: COLORS.secondary }}>✓</span> Faster AI processing</li>
             </ul>
             <Link
-              to="/login?tab=register"
+              to="/onboarding"
               className="relative mt-7 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold ring-1 ring-white/10 hover:bg-white/10 transition"
               style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
             >
@@ -355,14 +355,14 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Link
-                to="/login?tab=register"
+                to="/onboarding"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
                 Start Free
               </Link>
               <Link
-                to="/login"
+                to="/onboarding"
                 className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition"
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
               >

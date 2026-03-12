@@ -29,6 +29,9 @@ class User(Base):
 
     # Cooking preferences
     dish_preferences: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # e.g. ["pasta", "soups", "chicken"]
+    household_adults: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    household_kids: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diet_filters: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # e.g. ["vegetarian", "vegan"]
     default_servings: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
     allergens: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     custom_allergens_text: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -155,6 +158,17 @@ class ShoppingListCache(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class PreparedStarterRecipes(Base):
+    """Temporary storage for pre-fetched starter recipes during onboarding (claim by token)."""
+
+    __tablename__ = "prepared_starter_recipes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    claim_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    recipes_data: Mapped[list] = mapped_column(JSON, nullable=False)  # list of recipe dicts
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class IngredientSubstitution(Base):

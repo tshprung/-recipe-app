@@ -53,6 +53,10 @@ class UserRegister(BaseModel):
     dish_preferences: list[str] | None = None
     default_servings: int | None = None
     allergens: list[str] | None = None
+    custom_allergens_text: str | None = None
+    household_adults: int | None = None
+    household_kids: int | None = None
+    diet_filters: list[str] | None = None
 
     @field_validator("allergens")
     @classmethod
@@ -80,6 +84,40 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+# --- Onboarding (guest pre-fetch + claim) ---
+
+class OnboardingPrepareRequest(BaseModel):
+    """Payload for pre-fetching starter recipes during onboarding (no auth)."""
+    target_country: str = "PL"
+    target_language: str = "en"
+    target_city: str | None = None
+    target_zip: str | None = None
+    dish_preferences: list[str] = Field(default_factory=list)
+    default_servings: int = Field(default=4, ge=1, le=24)
+
+
+class OnboardingPrepareResponse(BaseModel):
+    claim_token: str
+
+
+class OnboardingClaimRequest(BaseModel):
+    """After sign-up: claim pre-fetched recipes and apply onboarding answers to user."""
+    claim_token: str
+    # Optional profile updates (from onboarding answers)
+    ui_language: str | None = None
+    target_language: str | None = None
+    target_country: str | None = None
+    target_city: str | None = None
+    target_zip: str | None = None
+    dish_preferences: list[str] | None = None
+    household_adults: int | None = None
+    household_kids: int | None = None
+    diet_filters: list[str] | None = None
+    default_servings: int | None = None
+    allergens: list[str] | None = None
+    custom_allergens_text: str | None = None
+
+
 # --- User ---
 
 class UserSettings(BaseModel):
@@ -89,6 +127,9 @@ class UserSettings(BaseModel):
     target_city: str
     target_zip: str | None = None
     dish_preferences: list[str] = Field(default_factory=list)
+    household_adults: int | None = None
+    household_kids: int | None = None
+    diet_filters: list[str] = Field(default_factory=list)
     default_servings: int = Field(default=4, ge=1, le=24)
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
@@ -129,6 +170,9 @@ class UserOut(BaseModel):
     is_admin: bool = False
     renewed_token: str | None = None  # set by backend on GET /users/me to slide expiry; client stores and does not put in user state
     dish_preferences: list[str] = Field(default_factory=list)
+    household_adults: int | None = None
+    household_kids: int | None = None
+    diet_filters: list[str] = Field(default_factory=list)
     default_servings: int = 4
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
