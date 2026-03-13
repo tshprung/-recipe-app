@@ -249,6 +249,10 @@ class UserOut(BaseModel):
 class RecipeCreate(BaseModel):
     raw_input: str | None = None
     source_url: str | None = None
+    # Optional overrides for trial sessions so the backend can respect updated
+    # Settings chosen on the client (language, country). Ignored for logged-in users.
+    target_language: str | None = None
+    target_country: str | None = None
 
     @model_validator(mode="after")
     def require_raw_or_url(self):

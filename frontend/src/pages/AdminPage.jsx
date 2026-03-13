@@ -228,15 +228,31 @@ export default function AdminPage() {
                         </button>
                       </span>
                     ) : (
-                      <span className="text-stone-200">
-                        {u.transformations_used} / {u.transformations_limit === -1 ? '∞' : u.transformations_limit}
+                      <span className="text-stone-200 flex items-center gap-2">
+                        <span>
+                          {u.transformations_used} / {u.transformations_limit === -1 ? '∞' : u.transformations_limit}
+                        </span>
                         <button
                           type="button"
                           onClick={() => setEditingLimit(prev => ({ ...prev, [u.id]: true }))}
-                          className="ml-2 text-amber-400 hover:underline text-xs"
+                          className="text-amber-400 hover:underline text-xs"
                         >
                           Edit
                         </button>
+                        {u.transformations_limit !== -1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!window.confirm(`Give unlimited credits to ${u.email}?`)) return
+                              handleSetCredits(u.id, -1, u.transformations_used)
+                            }}
+                            disabled={actionLoading === u.id}
+                            className="text-emerald-400 hover:underline text-xs"
+                            title="Set unlimited credits"
+                          >
+                            ∞ Unlimited
+                          </button>
+                        )}
                       </span>
                     )}
                   </td>

@@ -121,8 +121,6 @@ export default function RecipeDetailPage() {
   const [showTrialExhausted, setShowTrialExhausted] = useState(false)
   const dropdownRef = useRef(null)
 
-  // Ingredient alternatives: off by default so users don't waste credits by accident
-  const [ingredientLookupEnabled, setIngredientLookupEnabled] = useState(false)
   const [altIngredient, setAltIngredient] = useState(null)
   const [altIngredientIndex, setAltIngredientIndex] = useState(null)
   const [altOpen, setAltOpen] = useState(false)
@@ -711,31 +709,45 @@ export default function RecipeDetailPage() {
           )}
 
           {/* Meta row */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-stone-400">
               {new Date(recipe.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
-            {recipe.title_original && activeTab === 'original' && (
-              <button
-                onClick={() => {
-                  const w = window.open('', '_blank', 'noopener,noreferrer')
-                  if (!w) return
-                  const lang = (recipe.detected_language || 'en').substring(0, 5)
-                  const escaped = (recipe.raw_input || '')
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                  const title = (recipe.title_original || 'Original recipe').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                  w.document.write(
-                    `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1c1917;} pre{white-space:pre-wrap;word-wrap:break-word;}</style></head><body><h1>${title}</h1><pre>${escaped}</pre></body></html>`
-                  )
-                  w.document.close()
-                }}
-                className="text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors bg-stone-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg border border-stone-100"
-              >
-                ⇔ {t('showOriginal')}
-              </button>
+            {activeTab === 'original' && (
+              <div className="flex items-center gap-2">
+                {recipe.notes?.source_url && (
+                  <a
+                    href={recipe.notes.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                  >
+                    {t('openSourceSite') || 'Open source site'}
+                  </a>
+                )}
+                {recipe.title_original && (
+                  <button
+                    onClick={() => {
+                      const w = window.open('', '_blank', 'noopener,noreferrer')
+                      if (!w) return
+                      const lang = (recipe.detected_language || 'en').substring(0, 5)
+                      const escaped = (recipe.raw_input || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                      const title = (recipe.title_original || 'Source recipe').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      w.document.write(
+                        `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1c1917;} pre{white-space:pre-wrap;word-wrap:break-word;}</style></head><body><h1>${title}</h1><pre>${escaped}</pre></body></html>`
+                      )
+                      w.document.close()
+                    }}
+                    className="text-xs font-medium text-stone-400 hover:text-amber-600 transition-colors bg-stone-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg border border-stone-100"
+                  >
+                    ⇔ {t('showSource') || 'Show source'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
             </div>
@@ -940,17 +952,11 @@ export default function RecipeDetailPage() {
       {hasIngredients && (
         <Section title={t('ingredients')} icon="🧅">
           <Card>
-            {!ingredientLookupEnabled ? (
-              <div className="mb-3 pb-3 border-b border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => setIngredientLookupEnabled(true)}
-                  className="text-sm font-medium text-amber-600 hover:text-amber-700 hover:underline"
-                >
-                  {t('enableIngredientLookup')}
-                </button>
-              </div>
-            ) : null}
+            <div className="mb-3 pb-3 border-b border-stone-100">
+              <p className="text-xs text-stone-500">
+                ⇄ {t('ingredientAlternatives')} – {t('usesOneToken')}
+              </p>
+            </div>
             {showOriginal && activeTab === 'original' ? (
               <div>
                 <div className="grid grid-cols-2 gap-4 pb-2 mb-1 border-b border-stone-100">
@@ -965,7 +971,7 @@ export default function RecipeDetailPage() {
                     <div key={i} className="grid grid-cols-2 gap-4 py-2 border-b border-stone-50 last:border-0">
                       <div className="flex items-start gap-2 min-w-0">
                         <span className="text-sm text-stone-700 break-words">{pl}</span>
-                        {ingredientLookupEnabled && (
+                        {true && (
                           <button
                             type="button"
                             onClick={() => openIngredientAlternatives(pl, i)}
@@ -993,7 +999,7 @@ export default function RecipeDetailPage() {
                       </span>
                       <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
                         <span className="text-left break-words">{label}</span>
-                        {ingredientLookupEnabled && (
+                        {true && (
                           <button
                             type="button"
                             onClick={() => openIngredientAlternatives(label, i)}

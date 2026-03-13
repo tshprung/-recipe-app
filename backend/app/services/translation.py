@@ -137,7 +137,28 @@ def translate_recipe(
 
     client = OpenAI(api_key=api_key)
 
-    if not _is_recipe(raw_input, client):
+    def _looks_like_recipe_heuristic(text: str) -> bool:
+        """Heuristic fallback so obviously recipe-like text is accepted even if classifier is unsure."""
+        lowered = (text or "").lower()
+        keywords = [
+            "ingredients",
+            "ingredienti",
+            "sk\u0142adniki",  # PL
+            "\u05de\u05e6\u05e8\u05db\u05d9\u05dd",  # he: ingredients
+            "instructions",
+            "preparation",
+            "\u05d4\u05d5\u05e8\u05d0\u05d5\u05ea \u05d4\u05db\u05e0\u05d4",  # he: preparation steps
+            "step 1",
+            "step 2",
+        ]
+        if any(k in lowered for k in keywords):
+            return True
+        # Long-ish text with numbered steps is very likely to be a recipe.
+        if lowered.count("\n") >= 5 and any(token in lowered for token in ["1.", "2.", "3."]):
+            return True
+        return False
+
+    if not _is_recipe(raw_input, client) and not _looks_like_recipe_heuristic(raw_input):
         raise ValueError("NOT_A_RECIPE: classifier=false")
     source_lang = detect_language(raw_input, client)
 

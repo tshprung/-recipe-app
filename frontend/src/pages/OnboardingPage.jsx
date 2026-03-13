@@ -102,7 +102,6 @@ export default function OnboardingPage() {
   const turnstileWidgetIdRef = useRef(null)
   const [locationDetecting, setLocationDetecting] = useState(false)
   const [locationError, setLocationError] = useState(null)
-  const [zipResolving, setZipResolving] = useState(false)
   const [prepareLoading, setPrepareLoading] = useState(false)
 
   const set = (key) => (value) => setData((d) => ({ ...d, [key]: value }))
@@ -150,17 +149,7 @@ export default function OnboardingPage() {
     }
   }
 
-  async function resolveZipToCity() {
-    const zip = (data.target_zip || '').trim()
-    const country = (data.target_country || '').trim()
-    if (!zip || !country) return
-    setZipResolving(true)
-    try {
-      const res = await api.get(`/meta/resolve-city?country=${encodeURIComponent(country)}&zip=${encodeURIComponent(zip)}`)
-      if (res?.city) setData((d) => ({ ...d, target_city: res.city }))
-    } catch (_) {}
-    setZipResolving(false)
-  }
+  // Zip-to-city lookup removed from onboarding to keep only language + country.
 
   // Prepare is triggered when user clicks Next on step 2 so diet_filters (e.g. kosher) are included
 
@@ -328,27 +317,6 @@ export default function OnboardingPage() {
                   </button>
                 </div>
                 {locationError && <p className="text-amber-400 text-xs mt-1">{locationError}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-white/80 mb-1.5">City or ZIP (optional — enter ZIP and we’ll find the city)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={data.target_city}
-                    onChange={(e) => set('target_city')(e.target.value)}
-                    placeholder="City"
-                    className={inputCls}
-                  />
-                  <input
-                    type="text"
-                    value={data.target_zip}
-                    onChange={(e) => set('target_zip')(e.target.value)}
-                    onBlur={resolveZipToCity}
-                    placeholder="ZIP"
-                    className={inputCls}
-                  />
-                </div>
-                {zipResolving && <p className="text-white/50 text-xs mt-1">Looking up city…</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-1.5">App / website language</label>

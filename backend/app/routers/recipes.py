@@ -26,7 +26,7 @@ def _has_unlimited_quota(user: models.User) -> bool:
     return (user.email or "").strip().lower() == _UNLIMITED_QUOTA_EMAIL
 
 _TAG_RE = re.compile(r"<[^>]+>")
-_MAX_FETCH_BYTES = 500 * 1024  # 500 KB
+_MAX_FETCH_BYTES = 1_000 * 1024  # 1 MB
 _MIN_EXTRACTED_LEN = 10
 
 
@@ -96,6 +96,14 @@ def _fetch_and_extract_text(url: str) -> str:
     text = _TAG_RE.sub(" ", text)
     text = re.sub(r"\s+", " ", text).strip()
     text = _sanitize_text(text, max_len=10000)
+    # Some sites protect content with bot-block pages; try to detect those and
+    # return a clearer error so users know to paste the recipe manually.
+    lower = text.lower()
+    if "made us think that you are a bot" in lower or "block page" in lower:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This website is blocking automated access. Please copy and paste the recipe text instead of using the URL.",
+        )
     if len(text) < _MIN_EXTRACTED_LEN:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -138,8 +146,10 @@ def create_recipe(
             target_country = current_user.target_country
             target_city = current_user.target_city
         else:
-            target_language = trial_session.language
-            target_country = trial_session.country
+            # Trial: allow client to provide overrides from Settings; otherwise fall back
+            # to the language/country captured when the trial started.
+            target_language = (payload.target_language or trial_session.language)
+            target_country = payload.target_country or trial_session.country
             target_city = ""
         translated = translate_recipe(
             raw_input=raw_input,
@@ -163,6 +173,10 @@ def create_recipe(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Translation failed: {e}")
 
+    notes = translated.get("notes", {}) or {}
+    if (payload.source_url or "").strip():
+        notes.setdefault("source_url", payload.source_url.strip())
+
     recipe = models.Recipe(
         user_id=current_user.id if current_user is not None else None,
         trial_session_id=trial_session.id if trial_session is not None else None,
@@ -175,7 +189,7 @@ def create_recipe(
         steps_pl=translated.get("steps_pl", []),
         tags=translated.get("tags", []),
         substitutions=translated.get("substitutions", {}),
-        notes=translated.get("notes", {}),
+        notes=notes,
         raw_input=raw_input,
         detected_language=translated.get("detected_language"),
         target_language=target_language,

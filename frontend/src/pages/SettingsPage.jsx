@@ -232,7 +232,7 @@ export default function SettingsPage() {
         </SettingsCard>
 
         <SettingsCard icon="🌐" title={t('translateTo')}>
-          <p className="text-sm text-stone-500 mb-3">We guessed your location; you can change it here.</p>
+          <p className="text-sm text-stone-500 mb-3">Choose the language and country you want recipes adapted for.</p>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('recipeLanguage')}</label>
             <select
@@ -257,22 +257,6 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-              ZIP
-              <span className="ml-1.5 text-xs font-normal text-stone-400">(postal code)</span>
-            </label>
-            <input
-              type="text"
-              value={form.target_zip}
-              onChange={e => setForm(f => ({ ...f, target_zip: e.target.value }))}
-              onBlur={resolveZipToCity}
-              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
-            />
-            {zipStatus === 'loading' && <p className="text-xs text-stone-400 mt-1">Looking up city…</p>}
-            {zipStatus === 'error' && <p className="text-xs text-red-600 mt-1">Could not resolve city from ZIP.</p>}
-          </div>
-          <Field label={t('city')}     hint={t('hintCity')} value={form.target_city}     onChange={set('target_city')}     />
         </SettingsCard>
 
         <SettingsCard icon="👨‍👩‍👧‍👦" title={t('cookingAndDiet')}>

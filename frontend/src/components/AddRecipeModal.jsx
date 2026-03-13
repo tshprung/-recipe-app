@@ -38,6 +38,20 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       const body = mode === INPUT_MODE.URL
         ? { source_url: url.trim() }
         : { raw_input: text.trim() }
+
+      // For trial users, pass current target language/country so backend
+      // creates recipes in the language chosen in Settings.
+      if (!user && trialToken) {
+        try {
+          const raw = localStorage.getItem('trial_settings')
+          if (raw) {
+            const ts = JSON.parse(raw)
+            if (ts.target_language) body.target_language = ts.target_language
+            if (ts.target_country) body.target_country = ts.target_country
+          }
+        } catch (_) {}
+      }
+
       const data = await api.post('/recipes/', body)
       if (typeof data?.remaining_actions === 'number') syncTrialRemaining(data.remaining_actions)
       await refreshUser()
