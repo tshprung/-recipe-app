@@ -4,26 +4,8 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
-
-const DISH_TYPES = [
-  'pasta', 'pizza', 'chicken', 'beef', 'soups', 'fish', 'salads', 'baking', 'breakfast',
-  'vegetarian', 'desserts', 'stews', 'grilling',
-]
-
-const DIET_OPTIONS = [
-  { key: 'vegetarian', labelKey: 'vegetarian' },
-  { key: 'vegan', labelKey: 'vegan' },
-  { key: 'gluten_free', labelKey: 'glutenFree' },
-  { key: 'dairy_free', labelKey: 'dairyFree' },
-  { key: 'kosher', labelKey: 'kosher' },
-  { key: 'halal', labelKey: 'halal' },
-]
-
-const TIME_OPTIONS = [
-  { value: null, labelKey: 'anyTime' },
-  { value: 30, labelKey: 'under30Min' },
-  { value: 60, labelKey: 'under60Min' },
-]
+import { DISH_TYPES, DIET_OPTIONS, TIME_OPTIONS } from '../constants'
+import { getErrorMessage } from '../utils/errors'
 
 export default function DiscoverPage() {
   const { t } = useLanguage()
@@ -68,7 +50,7 @@ export default function DiscoverPage() {
         if (e.status === 402 || e.trialExhausted) {
           syncTrialRemaining(0)
           setShowTrialExhausted(true)
-        } else setError(e.message || t('somethingWentWrong'))
+        } else setError(getErrorMessage(e, t))
       })
       .finally(() => setLoading(false))
   }
@@ -87,7 +69,7 @@ export default function DiscoverPage() {
       setSavedTitle(sug.title)
       refreshUser()
     } catch (e) {
-      setError(e.message || t('somethingWentWrong'))
+      setError(getErrorMessage(e, t))
     } finally {
       setAddingTitle(null)
     }

@@ -1,3 +1,5 @@
+import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
+
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
 /** Base URL for static assets (e.g. recipe images) served by the API. */
@@ -15,10 +17,6 @@ export function getRecipeImageUrl(imageUrl) {
   return base ? `${base}${imageUrl}` : imageUrl
 }
 
-const LANG_STORAGE_KEY = 'recipe-app-lang'
-
-const REMEMBER_ME_KEY = 'recipe_app_remember_me'
-
 function getUserToken() {
   const usePersistent = localStorage.getItem(REMEMBER_ME_KEY) === '1'
   if (usePersistent) return localStorage.getItem('token')
@@ -31,8 +29,6 @@ function getToken() {
   if (userToken) return userToken
   return getTrialToken()
 }
-
-const TRIAL_TOKEN_KEY = 'trial_token'
 
 export function getTrialToken() {
   try {
@@ -57,6 +53,7 @@ function getLang() {
   return 'en'
 }
 
+/** Minimal t() for pre-React network errors only; app i18n lives in LanguageContext. */
 function t(key, vars = {}) {
   const lang = getLang()
   const dict = {

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user_optional
 from ..database import get_db
+from ..services.user_deletion import delete_user_and_data
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -147,23 +148,6 @@ def unblock_user(
     return {"detail": "User unblocked.", "email": user.email}
 
 
-def _delete_user_cascade(user_id: int, db: Session) -> None:
-    """Delete user and all related data (mirrors DELETE /users/me)."""
-    db.query(models.ShoppingListRecipe).filter(models.ShoppingListRecipe.user_id == user_id).delete(
-        synchronize_session=False
-    )
-    db.query(models.ShoppingListCache).filter(models.ShoppingListCache.user_id == user_id).delete(
-        synchronize_session=False
-    )
-    db.query(models.Recipe).filter(models.Recipe.user_id == user_id).delete(synchronize_session=False)
-    db.query(models.IngredientSubstitution).filter(
-        models.IngredientSubstitution.created_by_user_id == user_id
-    ).update({models.IngredientSubstitution.created_by_user_id: None})
-    user = db.get(models.User, user_id)
-    if user:
-        db.delete(user)
-
-
 @router.delete("/users/{user_id}")
 def delete_user(
     user_id: int,
@@ -173,7 +157,7 @@ def delete_user(
     user = db.get(models.User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    _delete_user_cascade(user_id, db)
+    delete_user_and_data(user_id, db)
     db.commit()
     return {"detail": "User deleted.", "email": user.email}
 

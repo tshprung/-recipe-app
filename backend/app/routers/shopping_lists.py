@@ -16,6 +16,31 @@ from ..services.shopping_list_ingredients import (
 _EMPTY_ITEMS = {cat: [] for cat in CATEGORIES}
 
 
+def _compute_categorized_items(
+    recipe_ids: list[int], user_id: int, db: Session, user: models.User | None = None
+) -> dict:
+    """Collect ingredients for recipe_ids, categorize via AI, and post-process. Raises on failure."""
+    ingredients = _collect_ingredients(recipe_ids, user_id, db, user=user)
+    if not ingredients:
+        return _EMPTY_ITEMS.copy()
+    try:
+        items = categorize_ingredients(ingredients)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Categorization failed: {e}")
+    for cat in list(items.keys()):
+        raw = items.get(cat)
+        if not isinstance(raw, list):
+            items[cat] = []
+            continue
+        items[cat] = [
+            cleaned for s in raw
+            if isinstance(s, str) and (cleaned := strip_cooking_instructions(s).strip())
+        ]
+    return items
+
+
 def _invalidate_shopping_list_cache(user_id: int, db: Session) -> None:
     """Remove cached shopping list for this user so next GET recomputes."""
     db.query(models.ShoppingListCache).filter(
@@ -116,28 +141,7 @@ def get_shopping_list(
     if cached:
         return {"recipe_ids": recipe_ids, "items": cached.items}
 
-    ingredients = _collect_ingredients(recipe_ids, current_user.id, db, user=current_user)
-    if not ingredients:
-        return {"recipe_ids": recipe_ids, "items": _EMPTY_ITEMS.copy()}
-
-    try:
-        items = categorize_ingredients(ingredients)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Categorization failed: {e}")
-
-    # Post-process: strip any prep/usage phrases the categorizer may have re-added
-    for cat in list(items.keys()):
-        raw = items.get(cat)
-        if not isinstance(raw, list):
-            items[cat] = []
-            continue
-        items[cat] = [
-            cleaned for s in raw
-            if isinstance(s, str) and (cleaned := strip_cooking_instructions(s).strip())
-        ]
-
+    items = _compute_categorized_items(recipe_ids, current_user.id, db, user=current_user)
     _invalidate_shopping_list_cache(current_user.id, db)
     db.add(
         models.ShoppingListCache(
@@ -235,15 +239,7 @@ def email_shopping_list(
     if not recipe_ids:
         raise HTTPException(status_code=400, detail="Shopping list is empty")
 
-    ingredients = _collect_ingredients(recipe_ids, current_user.id, db, user=current_user)
-
-    try:
-        items = categorize_ingredients(ingredients)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Categorization failed: {e}")
-
+    items = _compute_categorized_items(recipe_ids, current_user.id, db, user=current_user)
     try:
         send_shopping_list_email(to_email=current_user.email, items=items)
     except RuntimeError as e:

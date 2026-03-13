@@ -5,61 +5,10 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
-
-const TAG_COLORS = [
-  'bg-amber-100 text-amber-700',
-  'bg-orange-100 text-orange-700',
-  'bg-rose-100 text-rose-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-lime-100 text-lime-700',
-  'bg-teal-100 text-teal-700',
-]
-
-const NOTE_META = {
-  porcje:              { tKey: 'servings',     icon: '🍽' },
-  czas_przygotowania:  { tKey: 'prepTime',     icon: '⏱' },
-  czas_gotowania:      { tKey: 'cookTime',    icon: '🔥' },
-}
-
-const VARIANT_OPTIONS = [
-  { key: 'vegetarian', label: 'Vegetarian' },
-  { key: 'vegan',      label: 'Vegan' },
-  { key: 'dairy_free', label: 'Dairy free' },
-  { key: 'gluten_free',label: 'Gluten free' },
-  { key: 'kosher',     label: 'Kosher' },
-  { key: 'halal',      label: 'Halal' },
-  { key: 'nut_free',   label: 'Nut free' },
-  { key: 'low_sodium', label: 'Low sodium' },
-]
-
-// Badge shown on the recipe hero card for original and each variant
-const VARIANT_BADGE = {
-  original:    { label: 'Original',    cls: 'bg-stone-100 text-stone-500' },
-  vegetarian:  { label: 'Vegetarian', cls: 'bg-emerald-100 text-emerald-700' },
-  vegan:       { label: 'Vegan',      cls: 'bg-emerald-100 text-emerald-700' },
-  dairy_free:  { label: 'Dairy free', cls: 'bg-sky-100 text-sky-700' },
-  gluten_free: { label: 'Gluten free', cls: 'bg-violet-100 text-violet-700' },
-  kosher:      { label: 'Kosher',     cls: 'bg-blue-100 text-blue-700' },
-  halal:       { label: 'Halal',      cls: 'bg-teal-100 text-teal-700' },
-  nut_free:    { label: 'Nut free',   cls: 'bg-amber-100 text-amber-700' },
-  low_sodium:  { label: 'Low sodium', cls: 'bg-rose-100 text-rose-700' },
-}
-
-// Keywords for auto-detecting ingredient content tags
-const CONTENT_KEYWORDS = [
-  { label: 'Contains meat', icon: '🥩', words: ['mięso', 'kurczak', 'wołowina', 'wieprzowina', 'indyk', 'boczek', 'kiełbasa', 'wędlina', 'szynka', 'wątróbka', 'żeberka', 'mielone', 'kotlet', 'schab', 'cielęcina', 'kaczka', 'jagnięcina', 'baranina', 'rostbef', 'meat', 'chicken', 'beef', 'pork'] },
-  { label: 'Contains dairy', icon: '🧀', words: ['mleko', 'śmietana', 'śmietanka', 'ser', 'masło', 'jogurt', 'twaróg', 'ricotta', 'mozzarella', 'parmezan', 'kefir', 'maślanka', 'brie', 'camembert', 'feta', 'gouda', 'edam', 'milk', 'cream', 'cheese', 'butter'] },
-  { label: 'Contains eggs', icon: '🥚', words: ['jajko', 'jajka', 'jaja', 'żółtko', 'egg'] },
-  { label: 'Contains fish', icon: '🐟', words: ['ryba', 'łosoś', 'tuńczyk', 'dorsz', 'śledź', 'makrela', 'sardynka', 'pstrąg', 'karp', 'halibut', 'flądra', 'mintaj', 'krewetki', 'kalmary', 'fish', 'salmon', 'tuna'] },
-]
-
-function detectContentTags(ingredients) {
-  const text = (ingredients || [])
-    .map(ing => (typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}` : ing))
-    .join(' ')
-    .toLowerCase()
-  return CONTENT_KEYWORDS.filter(cat => cat.words.some(w => text.includes(w)))
-}
+import { VARIANT_OPTIONS, VARIANT_BADGE, variantLabelKey } from '../constants/recipes'
+import { TRIAL_SETTINGS_KEY } from '../constants/storageKeys'
+import { TAG_COLORS, NOTE_META, CONTENT_KEYWORDS } from './RecipeDetail/constants'
+import { parseAmountLeading, scaleIngredientLine, variantDisplayLabel, detectContentTags } from './RecipeDetail/utils'
 
 function Section({ title, icon, children }) {
   return (
@@ -79,52 +28,6 @@ function Card({ children, className = '' }) {
       {children}
     </div>
   )
-}
-
-function variantLabelKey(key) {
-  if (key === 'dairy_free') return 'dairyFree'
-  if (key === 'gluten_free') return 'glutenFree'
-  if (key === 'nut_free') return 'nutFree'
-  if (key === 'low_sodium') return 'lowSodium'
-  return key
-}
-
-function variantDisplayLabel(variantType, t) {
-  const parts = (variantType || '').split(',').map(s => s.trim()).filter(Boolean)
-  if (parts.length === 0) return ''
-  if (parts.length === 1) return t(variantLabelKey(parts[0]))
-  return parts.map(p => t(variantLabelKey(p))).join(' + ')
-}
-
-/** Parse leading number from ingredient amount (e.g. "2", "1/2", "2 1/2 cups", "1.5") -> number or null */
-function parseAmountLeading(value) {
-  if (value == null) return null
-  const s = String(value).trim()
-  const match = s.match(/^(\d+)\s+(\d+)\/(\d+)|^(\d+)\/(\d+)|^(\d+(?:\.\d+)?)/)
-  if (!match) return null
-  if (match[1] !== undefined) return parseInt(match[1], 10) + parseInt(match[2], 10) / parseInt(match[3], 10)
-  if (match[4] !== undefined) return parseInt(match[4], 10) / parseInt(match[5], 10)
-  return parseFloat(match[6])
-}
-
-/** Scale ingredient line by factor; supports string or { amount, name } */
-function scaleIngredientLine(ing, factor) {
-  if (factor === 1) return ing
-  if (typeof ing === 'object' && ing !== null) {
-    const amount = ing.amount != null ? String(ing.amount).trim() : ''
-    const n = parseAmountLeading(amount)
-    if (n != null) {
-      const scaled = Math.round(n * factor * 100) / 100
-      return { ...ing, amount: String(scaled) }
-    }
-    return ing
-  }
-  const str = String(ing)
-  const n = parseAmountLeading(str)
-  if (n == null) return str
-  const scaled = Math.round(n * factor * 100) / 100
-  const rest = str.replace(/^[\d\s\/.]+/, '').trim()
-  return rest ? `${scaled} ${rest}` : String(scaled)
 }
 
 export default function RecipeDetailPage() {
@@ -175,7 +78,7 @@ export default function RecipeDetailPage() {
     if (user?.default_servings != null && user.default_servings >= 1) return user.default_servings
     if (!user && trialToken) {
       try {
-        const raw = localStorage.getItem('trial_settings')
+        const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
         if (raw) {
           const s = JSON.parse(raw)
           const n = s?.default_servings
@@ -215,7 +118,7 @@ export default function RecipeDetailPage() {
         setVariants(variantData)
         const base = data?.servings_override ?? user?.default_servings ?? (() => {
           try {
-            const raw = localStorage.getItem('trial_settings')
+            const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
             if (raw) {
               const s = JSON.parse(raw)
               if (typeof s?.default_servings === 'number' && s.default_servings >= 1) return s.default_servings
@@ -375,7 +278,7 @@ export default function RecipeDetailPage() {
         : { variant_types: types }
       if (!user && trialToken) {
         try {
-          const raw = localStorage.getItem('trial_settings')
+          const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
           if (raw) {
             const ts = JSON.parse(raw)
             if (ts.target_language) body.target_language = ts.target_language
@@ -425,7 +328,7 @@ export default function RecipeDetailPage() {
       }
       if (!user && trialToken) {
         try {
-          const raw = localStorage.getItem('trial_settings')
+          const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
           if (raw) {
             const ts = JSON.parse(raw)
             if (ts.target_language) altBody.target_language = ts.target_language
@@ -703,7 +606,7 @@ export default function RecipeDetailPage() {
             <div className="mb-4">
               {(() => {
                 const baseKey = (activeTab.split(',')[0] || activeTab).replace(/_alt\d+$/, '')
-                const badge = VARIANT_BADGE[baseKey] ?? { cls: 'bg-stone-100 text-stone-500' }
+                const badge = VARIANT_BADGE[baseKey] ?? { labelKey: 'original', cls: 'bg-stone-100 text-stone-500' }
                 return (
                   <span className={`inline-block text-xs font-semibold rounded-full px-2.5 py-0.5 mb-2 ${badge.cls}`}>
                     {variantDisplayLabel(activeTab, t)}

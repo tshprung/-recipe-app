@@ -3,65 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
+import { COUNTRIES, TARGET_LANGUAGES, DISH_TYPES, ALLERGENS, DIET_OPTIONS } from '../constants'
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
 const COLORS = { bg: '#111111', card: '#1c1c1c', text: '#F8F8F6', accent: '#8FAF8F', secondary: '#C96A4A' }
-
-const COUNTRIES = [
-  { code: 'PL', name: 'Poland' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-]
-
-const TARGET_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'he', name: 'עברית' },
-  { code: 'es', name: 'Español' },
-  { code: 'fr', name: 'Français' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'pt', name: 'Português' },
-  { code: 'ru', name: 'Русский' },
-  { code: 'ja', name: '日本語' },
-]
-
-const DISH_TYPES = [
-  'pasta', 'pizza', 'chicken', 'beef', 'soups', 'fish', 'salads', 'baking', 'breakfast',
-  'vegetarian', 'desserts', 'stews', 'grilling',
-]
-
-const ALLERGENS = [
-  { code: 'gluten_cereals', label: 'Gluten (cereals)' },
-  { code: 'crustaceans', label: 'Crustaceans' },
-  { code: 'eggs', label: 'Eggs' },
-  { code: 'fish', label: 'Fish' },
-  { code: 'peanuts', label: 'Peanuts' },
-  { code: 'soybeans', label: 'Soybeans' },
-  { code: 'milk', label: 'Milk' },
-  { code: 'tree_nuts', label: 'Tree nuts' },
-  { code: 'sesame', label: 'Sesame' },
-  { code: 'mustard', label: 'Mustard' },
-  { code: 'celery', label: 'Celery' },
-  { code: 'lupin', label: 'Lupin' },
-  { code: 'sulphites', label: 'Sulphites' },
-  { code: 'molluscs', label: 'Molluscs' },
-]
-
-const DIET_OPTIONS = [
-  { key: 'vegetarian', label: 'Vegetarian' },
-  { key: 'vegan', label: 'Vegan' },
-  { key: 'gluten_free', label: 'Gluten-free' },
-  { key: 'dairy_free', label: 'Dairy-free' },
-  { key: 'kosher', label: 'Kosher' },
-  { key: 'halal', label: 'Halal' },
-]
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
@@ -472,7 +418,7 @@ export default function OnboardingPage() {
                       }`}
                       style={data.diet_filters.includes(d.key) ? { backgroundColor: COLORS.accent } : { backgroundColor: 'rgba(0,0,0,0.2)' }}
                     >
-                      {d.label}
+                      {t(d.labelKey)}
                     </button>
                   ))}
                 </div>

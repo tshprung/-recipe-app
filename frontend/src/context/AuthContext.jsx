@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { api, getTrialToken, setTrialTokenStorage } from '../api/client'
 import { hashPasswordForTransport } from '../auth/passwordHash'
+import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
 
 const AuthContext = createContext(null)
-const LANG_STORAGE_KEY = 'recipe-app-lang'
-const TRIAL_REMAINING_KEY = 'trial_remaining_actions'
+// Keep in sync with backend quota.MAX_TRIAL_ACTIONS
 const MAX_TRIAL_ACTIONS = 5
 
 function getTrialRemainingFromStorage() {
@@ -109,7 +109,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   function getToken() {
-    const usePersistent = typeof localStorage !== 'undefined' && localStorage.getItem('recipe_app_remember_me') === '1'
+    const usePersistent = typeof localStorage !== 'undefined' && localStorage.getItem(REMEMBER_ME_KEY) === '1'
     if (usePersistent) return localStorage.getItem('token')
     return sessionStorage.getItem('token')
   }
@@ -117,12 +117,12 @@ export function AuthProvider({ children }) {
   function clearToken() {
     localStorage.removeItem('token')
     sessionStorage.removeItem('token')
-    localStorage.setItem('recipe_app_remember_me', '0')
+    localStorage.setItem(REMEMBER_ME_KEY, '0')
   }
 
   function storeRenewedToken(me) {
     if (!me || !me.renewed_token) return me
-    const usePersistent = localStorage.getItem('recipe_app_remember_me') === '1'
+    const usePersistent = localStorage.getItem(REMEMBER_ME_KEY) === '1'
     if (usePersistent) localStorage.setItem('token', me.renewed_token)
     else sessionStorage.setItem('token', me.renewed_token)
     const { renewed_token: _, ...rest } = me
@@ -134,7 +134,7 @@ export function AuthProvider({ children }) {
     const data = await api.post('/auth/login', { email, password_hash })
     const token = data.access_token
     setTrialToken(null) // clear trial when user logs in
-    localStorage.setItem('recipe_app_remember_me', rememberMe ? '1' : '0')
+    localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? '1' : '0')
     if (rememberMe) {
       localStorage.setItem('token', token)
       sessionStorage.removeItem('token')
@@ -170,7 +170,7 @@ export function AuthProvider({ children }) {
 
   async function setTokenFromOAuth(accessToken) {
     if (!accessToken || typeof accessToken !== 'string') return
-    localStorage.setItem('recipe_app_remember_me', '1')
+    localStorage.setItem(REMEMBER_ME_KEY, '1')
     localStorage.setItem('token', accessToken)
     sessionStorage.removeItem('token')
     try {

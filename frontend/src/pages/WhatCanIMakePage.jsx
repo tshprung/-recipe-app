@@ -4,17 +4,8 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
-
-const DIET_OPTIONS = [
-  { key: 'vegetarian', labelKey: 'vegetarian' },
-  { key: 'vegan', labelKey: 'vegan' },
-  { key: 'dairy_free', labelKey: 'dairyFree' },
-  { key: 'gluten_free', labelKey: 'glutenFree' },
-  { key: 'kosher', labelKey: 'kosher' },
-  { key: 'halal', labelKey: 'halal' },
-  { key: 'nut_free', labelKey: 'nutFree' },
-  { key: 'low_sodium', labelKey: 'lowSodium' },
-]
+import { DIET_OPTIONS } from '../constants'
+import { getErrorMessage } from '../utils/errors'
 
 export default function WhatCanIMakePage() {
   const { t } = useLanguage()
@@ -68,7 +59,7 @@ export default function WhatCanIMakePage() {
       })
       .catch(e => {
         if (e.trialExhausted) setShowTrialExhausted(true)
-        else setError(e.message || t('somethingWentWrong'))
+        else setError(getErrorMessage(e, t))
         setLoading(false)
       })
   }
@@ -86,7 +77,7 @@ export default function WhatCanIMakePage() {
       setAddRecipeSuccess({ id: created.id, title: sug.title })
       setTimeout(() => setAddRecipeSuccess(null), 5000)
     } catch (e) {
-      setError(e.message || t('somethingWentWrong'))
+      setError(getErrorMessage(e, t))
     } finally {
       setAddingRecipeId(null)
     }
@@ -116,7 +107,7 @@ export default function WhatCanIMakePage() {
       })
       .catch(e => {
         if (e.trialExhausted) setShowTrialExhausted(true)
-        else setError(e.message || t('somethingWentWrong'))
+        else setError(getErrorMessage(e, t))
         setLoading(false)
       })
   }

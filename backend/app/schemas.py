@@ -39,6 +39,21 @@ def sanitize_custom_allergens_text(text: str | None) -> str | None:
     return cleaned[:500]
 
 
+def validate_allergen_codes(v: list[str] | None, *, allow_none: bool = False) -> list[str] | None:
+    """Validate and dedupe allergen codes against ALLOWED_ALLERGEN_CODES. Returns list or None if allow_none and v is None."""
+    if v is None:
+        return None if allow_none else []
+    cleaned: list[str] = []
+    for raw in v:
+        code = (raw or "").strip().lower()
+        if not code or code in cleaned:
+            continue
+        if code not in ALLOWED_ALLERGEN_CODES:
+            raise ValueError(f"Unknown allergen code: {code}")
+        cleaned.append(code)
+    return cleaned
+
+
 # --- Auth ---
 
 class UserRegister(BaseModel):
@@ -61,17 +76,7 @@ class UserRegister(BaseModel):
     @field_validator("allergens")
     @classmethod
     def validate_register_allergens(cls, v: list[str] | None) -> list[str]:
-        if v is None:
-            return []
-        cleaned: list[str] = []
-        for raw in v:
-            code = (raw or "").strip().lower()
-            if not code or code in cleaned:
-                continue
-            if code not in ALLOWED_ALLERGEN_CODES:
-                raise ValueError(f"Unknown allergen code: {code}")
-            cleaned.append(code)
-        return cleaned
+        return validate_allergen_codes(v, allow_none=False) or []
 
 
 class UserLogin(BaseModel):
@@ -160,16 +165,7 @@ class UserSettings(BaseModel):
     @field_validator("allergens")
     @classmethod
     def validate_allergens(cls, v: list[str]) -> list[str]:
-        cleaned: list[str] = []
-        for raw in v or []:
-            code = (raw or "").strip().lower()
-            if not code:
-                continue
-            if code not in ALLOWED_ALLERGEN_CODES:
-                raise ValueError(f"Unknown allergen code: {code}")
-            if code not in cleaned:
-                cleaned.append(code)
-        return cleaned
+        return validate_allergen_codes(v or [], allow_none=False) or []
 
     @field_validator("custom_allergens_text")
     @classmethod
@@ -195,18 +191,7 @@ class UserSettingsUpdate(BaseModel):
     @field_validator("allergens")
     @classmethod
     def validate_allergens(cls, v: list[str] | None) -> list[str] | None:
-        if v is None:
-            return None
-        cleaned: list[str] = []
-        for raw in v or []:
-            code = (raw or "").strip().lower()
-            if not code:
-                continue
-            if code not in ALLOWED_ALLERGEN_CODES:
-                raise ValueError(f"Unknown allergen code: {code}")
-            if code not in cleaned:
-                cleaned.append(code)
-        return cleaned
+        return validate_allergen_codes(v, allow_none=True)
 
     @field_validator("default_servings")
     @classmethod

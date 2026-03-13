@@ -3,59 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
-
-const TARGET_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'he', name: 'עברית' },
-  { code: 'es', name: 'Español' },
-  { code: 'fr', name: 'Français' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'pt', name: 'Português' },
-  { code: 'ru', name: 'Русский' },
-  { code: 'ar', name: 'العربية' },
-  { code: 'uk', name: 'Українська' },
-  { code: 'nl', name: 'Nederlands' },
-  { code: 'tr', name: 'Türkçe' },
-  { code: 'ja', name: '日本語' },
-  { code: 'zh', name: '中文' },
-  { code: 'cs', name: 'Čeština' },
-  { code: 'hu', name: 'Magyar' },
-  { code: 'ro', name: 'Română' },
-  { code: 'el', name: 'Ελληνικά' },
-  { code: 'sv', name: 'Svenska' },
-]
-
-const COUNTRIES = [
-  { code: 'PL', name: 'Poland' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-]
-
-const TRIAL_SETTINGS_KEY = 'trial_settings'
-
-const ALLERGENS = [
-  { code: 'gluten_cereals', label: 'Gluten (cereals)' },
-  { code: 'crustaceans', label: 'Crustaceans' },
-  { code: 'eggs', label: 'Eggs' },
-  { code: 'fish', label: 'Fish' },
-  { code: 'peanuts', label: 'Peanuts' },
-  { code: 'soybeans', label: 'Soybeans' },
-  { code: 'milk', label: 'Milk' },
-  { code: 'tree_nuts', label: 'Tree nuts' },
-  { code: 'sesame', label: 'Sesame' },
-  { code: 'mustard', label: 'Mustard' },
-  { code: 'celery', label: 'Celery' },
-  { code: 'lupin', label: 'Lupin' },
-  { code: 'sulphites', label: 'Sulphites' },
-  { code: 'molluscs', label: 'Molluscs' },
-]
+import { TARGET_LANGUAGES, COUNTRIES, ALLERGENS, TRIAL_SETTINGS_KEY, LANG_STORAGE_KEY } from '../constants'
 
 function Field({ label, hint, value, onChange }) {
   return (
@@ -171,7 +119,7 @@ export default function SettingsPage() {
         try {
           localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(form))
           if (form.ui_language && form.ui_language !== lang) setLang(form.ui_language)
-          localStorage.setItem('recipe-app-lang', form.ui_language || 'en')
+          localStorage.setItem(LANG_STORAGE_KEY, form.ui_language || 'en')
         } catch (_) {}
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)

@@ -8,6 +8,7 @@ from .. import models, schemas
 from ..auth import get_current_user, create_access_token
 from ..database import get_db
 from ..services.starter_recipes import add_starter_recipes_to_user, ensure_starter_recipes_for_user
+from ..services.user_deletion import delete_user_and_data
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -33,20 +34,7 @@ def delete_me(
 ):
     """Delete the current user and all their data (recipes, shopping list entries)."""
     user_id = current_user.id
-
-    # 1. Remove user's shopping list entries
-    db.query(models.ShoppingListRecipe).filter(models.ShoppingListRecipe.user_id == user_id).delete()
-
-    # 2. Delete user's recipes (RecipeVariant cascades via relationship)
-    db.query(models.Recipe).filter(models.Recipe.user_id == user_id).delete()
-
-    # 3. Unlink ingredient substitutions created by this user
-    db.query(models.IngredientSubstitution).filter(
-        models.IngredientSubstitution.created_by_user_id == user_id
-    ).update({models.IngredientSubstitution.created_by_user_id: None})
-
-    # 4. Delete the user
-    db.delete(current_user)
+    delete_user_and_data(user_id, db)
     db.commit()
     return None
 
@@ -94,31 +82,15 @@ def claim_starter_recipes(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Claim token expired. You can add starter recipes from Settings.",
         )
-    # Apply optional profile updates from onboarding
-    if payload.ui_language is not None:
-        current_user.ui_language = payload.ui_language
-    if payload.target_language is not None:
-        current_user.target_language = payload.target_language
-    if payload.target_country is not None:
-        current_user.target_country = payload.target_country
-    if payload.target_city is not None:
-        current_user.target_city = payload.target_city
-    if payload.target_zip is not None:
-        current_user.target_zip = payload.target_zip
-    if payload.dish_preferences is not None:
-        current_user.dish_preferences = payload.dish_preferences
-    if payload.household_adults is not None:
-        current_user.household_adults = payload.household_adults
-    if payload.household_kids is not None:
-        current_user.household_kids = payload.household_kids
-    if payload.diet_filters is not None:
-        current_user.diet_filters = payload.diet_filters
-    if payload.default_servings is not None:
-        current_user.default_servings = payload.default_servings
-    if payload.allergens is not None:
-        current_user.allergens = payload.allergens
-    if payload.custom_allergens_text is not None:
-        current_user.custom_allergens_text = payload.custom_allergens_text
+    # Apply optional profile updates from onboarding (allowlist to avoid setting arbitrary attributes)
+    _CLAIM_ALLOWED = {
+        "ui_language", "target_language", "target_country", "target_city", "target_zip",
+        "dish_preferences", "household_adults", "household_kids", "diet_filters",
+        "default_servings", "allergens", "custom_allergens_text",
+    }
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        if k in _CLAIM_ALLOWED:
+            setattr(current_user, k, v)
     db.commit()
     # Attach pre-fetched recipes to user (only if user has no recipes yet)
     if not current_user.starter_recipes_added:

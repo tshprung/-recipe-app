@@ -12,6 +12,18 @@ from ..auth import get_current_user, get_current_user_optional, get_optional_use
 from ..database import get_db
 from ..quota import MAX_TRIAL_ACTIONS, enforce_trial_or_user_quota
 from ..services.adaptation import adapt_recipe
+from .recipes_helpers import (
+    COMMON_PANTRY,
+    get_recipe_or_404,
+    ingredient_matches_user,
+    normalize_adapt_types,
+    normalize_ingredient_line,
+    recipe_ingredient_lines,
+    recipe_matches_query,
+    recipes_for_user_or_trial,
+    user_ingredients_set,
+    what_can_i_make_my_recipes,
+)
 from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.recipe_image import save_user_upload
 from ..services.translation import translate_recipe
@@ -250,34 +262,6 @@ def create_recipe_from_ai_suggestion(
     return recipe
 
 
-def _recipe_matches_query(recipe: models.Recipe, q: str) -> bool:
-    """True if recipe title, ingredients, or tags contain the query (case-insensitive)."""
-    if not q or not recipe:
-        return True
-    q_lower = q.strip().lower()
-    if not q_lower:
-        return True
-    if q_lower in (recipe.title_pl or "").lower():
-        return True
-    if q_lower in (recipe.title_original or "").lower():
-        return True
-    ingredients_pl = recipe.ingredients_pl or []
-    ing_parts = []
-    for item in ingredients_pl:
-        if isinstance(item, str):
-            ing_parts.append(item)
-        elif isinstance(item, dict):
-            ing_parts.append(str(item.get("name", "")) + " " + str(item.get("amount", "")))
-        else:
-            ing_parts.append(str(item))
-    if q_lower in " ".join(ing_parts).lower():
-        return True
-    tags = recipe.tags or []
-    if q_lower in " ".join(str(t) for t in tags).lower():
-        return True
-    return False
-
-
 @router.get("/", response_model=list[schemas.RecipeOut])
 def list_recipes(
     q: str | None = None,
@@ -288,12 +272,9 @@ def list_recipes(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    if current_user is not None:
-        recipes = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).all()
-    else:
-        recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == trial_session.id).all()
+    recipes = recipes_for_user_or_trial(db, current_user, trial_session)
     if q and q.strip():
-        recipes = [r for r in recipes if _recipe_matches_query(r, q)]
+        recipes = [r for r in recipes if recipe_matches_query(r, q)]
     if collection and collection.strip():
         coll = collection.strip().lower()
         recipes = [r for r in recipes if (r.collections or []) and any((c or "").strip().lower() == coll for c in r.collections)]
@@ -309,119 +290,13 @@ def list_collections(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    if current_user is not None:
-        recipes = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).all()
-    else:
-        recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == trial_session.id).all()
+    recipes = recipes_for_user_or_trial(db, current_user, trial_session)
     names: set[str] = set()
     for r in recipes:
         for c in (r.collections or []):
             if isinstance(c, str) and c.strip():
                 names.add(c.strip())
     return schemas.RecipeCollectionsListOut(collections=sorted(names))
-
-
-# Common pantry items assumed if assume_pantry is True (lowercase for matching)
-_COMMON_PANTRY = {
-    "salt", "sugar", "pepper", "black pepper", "oil", "olive oil", "vegetable oil",
-    "water", "flour", "vanilla", "vinegar", "baking powder", "baking soda",
-    "soy sauce", "paprika", "cumin", "oregano", "basil", "garlic", "onion",
-    "butter", "milk", "eggs", "honey", "mustard", "ketchup",
-}
-
-
-def _normalize_ingredient_line(item) -> str:
-    """Extract a single line of text from an ingredient (string or dict)."""
-    if isinstance(item, str):
-        return (item or "").strip()
-    if isinstance(item, dict):
-        return f"{item.get('amount', '')} {item.get('name', '')}".strip()
-    return str(item).strip()
-
-
-def _recipe_ingredient_lines(recipe: models.Recipe) -> list[str]:
-    """List of normalized ingredient lines for a recipe (from ingredients_pl)."""
-    lines = []
-    for item in recipe.ingredients_pl or []:
-        line = _normalize_ingredient_line(item)
-        if line:
-            lines.append(line.lower())
-    return lines
-
-
-def _user_ingredients_set(ingredients: list[str], assume_pantry: bool) -> set[str]:
-    """Set of normalized user ingredient strings (plus pantry if assumed)."""
-    out = set()
-    for s in ingredients or []:
-        t = (s or "").strip().lower()
-        if t:
-            out.add(t)
-    if assume_pantry:
-        out |= _COMMON_PANTRY
-    return out
-
-
-def _ingredient_matches_user(recipe_line: str, user_set: set[str]) -> bool:
-    """True if recipe_line is 'covered' by any user ingredient (substring or exact)."""
-    recipe_lower = recipe_line.lower()
-    for u in user_set:
-        if u in recipe_lower or recipe_lower in u:
-            return True
-    # Also check individual words (e.g. user has "lemon", recipe has "2 lemons juice")
-    for word in recipe_lower.replace(",", " ").split():
-        word = word.strip()
-        if len(word) < 3:
-            continue
-        for u in user_set:
-            if word in u or u in word:
-                return True
-    return False
-
-
-def _recipe_meat_dairy_keywords(recipe: models.Recipe) -> tuple[bool, bool]:
-    """Returns (has_meat, has_dairy) based on ingredient text."""
-    text = " ".join(_recipe_ingredient_lines(recipe)).lower()
-    meat = any(w in text for w in (
-        "meat", "chicken", "beef", "pork", "lamb", "fish", "salmon", "tuna",
-        "mięso", "kurczak", "wołowina", "wieprzowina", "ryba", "łosoś",
-    ))
-    dairy = any(w in text for w in (
-        "milk", "cream", "cheese", "butter", "yogurt",
-        "mleko", "śmietana", "ser", "masło", "jogurt",
-    ))
-    return meat, dairy
-
-
-def _what_can_i_make_my_recipes(
-    recipes: list[models.Recipe],
-    user_ingredients: list[str],
-    assume_pantry: bool,
-    diet_filters: list[str] | None,
-) -> list[tuple[models.Recipe, bool, list[str]]]:
-    """Returns list of (recipe, can_make, missing_ingredients) sorted by best match."""
-    user_set = _user_ingredients_set(user_ingredients, assume_pantry)
-    results = []
-    for recipe in recipes:
-        lines = _recipe_ingredient_lines(recipe)
-        if not lines:
-            continue
-        # Diet filter: if user wants vegetarian/vegan, exclude meat-based; if dairy_free, exclude dairy
-        if diet_filters:
-            meat, dairy = _recipe_meat_dairy_keywords(recipe)
-            if "vegetarian" in diet_filters or "vegan" in diet_filters:
-                if meat:
-                    continue
-            if "dairy_free" in diet_filters and dairy:
-                continue
-        missing = []
-        for line in lines:
-            if not _ingredient_matches_user(line, user_set):
-                missing.append(line)
-        can_make = len(missing) == 0
-        results.append((recipe, can_make, missing))
-    # Sort: can_make first, then by fewest missing, then by most ingredients matched
-    results.sort(key=lambda x: (not x[1], len(x[2]), -len(_recipe_ingredient_lines(x[0]))))
-    return results
 
 
 @router.post(
@@ -438,19 +313,8 @@ def what_can_i_make(
     trial_session = enforce_trial_or_user_quota(request, db, current_user)
     if payload.source == "ai":
         return _what_can_i_make_ai(payload, current_user, trial_session, db)
-    if current_user is not None:
-        recipes = (
-            db.query(models.Recipe)
-            .filter(models.Recipe.user_id == current_user.id)
-            .all()
-        )
-    else:
-        recipes = (
-            db.query(models.Recipe)
-            .filter(models.Recipe.trial_session_id == trial_session.id)
-            .all()
-        )
-    matches_result = _what_can_i_make_my_recipes(
+    recipes = recipes_for_user_or_trial(db, current_user, trial_session)
+    matches_result = what_can_i_make_my_recipes(
         recipes,
         payload.ingredients or [],
         payload.assume_pantry,
@@ -580,10 +444,7 @@ def get_recipe(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
-    return recipe
+    return get_recipe_or_404(recipe_id, current_user, trial_session, db)
 
 
 @router.post("/{recipe_id}/ingredient-match", response_model=schemas.RecipeIngredientMatchOut)
@@ -597,14 +458,12 @@ def recipe_ingredient_match(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
-    lines = _recipe_ingredient_lines(recipe)
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
+    lines = recipe_ingredient_lines(recipe)
     if not lines:
         return schemas.RecipeIngredientMatchOut(have_count=0, need_count=0, missing_ingredients=[])
-    user_set = _user_ingredients_set(payload.ingredients or [], payload.assume_pantry)
-    missing = [line for line in lines if not _ingredient_matches_user(line, user_set)]
+    user_set = user_ingredients_set(payload.ingredients or [], payload.assume_pantry)
+    missing = [line for line in lines if not ingredient_matches_user(line, user_set)]
     have_count = len(lines) - len(missing)
     return schemas.RecipeIngredientMatchOut(
         have_count=have_count,
@@ -628,9 +487,7 @@ def upload_recipe_image(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     content_type = (file.content_type or "").strip().lower()
     if content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
         raise HTTPException(
@@ -669,9 +526,7 @@ def remove_recipe_image(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     recipe.image_url = None
     db.commit()
     db.refresh(recipe)
@@ -688,9 +543,7 @@ def update_notes(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     recipe.user_notes = payload.user_notes
     db.commit()
     db.refresh(recipe)
@@ -707,9 +560,7 @@ def toggle_favorite(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     recipe.is_favorite = payload.is_favorite
     db.commit()
     db.refresh(recipe)
@@ -726,9 +577,7 @@ def update_recipe_meta(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
 
     updates = payload.model_dump(exclude_unset=True)
     if "rating" in updates:
@@ -755,9 +604,7 @@ def update_recipe_collections(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     recipe.collections = [str(c).strip() for c in (payload.collections or []) if str(c).strip()]
     db.commit()
     db.refresh(recipe)
@@ -773,9 +620,7 @@ def list_variants(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     return recipe.variants
 
 
@@ -867,20 +712,6 @@ def relocalize_recipe(
     return recipe
 
 
-def _normalize_adapt_types(payload: schemas.AdaptRequest) -> list[str]:
-    if payload.variant_types:
-        return list(payload.variant_types)
-    return [payload.variant_type] if payload.variant_type else []
-
-
-def _recipe_owned_by(recipe: models.Recipe, current_user: models.User | None, trial_session: models.TrialSession | None) -> bool:
-    if current_user is not None and recipe.user_id == current_user.id:
-        return True
-    if trial_session is not None and recipe.trial_session_id == trial_session.id:
-        return True
-    return False
-
-
 @router.post("/{recipe_id}/adapt")
 def adapt_recipe_endpoint(
     recipe_id: int,
@@ -890,9 +721,7 @@ def adapt_recipe_endpoint(
     current_user: models.User | None = Depends(get_current_user_optional),
 ):
     trial_session = enforce_trial_or_user_quota(request, db, current_user)
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
 
     if current_user is not None and not current_user.is_verified:
         raise HTTPException(
@@ -900,7 +729,7 @@ def adapt_recipe_endpoint(
             detail="Verify your email before using the app.",
         )
 
-    types = _normalize_adapt_types(payload)
+    types = normalize_adapt_types(getattr(payload, "variant_types", None), getattr(payload, "variant_type", None))
     composite_key = ",".join(types)
 
     if current_user is not None:
@@ -1144,9 +973,7 @@ def delete_recipe(
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
-    recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
     # Remove from any shopping lists before deleting the recipe
     db.query(models.ShoppingListRecipe).filter(
         models.ShoppingListRecipe.recipe_id == recipe_id

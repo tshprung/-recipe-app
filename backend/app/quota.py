@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from . import models
 from .auth import decode_trial_token
 
+# Keep in sync with frontend AuthContext MAX_TRIAL_ACTIONS
 MAX_TRIAL_ACTIONS = 5
 TRIAL_EXHAUSTED_DETAIL = "Free trial finished; please register"
 TRIAL_EXHAUSTED_CODE = "trial_exhausted"

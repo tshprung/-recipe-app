@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { TrialExhaustedModal } from './TrialExhaustedModal'
+import { TRIAL_SETTINGS_KEY } from '../constants/storageKeys'
 
 const INPUT_MODE = { PASTE: 'paste', URL: 'url' }
 
@@ -43,7 +44,7 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       // creates recipes in the language chosen in Settings.
       if (!user && trialToken) {
         try {
-          const raw = localStorage.getItem('trial_settings')
+          const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
           if (raw) {
             const ts = JSON.parse(raw)
             if (ts.target_language) body.target_language = ts.target_language
