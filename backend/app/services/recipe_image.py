@@ -166,11 +166,12 @@ def get_or_create_recipe_image(
     tags_clause = ""
     if recipe_tags:
         tags_clause = " Tags for this recipe: " + ", ".join(str(t) for t in recipe_tags[:8]) + "."
+    # Prefer no image over a wrong one: prompt must describe the exact dish (e.g. cheesecake → cheesecake, not a generic meal).
     prompt = (
-        f"Realistic food photo of the finished dish '{title}'. The image must match this recipe exactly."
+        f"Realistic food photo of one finished dish only: '{title}'. The image must show exactly this type of dish — nothing else."
         f"{ingredients_clause}{tags_clause}{tag_hint}"
         " Show the cooked/plated dish only (no raw ingredients on their own), on a plate or in a bowl."
-        " Natural lighting, close-up, high quality, no people, no hands, no text, no logos."
+        " Natural lighting, close-up, high quality. No people, no hands, no text, no logos. Single dish that matches the recipe name."
     )
     image_bytes = _generate_image_via_openai(prompt)
     if not image_bytes:

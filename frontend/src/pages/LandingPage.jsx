@@ -15,7 +15,9 @@ const TRIAL_LOADING_SENTENCES = [
   'We are loading your personal view…',
   'This app uses AI to adapt recipes to your needs.',
   'Starter recipes are chosen for your region.',
-  'You’ll get 5 free AI actions to try adapt and more.',
+  'You can change recipe and website languages anytime in Settings.',
+  'You can also add allergens and diet preferences in Settings.',
+  'You get 5 free AI actions to try.',
   'Almost there…',
 ]
 
@@ -56,7 +58,7 @@ export default function LandingPage() {
     setLoadingSentenceIndex(0)
     const interval = setInterval(() => {
       setLoadingSentenceIndex(i => (i + 1) % TRIAL_LOADING_SENTENCES.length)
-    }, 3500)
+    }, 5500)
     return () => clearInterval(interval)
   }, [trialLoading])
 

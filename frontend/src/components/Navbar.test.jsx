@@ -40,7 +40,7 @@ describe('Navbar', () => {
   it('renders app title and subtitle', () => {
     renderNavbar()
     expect(screen.getByText('Intelligent Kitchen Helper')).toBeInTheDocument()
-    expect(screen.getByText('Recipe translation')).toBeInTheDocument()
+    expect(screen.getByText('Adapt, shop, cook — powered by AI.')).toBeInTheDocument()
   })
 
   it('does not render UI language selector on main pages', () => {
@@ -65,6 +65,6 @@ describe('Navbar', () => {
 
   it('renders recipes quota when user is present', () => {
     renderNavbar()
-    expect(screen.getByText('Recipes: 0/5')).toBeInTheDocument()
+    expect(screen.getByText('Credits: 5')).toBeInTheDocument()
   })
 })

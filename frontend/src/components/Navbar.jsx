@@ -22,11 +22,12 @@ export default function Navbar() {
 
   const used = user?.transformations_used ?? 0
   const limit = user?.transformations_limit
+  const remaining = limit === -1 ? null : Math.max(0, (limit ?? 0) - used)
   const quotaLabel =
     limit === -1
-      ? t('recipesQuotaUnlimited')
-      : t('recipesQuota', { used, limit: limit ?? 0 })
-  const trialQuotaLabel = `${trialRemainingActions ?? 0} / 5`
+      ? t('creditsUnlimited')
+      : t('creditsRemaining', { count: remaining })
+  const trialQuotaLabel = t('creditsRemaining', { count: trialRemainingActions ?? 0 })
 
   return (
     <nav className="bg-black/70 backdrop-blur border-b border-white/10 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)] text-stone-50">
@@ -82,7 +83,7 @@ export default function Navbar() {
           )}
           {isTrial && (
             <span className="text-xs font-medium text-amber-400/90 mr-0.5 sm:mr-1" title="Free trial AI actions">
-              {trialQuotaLabel} <span className="text-stone-500 text-[10px]">trial</span>
+              {trialQuotaLabel}
             </span>
           )}
 

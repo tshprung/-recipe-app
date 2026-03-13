@@ -30,6 +30,7 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
   const navigate = useNavigate()
   const { t } = useLanguage()
   const { isInList, actionLoadingId } = useShoppingList()
+  const [imageError, setImageError] = useState(false)
   const accent = CARD_ACCENTS[recipe.id % CARD_ACCENTS.length]
   const inList = isInList(recipe.id)
   const isActioning = actionLoadingId === recipe.id
@@ -94,8 +95,8 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
           </div>
           {/* Recipe image: small thumbnail top-right */}
           <div className="shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
-            {imageUrl ? (
-              <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            {imageUrl && !imageError ? (
+              <img src={imageUrl} alt="" className="w-full h-full object-cover" onError={() => setImageError(true)} />
             ) : (
               <span className="text-2xl text-stone-300" aria-hidden>🍽</span>
             )}

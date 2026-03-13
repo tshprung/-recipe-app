@@ -131,6 +131,7 @@ export default function RecipeDetailPage() {
   const [altError, setAltError] = useState(null)
   const [generateImageLoading, setGenerateImageLoading] = useState(false)
   const [uploadImageLoading, setUploadImageLoading] = useState(false)
+  const [detailImageError, setDetailImageError] = useState(false)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -727,20 +728,21 @@ export default function RecipeDetailPage() {
             )}
           </div>
             </div>
-            {/* Recipe dish image: large on detail */}
-            {activeTab === 'original' && (
-              <div className="shrink-0 w-full md:w-64 flex flex-col gap-2">
+            {/* Recipe dish image: show for all tabs (use main recipe image) */}
+            <div className="shrink-0 w-full md:w-64 flex flex-col gap-2">
                 <div className="aspect-square max-h-72 md:max-h-none rounded-2xl overflow-hidden bg-stone-100 flex items-center justify-center">
-                  {getRecipeImageUrl(recipe.image_url) ? (
+                  {getRecipeImageUrl(recipe.image_url) && !detailImageError ? (
                     <img
                       src={getRecipeImageUrl(recipe.image_url)}
                       alt=""
                       className="w-full h-full object-cover"
+                      onError={() => setDetailImageError(true)}
                     />
                   ) : (
                     <span className="text-6xl text-stone-300" aria-hidden>🍽</span>
                   )}
                 </div>
+                {activeTab === 'original' && (
                 <div className="flex flex-wrap items-center gap-2">
                   {!recipe.image_url && (
                     <button
@@ -780,8 +782,8 @@ export default function RecipeDetailPage() {
                     </button>
                   )}
                 </div>
+                )}
               </div>
-            )}
           </div>
         </div>
       </div>
