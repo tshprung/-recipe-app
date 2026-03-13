@@ -99,7 +99,7 @@ export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, trialToken, refreshUser, decrementTrialActions } = useAuth()
+  const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const { t } = useLanguage()
 
   const [recipe, setRecipe] = useState(null)
@@ -250,8 +250,8 @@ export default function RecipeDetailPage() {
         } catch (_) {}
       }
       const result = await api.post(`/recipes/${id}/adapt`, body)
+      if (typeof result?.remaining_actions === 'number') syncTrialRemaining(result.remaining_actions)
       if (result.can_adapt) {
-        if (!user && trialToken) decrementTrialActions()
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
         await refreshUser()
@@ -260,8 +260,10 @@ export default function RecipeDetailPage() {
         if (types.length > 1) setPendingVariantType(types[types.length - 1])
       }
     } catch (e) {
-      if (e.trialExhausted) setShowTrialExhausted(true)
-      else setAdaptError(e.message || t('failedToAdapt'))
+      if (e.status === 402 || e.trialExhausted) {
+        syncTrialRemaining(0)
+        setShowTrialExhausted(true)
+      } else setAdaptError(e.message || t('failedToAdapt'))
     } finally {
       setAdaptLoading(false)
     }
@@ -298,15 +300,17 @@ export default function RecipeDetailPage() {
         } catch (_) {}
       }
       const result = await api.post(`/recipes/${id}/adapt`, altBody)
+      if (typeof result?.remaining_actions === 'number') syncTrialRemaining(result.remaining_actions)
       if (result.can_adapt) {
-        if (!user && trialToken) decrementTrialActions()
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
         await refreshUser()
       }
     } catch (e) {
-      if (e.trialExhausted) setShowTrialExhausted(true)
-      else setAdaptError(e.message || t('failedToGenerateVariant'))
+      if (e.status === 402 || e.trialExhausted) {
+        syncTrialRemaining(0)
+        setShowTrialExhausted(true)
+      } else setAdaptError(e.message || t('failedToGenerateVariant'))
     } finally {
       setAdaptLoading(false)
     }

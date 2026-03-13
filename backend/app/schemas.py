@@ -261,6 +261,12 @@ class RecipeCreate(BaseModel):
 
 
 
+class RecipeCreateTrialResponse(BaseModel):
+    """Response when creating a recipe in trial mode; includes backend remaining_actions for sync."""
+    recipe: "RecipeOut"
+    remaining_actions: int
+
+
 class RecipeOut(BaseModel):
     id: int
     user_id: int | None = None

@@ -12,7 +12,7 @@ function isValidHttpUrl(s) {
 }
 
 export default function AddRecipeModal({ onClose, onCreated }) {
-  const { refreshUser, user, trialToken, decrementTrialActions } = useAuth()
+  const { refreshUser, user, trialToken, syncTrialRemaining } = useAuth()
   const { t, lang } = useLanguage()
   const [mode, setMode] = useState(INPUT_MODE.PASTE)
   const [text, setText] = useState('')
@@ -38,13 +38,15 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       const body = mode === INPUT_MODE.URL
         ? { source_url: url.trim() }
         : { raw_input: text.trim() }
-      const recipe = await api.post('/recipes/', body)
-      if (!user && trialToken) decrementTrialActions()
+      const data = await api.post('/recipes/', body)
+      if (typeof data?.remaining_actions === 'number') syncTrialRemaining(data.remaining_actions)
       await refreshUser()
-      onCreated(recipe)
+      onCreated(data?.recipe ?? data)
     } catch (err) {
-      if (err.trialExhausted) setShowTrialExhausted(true)
-      else setError(err.message || t('urlError'))
+      if (err.status === 402 || err.trialExhausted) {
+        syncTrialRemaining(0)
+        setShowTrialExhausted(true)
+      } else setError(err.message || t('urlError'))
     } finally {
       setLoading(false)
     }

@@ -53,6 +53,13 @@ export function AuthProvider({ children }) {
     })
   }
 
+  /** Sync trial remaining from backend (e.g. after create/adapt) so UI matches server. */
+  function syncTrialRemaining(remaining) {
+    const n = Math.max(0, Number(remaining) | 0)
+    setTrialRemainingActionsState(n)
+    setTrialRemainingStorage(n)
+  }
+
   function syncUiLanguageToStorage(u) {
     const l = u?.ui_language
     if (l === 'en' || l === 'he' || l === 'pl') {
@@ -180,7 +187,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, setUser, refreshUser, login, register, logout, setTokenFromOAuth,
-      trialToken, setTrialToken, leaveTrial, trialRemainingActions, decrementTrialActions,
+      trialToken, setTrialToken, leaveTrial, trialRemainingActions, decrementTrialActions, syncTrialRemaining,
       loading,
     }}>
       {children}

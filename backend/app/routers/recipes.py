@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_current_user, get_current_user_optional, get_optional_user_and_trial
 from ..database import get_db
-from ..quota import enforce_trial_or_user_quota
+from ..quota import MAX_TRIAL_ACTIONS, enforce_trial_or_user_quota
 from ..services.adaptation import adapt_recipe
 from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.recipe_image import save_user_upload
@@ -104,7 +104,11 @@ def _fetch_and_extract_text(url: str) -> str:
     return text
 
 
-@router.post("/", response_model=schemas.RecipeOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=schemas.RecipeOut | schemas.RecipeCreateTrialResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_recipe(
     payload: schemas.RecipeCreate,
     request: Request,
@@ -186,6 +190,11 @@ def create_recipe(
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
+    if trial_session is not None:
+        return schemas.RecipeCreateTrialResponse(
+            recipe=schemas.RecipeOut.model_validate(recipe),
+            remaining_actions=MAX_TRIAL_ACTIONS - trial_session.used_actions,
+        )
     return recipe
 
 
@@ -773,11 +782,14 @@ def adapt_recipe_endpoint(
             .first()
         )
         if existing:
-            return {
+            out = {
                 "can_adapt": True,
                 "variant": schemas.RecipeVariantOut.model_validate(existing),
                 "alternatives": [],
             }
+            if trial_session is not None:
+                out["remaining_actions"] = MAX_TRIAL_ACTIONS - trial_session.used_actions
+            return out
 
     if current_user is not None and not _has_unlimited_quota(current_user):
         user_for_update.transformations_used += 1
@@ -862,11 +874,14 @@ def adapt_recipe_endpoint(
     db.add(variant)
     db.commit()
     db.refresh(variant)
-    return {
+    out = {
         "can_adapt": True,
         "variant": schemas.RecipeVariantOut.model_validate(variant),
         "alternatives": [],
     }
+    if trial_session is not None:
+        out["remaining_actions"] = MAX_TRIAL_ACTIONS - trial_session.used_actions
+    return out
 
 
 @router.post(
@@ -990,18 +1005,21 @@ def delete_variant(
 def delete_recipe(
     recipe_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     # Remove from any shopping lists before deleting the recipe
     db.query(models.ShoppingListRecipe).filter(
         models.ShoppingListRecipe.recipe_id == recipe_id
     ).delete()
     db.delete(recipe)
-    # Invalidate shopping list cache for owner so next GET recomputes
-    db.query(models.ShoppingListCache).filter(
-        models.ShoppingListCache.user_id == current_user.id
-    ).delete(synchronize_session=False)
+    if current_user is not None:
+        db.query(models.ShoppingListCache).filter(
+            models.ShoppingListCache.user_id == current_user.id
+        ).delete(synchronize_session=False)
     db.commit()
