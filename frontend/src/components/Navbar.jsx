@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
-  const { user, logout, trialToken, trialRemainingActions } = useAuth()
+  const { user, logout, trialToken, trialRemainingActions, setTrialToken } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -137,6 +137,24 @@ export default function Navbar() {
                 >
                   {t('signIn')}
                 </Link>
+                <Link
+                  to="/register"
+                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-300 hover:text-stone-50 hover:bg-stone-700/50 transition-colors"
+                >
+                  {t('register')}
+                </Link>
+                {isTrial && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrialToken(null)
+                      navigate('/', { replace: true })
+                    }}
+                    className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-400 hover:text-stone-200 transition-colors"
+                  >
+                    {t('backToLanding')}
+                  </button>
+                )}
               </>
             )}
           </div>

@@ -70,7 +70,7 @@ export default function LandingPage() {
       setTrialToken(data.trial_token, data.remaining_actions ?? 5)
       try {
         sessionStorage.setItem('trial_recipes', JSON.stringify(data.recipes || []))
-        sessionStorage.setItem('trial_remaining_actions', String(data.remaining_actions ?? 5))
+        localStorage.setItem('trial_remaining_actions', String(data.remaining_actions ?? 5))
       } catch (_) {}
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
     } catch (err) {

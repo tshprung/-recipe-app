@@ -9,7 +9,7 @@ const MAX_TRIAL_ACTIONS = 5
 
 function getTrialRemainingFromStorage() {
   try {
-    const v = sessionStorage.getItem(TRIAL_REMAINING_KEY)
+    const v = localStorage.getItem(TRIAL_REMAINING_KEY)
     if (v != null) {
       const n = parseInt(v, 10)
       if (Number.isFinite(n) && n >= 0) return Math.min(n, MAX_TRIAL_ACTIONS)
@@ -20,8 +20,8 @@ function getTrialRemainingFromStorage() {
 
 function setTrialRemainingStorage(n) {
   try {
-    if (n != null) sessionStorage.setItem(TRIAL_REMAINING_KEY, String(n))
-    else sessionStorage.removeItem(TRIAL_REMAINING_KEY)
+    if (n != null) localStorage.setItem(TRIAL_REMAINING_KEY, String(n))
+    else localStorage.removeItem(TRIAL_REMAINING_KEY)
   } catch (_) {}
 }
 

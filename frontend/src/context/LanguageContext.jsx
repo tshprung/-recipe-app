@@ -30,6 +30,7 @@ const translations = {
     settings: 'Settings',
     logOut: 'Log out',
     signIn: 'Sign in',
+    backToLanding: 'Back to landing',
     // Settings
     translationAndLocation: 'Translation and location',
     appLanguage: 'App / website language',
@@ -230,6 +231,7 @@ const translations = {
     settings: 'הגדרות',
     logOut: 'התנתק',
     signIn: 'כניסה',
+    backToLanding: 'חזרה לדף הבית',
     translationAndLocation: 'תרגום ומיקום',
     appLanguage: 'שפת האפליקציה / האתר',
     recipeLanguage: 'שפת המתכונים',
@@ -424,6 +426,7 @@ const translations = {
     settings: 'Ustawienia',
     logOut: 'Wyloguj',
     signIn: 'Zaloguj',
+    backToLanding: 'Powrót do strony startowej',
     translationAndLocation: 'Tłumaczenie i lokalizacja',
     appLanguage: 'Język aplikacji / strony',
     recipeLanguage: 'Język przepisów',
