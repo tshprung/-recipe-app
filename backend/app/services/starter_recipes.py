@@ -2,18 +2,12 @@
 import json
 import logging
 import os
-import re
 
-import httpx
 from openai import APIError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-# Minimum number of image candidates to fetch from search API; select best from these
-_STARTER_IMAGE_CANDIDATES = 5
-_UNSPLASH_SEARCH_URL = "https://api.unsplash.com/search/photos"
-
-# Temporary: borrowed dish images by type so each starter recipe gets a matching image. No rights; replace with proper assets later.
+# Static dish images by type (soup, main, dessert). No generated/fetched images.
 # Keys: "soup" (soups, stews, broths), "main" (main courses, dumplings, meat), "dessert" (desserts, cakes, salads).
 STARTER_IMAGE_BY_TYPE = {
     "soup": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=70",  # soup bowl
@@ -50,97 +44,11 @@ def _recipe_dish_type(title: str, tags: list) -> str:
     return "main"
 
 
-def _fetch_starter_image_candidates(image_query: str, per_page: int = 10) -> list[dict]:
-    """Fetch candidate image URLs from Unsplash search. Returns list of {url, description, alt}."""
-    access_key = os.getenv("UNSPLASH_ACCESS_KEY")
-    if not access_key or not (image_query or "").strip():
-        return []
-    query = (image_query or "").strip()[:200]
-    try:
-        with httpx.Client(timeout=10.0) as client:
-            r = client.get(
-                _UNSPLASH_SEARCH_URL,
-                params={"query": query, "per_page": max(per_page, _STARTER_IMAGE_CANDIDATES)},
-                headers={"Authorization": f"Client-ID {access_key}"},
-            )
-            r.raise_for_status()
-    except Exception as e:
-        logger.warning("Unsplash search failed for %r: %s", query[:50], e)
-        return []
-    data = r.json()
-    results = data.get("results") or []
-    out = []
-    for hit in results[:per_page]:
-        urls = hit.get("urls") or {}
-        url = urls.get("regular") or urls.get("small") or urls.get("full")
-        if not url:
-            continue
-        desc = (hit.get("description") or "") or (hit.get("alt_description") or "")
-        alt = hit.get("alt_description") or ""
-        out.append({"url": url, "description": f"{desc} {alt}".strip(), "alt": alt})
-    return out
-
-
-# Preferred terms for plated food / restaurant-style / top-down dish photos
-_PREFERRED_IMAGE_TERMS = (
-    "plated", "plate", "bowl", "dish", "food", "restaurant", "top down", "top-down",
-    "close-up", "close up", "serving", "cooked", "finished", "photography", "photo",
-)
-
-
-def _score_image_candidate(candidate: dict, image_query: str) -> float:
-    """Score a candidate: higher = better match. Prefer plated food, query overlap in description."""
-    desc = (candidate.get("description") or "") + " " + (candidate.get("alt") or "")
-    desc_lower = desc.lower()
-    query_lower = (image_query or "").lower()
-    query_words = set(re.findall(r"[a-z0-9]+", query_lower)) - {"a", "an", "the", "in", "on", "of"}
-    score = 0.0
-    for w in query_words:
-        if len(w) >= 2 and w in desc_lower:
-            score += 1.0
-    for term in _PREFERRED_IMAGE_TERMS:
-        if term in desc_lower:
-            score += 0.5
-    return score
-
-
-def _select_best_starter_image(candidates: list[dict], image_query: str) -> str | None:
-    """
-    Select the best image from candidates: prefer plated food, top-down, clear dish match.
-    If the best-scoring image has very low relevance, try the next until one is acceptable.
-    """
-    if not candidates or not (image_query or "").strip():
-        return candidates[0]["url"] if candidates else None
-    scored = [(_score_image_candidate(c, image_query), c) for c in candidates]
-    scored.sort(key=lambda x: -x[0])
-    # Minimum score to accept (at least some query words or preferred terms)
-    min_accept = 1.0
-    for score, c in scored:
-        if score >= min_accept:
-            return c.get("url")
-    # If none meet threshold, return best we have
-    return scored[0][1].get("url") if scored else None
-
-
-def get_starter_recipe_image_url(image_query: str) -> str | None:
-    """
-    Fetch at least 5 candidate images for image_query, select the best (plated, dish match).
-    Returns URL or None if API unavailable / no key.
-    """
-    candidates = _fetch_starter_image_candidates(image_query, per_page=max(10, _STARTER_IMAGE_CANDIDATES))
-    if len(candidates) < _STARTER_IMAGE_CANDIDATES:
-        if candidates:
-            return _select_best_starter_image(candidates, image_query)
-        return None
-    return _select_best_starter_image(candidates, image_query)
-
-
 SYSTEM_PROMPT = """\
 You return exactly 3 classic recipes from well-known cooks or chefs of the given country.
-Each recipe must have: title, ingredients (list of strings), steps (list of strings), author_name, author_bio, image_query.
+Each recipe must have: title, ingredients (list of strings), steps (list of strings), author_name, author_bio.
 author_bio is 1-2 sentences: why they are famous in that country (e.g. TV show host, cookbook author, restaurant chef).
-image_query is a short English phrase for image search: dish name + 2-3 key ingredients + plating style (e.g. plated, in skillet, in bowl) + "food photography". Describe the finished dish clearly so we can find a matching photo.
-Output valid JSON only — no markdown, no prose. Use the output_language for all text except image_query (always English).
+Output valid JSON only — no markdown, no prose. Use the output_language for all text.
 """
 
 USER_PROMPT_TEMPLATE = """\
@@ -157,15 +65,13 @@ Return exactly this JSON (array of 3 recipes from famous cooks in that country):
       "steps": ["<step 1>", "<step 2>", ...],
       "author_name": "<full name of a real famous cook/chef from this country>",
       "author_bio": "<1-2 sentences: e.g. TV show host, cookbook author, Michelin chef>",
-      "tags": ["<tag1 in {output_lang}>", "<tag2>", ...],
-      "image_query": "<short English phrase for image search: dish name, 2-3 key ingredients, plating style, food photography. Example: shakshuka eggs in tomato sauce skillet middle eastern dish food photography>"
+      "tags": ["<tag1 in {output_lang}>", "<tag2>", ...]
     }},
     ... (3 recipes total, each from a different well-known figure)
   ]
 }}
 
 For each recipe, include 2-4 short tags in {output_lang} (e.g. breakfast, lunch, dinner, dessert, easy, quick, traditional, vegetarian, soup, main course — whatever fits the recipe).
-Each image_query must be in English and describe the finished dish clearly for finding a matching photo (plated food, key ingredients, style).
 """
 
 _LANG_NAMES = {
@@ -219,7 +125,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_bio": "Klasyczna polska kuchnia.",
                 "author_image_url": None,
                 "tags": ["zupa", "łatwe", "obiad"],
-                "image_query": "tomato soup bowl plated food photography",
             },
             {
                 "title": "Kotlet schabowy",
@@ -229,7 +134,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_bio": "Tradycyjna polska potrawa.",
                 "author_image_url": None,
                 "tags": ["danie główne", "tradycyjne", "mięso"],
-                "image_query": "pork schnitzel cutlet breaded plated food photography",
             },
             {
                 "title": "Sałatka jarzynowa",
@@ -239,7 +143,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
                 "author_bio": "Prosta sałatka na każdy dzień.",
                 "author_image_url": None,
                 "tags": ["sałatka", "łatwe", "na zimno"],
-                "image_query": "polish vegetable salad potato carrot bowl food photography",
             },
         ]
     # Default English fallback
@@ -252,7 +155,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_bio": "Classic simple recipe.",
             "author_image_url": None,
             "tags": ["soup", "easy", "lunch"],
-            "image_query": "tomato soup bowl plated food photography",
         },
         {
             "title": "Grilled chicken",
@@ -262,7 +164,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_bio": "Quick and healthy.",
             "author_image_url": None,
             "tags": ["main course", "easy", "quick"],
-            "image_query": "grilled chicken breast plated herbs lemon food photography",
         },
         {
             "title": "Green salad",
@@ -272,7 +173,6 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             "author_bio": "Fresh and easy.",
             "author_image_url": None,
             "tags": ["salad", "easy", "side"],
-            "image_query": "green salad lettuce cucumber tomato bowl food photography",
         },
     ]
 
@@ -288,7 +188,8 @@ def get_starter_recipes(
     Optionally prefer recipe types matching dish_preferences (e.g. ["pasta", "soups"]).
     If diet_filters (e.g. ["kosher", "vegetarian"]) are set, all recipes MUST comply with those diets
     (either choose compliant recipes or adapt ingredients/steps so the recipe is compliant).
-    Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional), tags (list), image_query (short phrase for image search). Images are fetched via Unsplash using image_query when UNSPLASH_ACCESS_KEY is set.
+    Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional), tags (list).
+    Starter recipe images use static URLs by dish type (soup/main/dessert); no image generation or fetching.
     Uses OpenAI when available; falls back to static recipes on failure.
     """
     api_key = os.getenv("OPENAI_API_KEY")
@@ -354,9 +255,6 @@ def get_starter_recipes(
         author_bio = (str(r.get("author_bio") or "").strip()) or None
         author_image_url = (str(r.get("author_image_url") or "").strip()) or None
         tags = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
-        image_query = (str(r.get("image_query") or "").strip()) or None
-        if not image_query:
-            image_query = f"{title} dish food photography"
         out.append({
             "title": title,
             "ingredients": ingredients,
@@ -365,7 +263,6 @@ def get_starter_recipes(
             "author_bio": author_bio,
             "author_image_url": author_image_url,
             "tags": tags,
-            "image_query": image_query,
         })
     if len(out) < 3:
         # Pad with fallback if AI returned fewer than 3
@@ -420,10 +317,7 @@ def add_starter_recipes_to_user(
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
         dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
-        image_query = (r.get("image_query") or "").strip() or f"{title} dish food photography"
-        image_url = get_starter_recipe_image_url(image_query)
-        if not image_url:
-            image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
+        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=user.id,
             title_pl=title,
@@ -471,10 +365,7 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
         dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
-        image_query = (r.get("image_query") or "").strip() or f"{title} dish food photography"
-        image_url = get_starter_recipe_image_url(image_query)
-        if not image_url:
-            image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
+        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=None,
             trial_session_id=trial_session.id,
