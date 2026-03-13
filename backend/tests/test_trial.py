@@ -37,6 +37,32 @@ def test_trial_start_returns_token_and_recipes(mock_starter, mock_geo, client):
 
 @patch("app.routers.trial._geo_from_ip")
 @patch("app.routers.trial.get_starter_recipes")
+def test_trial_start_creates_recipes_with_no_image(mock_starter, mock_geo, client):
+    """Starter recipes are stored with image_url=None (no static/generated images)."""
+    mock_geo.return_value = {"country_code": "PL"}
+    mock_starter.return_value = _three_starter_recipes()
+
+    r = client.post("/api/trial/start", json={})
+    assert r.status_code == 200
+    token = r.json()["trial_token"]
+    payload = decode_trial_token(token)
+    assert payload is not None
+    token_id = payload.get("sub")
+
+    db = TestSessionLocal()
+    try:
+        session = db.query(models.TrialSession).filter(models.TrialSession.token_id == token_id).first()
+        assert session is not None
+        recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == session.id).all()
+        assert len(recipes) == 3
+        for recipe in recipes:
+            assert recipe.image_url is None
+    finally:
+        db.close()
+
+
+@patch("app.routers.trial._geo_from_ip")
+@patch("app.routers.trial.get_starter_recipes")
 def test_trial_start_ip_guard_429(mock_starter, mock_geo, client):
     mock_geo.return_value = {"country_code": "US"}
     mock_starter.return_value = _three_starter_recipes()

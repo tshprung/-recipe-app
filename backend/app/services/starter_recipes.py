@@ -7,41 +7,7 @@ from openai import APIError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-# Static dish images by type (soup, main, dessert). No generated/fetched images.
-# Keys: "soup" (soups, stews, broths), "main" (main courses, dumplings, meat), "dessert" (desserts, cakes, salads).
-STARTER_IMAGE_BY_TYPE = {
-    "soup": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=70",  # soup bowl
-    "main": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=600&q=70",  # main dish / pasta
-    "dessert": "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=600&q=70",  # dessert/cake
-}
-# Fallback order when type is ambiguous (soup, main, dessert).
-STARTER_IMAGE_URLS_FALLBACK = [
-    STARTER_IMAGE_BY_TYPE["soup"],
-    STARTER_IMAGE_BY_TYPE["main"],
-    STARTER_IMAGE_BY_TYPE["dessert"],
-]
-
-
-def _recipe_dish_type(title: str, tags: list) -> str:
-    """Classify recipe as 'soup', 'main', or 'dessert' from title and tags for better image matching."""
-    text = " ".join([(title or "").lower()] + [str(t).lower() for t in (tags or [])])
-    # Soup/stew: zupa, soup, stew, bigos, broth, barszcz, rosół, etc.
-    soup_keywords = [
-        "soup", "zupa", "stew", "bigos", "broth", "barszcz", "rosół", "suppe", "soep",
-        "sopa", "soupe", "zuppa",
-    ]
-    if any(k in text for k in soup_keywords):
-        return "soup"
-    # Dessert/salad/cake: dessert, cake, sernik, ciasto, salad, sałatka, deser, tort, etc.
-    # Avoid short tokens that match other dishes (e.g. "pie" matches "pierogi").
-    dessert_keywords = [
-        "dessert", "cake", "sernik", "ciasto", "salad", "sałatka", "deser", "tort", "cookie",
-        "cookies", "sweet", "ice cream", "lody", "fruit salad", "salat", "kuchen", "torta",
-        "cheesecake", "ciastko", "cobbler", "brownie",
-    ]
-    if any(k in text for k in dessert_keywords):
-        return "dessert"
-    return "main"
+# Starter recipes are created without images (image_url=None).
 
 
 SYSTEM_PROMPT = """\
@@ -189,7 +155,7 @@ def get_starter_recipes(
     If diet_filters (e.g. ["kosher", "vegetarian"]) are set, all recipes MUST comply with those diets
     (either choose compliant recipes or adapt ingredients/steps so the recipe is compliant).
     Each dict has: title, ingredients (list), steps (list), author_name, author_bio, author_image_url (optional), tags (list).
-    Starter recipe images use static URLs by dish type (soup/main/dessert); no image generation or fetching.
+    Starter recipes are created with no image (image_url=None).
     Uses OpenAI when available; falls back to static recipes on failure.
     """
     api_key = os.getenv("OPENAI_API_KEY")
@@ -316,8 +282,6 @@ def add_starter_recipes_to_user(
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
-        dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
-        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=user.id,
             title_pl=title,
@@ -337,7 +301,7 @@ def add_starter_recipes_to_user(
             author_bio=(r.get("author_bio") or "").strip() or None,
             author_image_url=(r.get("author_image_url") or "").strip() or None,
             diet_tags=diet_tags,
-            image_url=image_url,
+            image_url=None,
         )
         db.add(recipe)
     user.starter_recipes_added = True
@@ -346,7 +310,7 @@ def add_starter_recipes_to_user(
 
 def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict], db) -> list:
     """
-    Create Recipe rows for a trial session (no user_id). Use borrowed dish image URLs for the 3 starters.
+    Create Recipe rows for a trial session (no user_id). Starter recipes have no image (image_url=None).
     Returns list of created Recipe models.
     """
     from .. import models
@@ -364,8 +328,6 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
-        dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
-        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=None,
             trial_session_id=trial_session.id,
@@ -386,7 +348,7 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
             author_bio=(r.get("author_bio") or "").strip() or None,
             author_image_url=(r.get("author_image_url") or "").strip() or None,
             diet_tags=tags_list,
-            image_url=image_url,
+            image_url=None,
         )
         db.add(recipe)
         created.append(recipe)

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { api, getTrialToken, setTrialTokenStorage } from '../api/client'
 import { hashPasswordForTransport } from '../auth/passwordHash'
-import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
+import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_RECIPES_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
 
 const AuthContext = createContext(null)
 // Keep in sync with backend quota.MAX_TRIAL_ACTIONS
@@ -40,9 +40,15 @@ export function AuthProvider({ children }) {
     setTrialRemainingStorage(remaining)
   }
 
-  /** Sign out of trial view only: hide app and show landing. Keeps trial token and credits in storage so "Try for free" restores the same session. */
+  /** Sign out of trial: clear trial token and related storage so refresh keeps user on landing page. */
   function leaveTrial() {
+    setTrialTokenStorage(null)
+    setTrialRemainingStorage(null)
+    try {
+      localStorage.removeItem(TRIAL_RECIPES_KEY)
+    } catch (_) {}
     setTrialTokenState(null)
+    setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
   }
 
   function decrementTrialActions() {

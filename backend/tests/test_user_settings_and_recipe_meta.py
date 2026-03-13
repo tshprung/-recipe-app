@@ -61,3 +61,25 @@ def test_patch_recipe_meta_rating_and_times(client, auth_headers):
     assert r.status_code == 200
     assert r.json()["user_rating"] is None
 
+
+def _three_starter_recipes():
+    return [
+        {"title": "Recipe 1", "ingredients": ["a", "b"], "steps": ["1", "2"], "author_name": "Chef A", "author_bio": "Famous", "tags": ["soup"]},
+        {"title": "Recipe 2", "ingredients": ["c"], "steps": ["1"], "author_name": "Chef B", "author_bio": "TV host", "tags": ["main"]},
+        {"title": "Recipe 3", "ingredients": ["d", "e"], "steps": ["1", "2", "3"], "author_name": None, "author_bio": None, "tags": ["dessert"]},
+    ]
+
+
+@patch("app.services.starter_recipes.get_starter_recipes")
+def test_fetch_starter_recipes_creates_recipes_with_no_image(mock_get_starter, client, auth_headers):
+    """Fetch starter recipes (Settings) creates recipes with image_url=None."""
+    mock_get_starter.return_value = _three_starter_recipes()
+    r = client.post("/api/users/me/fetch-starter-recipes", headers=auth_headers)
+    assert r.status_code == 204
+    r = client.get("/api/recipes/", headers=auth_headers)
+    assert r.status_code == 200
+    recipes = r.json()
+    assert len(recipes) >= 3
+    for rec in recipes[:3]:
+        assert rec.get("image_url") is None
+

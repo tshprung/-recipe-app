@@ -124,6 +124,7 @@ export default function SettingsPage() {
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
         setSaving(false)
+        navigate('/', { replace: true })
         return
       }
       const updated = await api.patch('/users/me/settings', form)
@@ -133,6 +134,7 @@ export default function SettingsPage() {
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -362,6 +364,7 @@ export default function SettingsPage() {
                   await api.post('/users/me/fetch-starter-recipes')
                   setFetchStarterMessage({ success: true, text: t('fetchStarterRecipesDone') })
                   refreshUser?.()
+                  navigate('/', { replace: true })
                 } catch (err) {
                   setFetchStarterMessage({ success: false, text: err.message || t('somethingWentWrong') })
                 } finally {
