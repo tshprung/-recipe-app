@@ -63,10 +63,11 @@ def test_patch_recipe_meta_rating_and_times(client, auth_headers):
 
 
 def _three_starter_recipes():
+    """Starter recipes must include amounts in ingredients."""
     return [
-        {"title": "Recipe 1", "ingredients": ["a", "b"], "steps": ["1", "2"], "author_name": "Chef A", "author_bio": "Famous", "tags": ["soup"]},
-        {"title": "Recipe 2", "ingredients": ["c"], "steps": ["1"], "author_name": "Chef B", "author_bio": "TV host", "tags": ["main"]},
-        {"title": "Recipe 3", "ingredients": ["d", "e"], "steps": ["1", "2", "3"], "author_name": None, "author_bio": None, "tags": ["dessert"]},
+        {"title": "Recipe 1", "ingredients": ["500g flour", "2 cups water", "1 tsp salt"], "steps": ["Mix.", "Bake."], "author_name": "Chef A", "author_bio": "Famous", "tags": ["soup"]},
+        {"title": "Recipe 2", "ingredients": ["300g chicken", "1 tbsp oil"], "steps": ["Fry."], "author_name": "Chef B", "author_bio": "TV host", "tags": ["main"]},
+        {"title": "Recipe 3", "ingredients": ["200g sugar", "3 eggs", "100g butter"], "steps": ["Mix.", "Bake.", "Cool."], "author_name": None, "author_bio": None, "tags": ["dessert"]},
     ]
 
 

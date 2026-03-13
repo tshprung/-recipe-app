@@ -1,4 +1,5 @@
 """Tests for anonymous trial: /api/trial/start and trial quota enforcement."""
+import re
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
@@ -6,14 +7,16 @@ import pytest
 
 from app import models
 from app.auth import create_trial_token, decode_trial_token
+from app.services.starter_recipes import _fallback_recipes
 from tests.conftest import TestSessionLocal
 
 
 def _three_starter_recipes():
+    """Starter recipes must include amounts in ingredients (e.g. 500g flour)."""
     return [
-        {"title": "Recipe 1", "ingredients": ["a", "b"], "steps": ["1", "2"], "author_name": "Chef A", "author_bio": "Famous", "author_image_url": None},
-        {"title": "Recipe 2", "ingredients": ["c"], "steps": ["1"], "author_name": "Chef B", "author_bio": "TV host", "author_image_url": None},
-        {"title": "Recipe 3", "ingredients": ["d", "e"], "steps": ["1", "2", "3"], "author_name": None, "author_bio": None, "author_image_url": None},
+        {"title": "Recipe 1", "ingredients": ["500g flour", "2 cups water", "1 tsp salt"], "steps": ["Mix.", "Bake."], "author_name": "Chef A", "author_bio": "Famous", "author_image_url": None, "tags": ["soup"]},
+        {"title": "Recipe 2", "ingredients": ["300g chicken", "1 tbsp oil"], "steps": ["Fry."], "author_name": "Chef B", "author_bio": "TV host", "author_image_url": None, "tags": ["main"]},
+        {"title": "Recipe 3", "ingredients": ["200g sugar", "3 eggs", "100g butter"], "steps": ["Mix.", "Bake.", "Cool."], "author_name": None, "author_bio": None, "author_image_url": None, "tags": ["dessert"]},
     ]
 
 
@@ -59,6 +62,39 @@ def test_trial_start_creates_recipes_with_no_image(mock_starter, mock_geo, clien
             assert recipe.image_url is None
     finally:
         db.close()
+
+
+@patch("app.routers.trial._geo_from_ip")
+@patch("app.routers.trial.get_starter_recipes")
+def test_trial_start_recipe_ingredients_have_amounts(mock_starter, mock_geo, client):
+    """Starter recipe ingredients must include quantities/amounts (e.g. 500g flour)."""
+    mock_geo.return_value = {"country_code": "PL"}
+    mock_starter.return_value = _three_starter_recipes()
+
+    r = client.post("/api/trial/start", json={})
+    assert r.status_code == 200
+    recipes = r.json()["recipes"]
+    assert len(recipes) >= 3
+    amount_pattern = re.compile(r"\d")
+    for recipe in recipes[:3]:
+        ingredients = recipe.get("ingredients") or recipe.get("ingredients_pl") or []
+        assert ingredients, f"Recipe {recipe.get('title')} has no ingredients"
+        # At least one ingredient should contain a digit (amount)
+        combined = " ".join(str(i) for i in ingredients)
+        assert amount_pattern.search(combined), f"Recipe ingredients should include amounts: {ingredients}"
+
+
+def test_fallback_starter_recipes_ingredients_have_amounts():
+    """Fallback starter recipes (PL and EN) must include amounts in ingredients."""
+    amount_pattern = re.compile(r"\d")
+    for lang in ("pl", "en"):
+        recipes = _fallback_recipes(lang)
+        assert len(recipes) == 3
+        for r in recipes:
+            ingredients = r.get("ingredients") or []
+            assert ingredients, f"Fallback recipe {r.get('title')} has no ingredients"
+            combined = " ".join(str(i) for i in ingredients)
+            assert amount_pattern.search(combined), f"Fallback ingredients should include amounts: {ingredients}"
 
 
 @patch("app.routers.trial._geo_from_ip")

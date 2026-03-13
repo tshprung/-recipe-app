@@ -14,7 +14,9 @@ SYSTEM_PROMPT = """\
 You return exactly 3 classic recipes from well-known cooks or chefs of the given country.
 Each recipe must have: title, ingredients (list of strings), steps (list of strings), author_name, author_bio.
 author_bio is 1-2 sentences: why they are famous in that country (e.g. TV show host, cookbook author, restaurant chef).
-Output valid JSON only — no markdown, no prose. Use the output_language for all text.
+CRITICAL: Every recipe field (title, ingredients, steps, tags) must be written entirely in the output_language. No mixing languages.
+Each ingredient must include a quantity or amount (e.g. "500g flour", "2 cups milk", "1 tsp salt", "3 eggs"). Do not list ingredients as single words.
+Output valid JSON only — no markdown, no prose.
 """
 
 USER_PROMPT_TEMPLATE = """\
@@ -22,13 +24,15 @@ Country: {country_name}
 Output language: {output_lang}
 {dish_types_line}{diet_constraint_line}
 
+CRITICAL: Write the entire recipe in the output language only. If output language is English, use English for title, ingredients, steps, and tags. If Polish, use Polish. No mixed-language text.
+
 Return exactly this JSON (array of 3 recipes from famous cooks in that country):
 {{
   "recipes": [
     {{
-      "title": "<recipe title in {output_lang}>",
-      "ingredients": ["<ingredient 1>", "<ingredient 2>", ...],
-      "steps": ["<step 1>", "<step 2>", ...],
+      "title": "<recipe title in {output_lang}, e.g. in English: Polish potato dumplings>",
+      "ingredients": ["<amount and ingredient in {output_lang}, e.g. 500g flour>", "<e.g. 2 cups water>", ...],
+      "steps": ["<step 1 in {output_lang}>", "<step 2>", ...],
       "author_name": "<full name of a real famous cook/chef from this country>",
       "author_bio": "<1-2 sentences: e.g. TV show host, cookbook author, Michelin chef>",
       "tags": ["<tag1 in {output_lang}>", "<tag2>", ...]
@@ -37,7 +41,7 @@ Return exactly this JSON (array of 3 recipes from famous cooks in that country):
   ]
 }}
 
-For each recipe, include 2-4 short tags in {output_lang} (e.g. breakfast, lunch, dinner, dessert, easy, quick, traditional, vegetarian, soup, main course — whatever fits the recipe).
+Each ingredient must include quantity/amount (e.g. "2 cups flour", "1 kg potatoes", "1/2 tsp salt"). For each recipe, include 2-4 short tags in {output_lang}.
 """
 
 _LANG_NAMES = {
@@ -85,7 +89,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
         return [
             {
                 "title": "Zupa pomidorowa",
-                "ingredients": ["pomidory", "cebula", "czosnek", "bulion", "bazylia", "sól", "pieprz"],
+                "ingredients": ["500 g pomidorów", "1 cebula", "2 ząbki czosnku", "500 ml bulionu", "garść bazylii", "sól i pieprz do smaku"],
                 "steps": ["Ugotuj pomidory z cebulą i czosnkiem.", "Zmiksuj, dopraw solą i pieprzem.", "Podawaj z bazylią."],
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Klasyczna polska kuchnia.",
@@ -94,7 +98,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             },
             {
                 "title": "Kotlet schabowy",
-                "ingredients": ["schab", "jajko", "bułka tarta", "sól", "olej"],
+                "ingredients": ["4 plastry schabu", "1 jajko", "3 łyżki bułki tartej", "sól i pieprz", "2 łyżki oleju"],
                 "steps": ["Rozbij mięso.", "Panieruj w jajku i bułce tartej.", "Usmaż na oleju na złoto."],
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Tradycyjna polska potrawa.",
@@ -103,7 +107,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
             },
             {
                 "title": "Sałatka jarzynowa",
-                "ingredients": ["ziemniaki", "marchew", "groszek", "ogórek kiszony", "majonez", "sól"],
+                "ingredients": ["500 g ziemniaków", "2 marchewki", "200 g groszku", "2 ogórki kiszone", "3 łyżki majonezu", "sól do smaku"],
                 "steps": ["Ugotuj warzywa, ostudź.", "Pokrój w kostkę, wymieszaj z majonezem.", "Dopraw solą."],
                 "author_name": "Kuchnia domowa",
                 "author_bio": "Prosta sałatka na każdy dzień.",
@@ -115,7 +119,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
     return [
         {
             "title": "Tomato soup",
-            "ingredients": ["tomatoes", "onion", "garlic", "stock", "basil", "salt", "pepper"],
+            "ingredients": ["500 g tomatoes", "1 onion", "2 cloves garlic", "500 ml stock", "handful basil", "salt and pepper to taste"],
             "steps": ["Cook tomatoes with onion and garlic.", "Blend, season with salt and pepper.", "Serve with basil."],
             "author_name": "Home cooking",
             "author_bio": "Classic simple recipe.",
@@ -124,7 +128,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
         },
         {
             "title": "Grilled chicken",
-            "ingredients": ["chicken breast", "olive oil", "lemon", "herbs", "salt", "pepper"],
+            "ingredients": ["4 chicken breast fillets", "2 tbsp olive oil", "1 lemon", "1 tsp dried herbs", "salt and pepper"],
             "steps": ["Coat chicken with oil and herbs.", "Grill until cooked through.", "Serve with lemon."],
             "author_name": "Home cooking",
             "author_bio": "Quick and healthy.",
@@ -133,7 +137,7 @@ def _fallback_recipes(target_language: str) -> list[dict]:
         },
         {
             "title": "Green salad",
-            "ingredients": ["lettuce", "cucumber", "tomato", "olive oil", "vinegar", "salt"],
+            "ingredients": ["1 head lettuce", "1 cucumber", "2 tomatoes", "2 tbsp olive oil", "1 tbsp vinegar", "salt to taste"],
             "steps": ["Wash and chop vegetables.", "Toss with oil and vinegar.", "Season with salt."],
             "author_name": "Home cooking",
             "author_bio": "Fresh and easy.",
