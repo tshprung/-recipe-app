@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, Request, HTTPException, status, Depends
+from fastapi import APIRouter, Body, Request, HTTPException, status, Depends
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -58,11 +58,56 @@ def _language_from_country(country_code: str) -> str:
 
 
 @router.post("/start", response_model=schemas.TrialStartOut)
-def trial_start(request: Request, db: Session = Depends(get_db)):
+def trial_start(
+    request: Request,
+    body: schemas.TrialStartRequest | None = Body(None),
+    db: Session = Depends(get_db),
+):
     """
-    Start an anonymous trial: issue a trial token and return 3 starter recipes.
-    IP-limited (max 3 trial sessions per IP in 24h). Country/language from IP geo.
+    Start or resume an anonymous trial. If device_id is sent and matches an existing
+    session, return that session's token and remaining credits (no new trial). Otherwise
+    create a new session and return device_id for the client to store.
     """
+    body = body or schemas.TrialStartRequest()
+    device_id = (body.device_id or "").strip() or None
+
+    # Resume existing trial by device_id (same device, same credits after sign-out)
+    if device_id:
+        session = db.query(models.TrialSession).filter(
+            models.TrialSession.device_id == device_id,
+        ).first()
+        if session:
+            trial_token = create_trial_token(session.token_id)
+            remaining = max(0, MAX_TRIAL_ACTIONS - session.used_actions)
+            recipes = (
+                db.query(models.Recipe)
+                .filter(models.Recipe.trial_session_id == session.id)
+                .order_by(models.Recipe.id)
+                .all()
+            )
+            recipes_out = [
+                schemas.TrialRecipeOut(
+                    id=r.id,
+                    title=r.title_pl or "Recipe",
+                    ingredients=r.ingredients_pl or [],
+                    steps=r.steps_pl or [],
+                    author_name=r.author_name,
+                    author_bio=r.author_bio,
+                    author_image_url=r.author_image_url,
+                    image_url=r.image_url,
+                    diet_tags=r.diet_tags or [],
+                )
+                for r in recipes
+            ]
+            return schemas.TrialStartOut(
+                trial_token=trial_token,
+                country=session.country,
+                language=session.language,
+                recipes=recipes_out,
+                remaining_actions=remaining,
+                device_id=device_id,
+            )
+
     client_ip = _client_ip(request)
     geo = _geo_from_ip(client_ip)
     country_code = geo.get("country_code") or "PL"
@@ -71,7 +116,6 @@ def trial_start(request: Request, db: Session = Depends(get_db)):
     # IP guard: last 24h
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     if client_ip:
-        # Allow whitelisted IPs to bypass per-IP trial limits (for admin/dev use).
         whitelisted = db.scalar(
             select(models.TrialIpWhitelist.id).where(
                 models.TrialIpWhitelist.ip_address == client_ip
@@ -91,9 +135,11 @@ def trial_start(request: Request, db: Session = Depends(get_db)):
                 )
 
     token_id = secrets.token_urlsafe(16)[:32]
+    new_device_id = secrets.token_urlsafe(24)[:48]
     now = datetime.now(timezone.utc)
     session = models.TrialSession(
         token_id=token_id,
+        device_id=new_device_id,
         country=country_code,
         language=language,
         used_actions=0,
@@ -129,4 +175,5 @@ def trial_start(request: Request, db: Session = Depends(get_db)):
         language=language,
         recipes=recipes_out,
         remaining_actions=MAX_TRIAL_ACTIONS,
+        device_id=new_device_id,
     )

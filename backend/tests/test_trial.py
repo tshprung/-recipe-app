@@ -99,6 +99,42 @@ def test_fallback_starter_recipes_ingredients_have_amounts():
 
 @patch("app.routers.trial._geo_from_ip")
 @patch("app.routers.trial.get_starter_recipes")
+def test_trial_start_resume_by_device_id_returns_same_credits(mock_starter, mock_geo, client):
+    """Sending device_id of an existing trial resumes it and returns actual remaining_actions, not 5."""
+    mock_geo.return_value = {"country_code": "PL"}
+    mock_starter.return_value = _three_starter_recipes()
+
+    r = client.post("/api/trial/start", json={})
+    assert r.status_code == 200
+    data = r.json()
+    device_id = data.get("device_id")
+    assert device_id, "First trial start must return device_id"
+    assert data["remaining_actions"] == 5
+
+    # Use 2 actions (e.g. quota enforcement would increment used_actions)
+    db = TestSessionLocal()
+    try:
+        payload = decode_trial_token(data["trial_token"])
+        session = db.query(models.TrialSession).filter(
+            models.TrialSession.token_id == payload["sub"],
+        ).first()
+        assert session is not None
+        session.used_actions = 2
+        db.commit()
+    finally:
+        db.close()
+
+    # Resume with device_id: should get remaining_actions=3, not 5
+    r2 = client.post("/api/trial/start", json={"device_id": device_id})
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["remaining_actions"] == 3
+    assert data2["device_id"] == device_id
+    assert len(data2["recipes"]) == 3
+
+
+@patch("app.routers.trial._geo_from_ip")
+@patch("app.routers.trial.get_starter_recipes")
 def test_trial_start_ip_guard_429(mock_starter, mock_geo, client):
     mock_geo.return_value = {"country_code": "US"}
     mock_starter.return_value = _three_starter_recipes()

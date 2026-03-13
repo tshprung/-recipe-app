@@ -103,12 +103,18 @@ class TrialRecipeOut(BaseModel):
     diet_tags: list[str] = Field(default_factory=list)
 
 
+class TrialStartRequest(BaseModel):
+    """Optional device_id to resume an existing trial (same credits)."""
+    device_id: str | None = None
+
+
 class TrialStartOut(BaseModel):
     trial_token: str
     country: str
     language: str
     recipes: list[TrialRecipeOut]
     remaining_actions: int
+    device_id: str | None = None  # Client stores this; send on next trial/start to resume
 
 
 # --- Onboarding (guest pre-fetch + claim) ---

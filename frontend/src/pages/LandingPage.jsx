@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api, getTrialToken } from '../api/client'
+import { TRIAL_DEVICE_ID_KEY, TRIAL_RECIPES_KEY, TRIAL_REMAINING_KEY } from '../constants/storageKeys'
 
 const COLORS = {
   bg: '#111111',
@@ -67,9 +68,9 @@ export default function LandingPage() {
     const existingToken = getTrialToken()
     if (existingToken) {
       try {
-        const stored = localStorage.getItem('trial_recipes')
+        const stored = localStorage.getItem(TRIAL_RECIPES_KEY)
         const trialRecipes = stored ? JSON.parse(stored) : []
-        const remainingStr = localStorage.getItem('trial_remaining_actions')
+        const remainingStr = localStorage.getItem(TRIAL_REMAINING_KEY)
         const remaining = remainingStr != null ? parseInt(remainingStr, 10) : 5
         const remainingActions = Number.isFinite(remaining) && remaining >= 0 ? remaining : 5
         setTrialToken(existingToken, remainingActions)
@@ -81,11 +82,14 @@ export default function LandingPage() {
     }
     setTrialLoading(true)
     try {
-      const data = await api.post('/trial/start', {})
+      const deviceId = typeof localStorage !== 'undefined' ? localStorage.getItem(TRIAL_DEVICE_ID_KEY) : null
+      const body = deviceId ? { device_id: deviceId } : {}
+      const data = await api.post('/trial/start', body)
       setTrialToken(data.trial_token, data.remaining_actions ?? 5)
       try {
-        localStorage.setItem('trial_recipes', JSON.stringify(data.recipes || []))
-        localStorage.setItem('trial_remaining_actions', String(data.remaining_actions ?? 5))
+        localStorage.setItem(TRIAL_RECIPES_KEY, JSON.stringify(data.recipes || []))
+        localStorage.setItem(TRIAL_REMAINING_KEY, String(data.remaining_actions ?? 5))
+        if (data.device_id) localStorage.setItem(TRIAL_DEVICE_ID_KEY, data.device_id)
       } catch (_) {}
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
     } catch (err) {

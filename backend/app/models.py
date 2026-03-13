@@ -204,12 +204,13 @@ class RecipeImageCache(Base):
 
 
 class TrialSession(Base):
-    """Anonymous trial session: 5 actions per token_id, IP-limited."""
+    """Anonymous trial session: 5 actions per token_id, IP-limited. device_id allows resume after sign-out."""
 
     __tablename__ = "trial_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     token_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     country: Mapped[str] = mapped_column(String(10), nullable=False)
     language: Mapped[str] = mapped_column(String(10), nullable=False)
     used_actions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
