@@ -32,11 +32,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   function setTrialToken(token, remainingActions = null) {
-    setTrialTokenStorage(token)
+    if (token) setTrialTokenStorage(token)
+    else setTrialTokenStorage(null)
     setTrialTokenState(token || null)
     const remaining = remainingActions != null ? remainingActions : (token ? getTrialRemainingFromStorage() : MAX_TRIAL_ACTIONS)
     setTrialRemainingActionsState(remaining)
     setTrialRemainingStorage(remaining)
+  }
+
+  /** Sign out of trial view only: hide app and show landing. Keeps trial token and credits in storage so "Try for free" restores the same session. */
+  function leaveTrial() {
+    setTrialTokenState(null)
   }
 
   function decrementTrialActions() {
@@ -173,7 +179,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, setUser, refreshUser, login, register, logout, setTokenFromOAuth,
-      trialToken, setTrialToken, trialRemainingActions, decrementTrialActions,
+      trialToken, setTrialToken, leaveTrial, trialRemainingActions, decrementTrialActions,
       loading,
     }}>
       {children}

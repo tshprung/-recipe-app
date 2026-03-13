@@ -219,7 +219,7 @@ export default function RecipeListPage() {
         let raw = state?.trialRecipes
         if (!raw?.length) {
           try {
-            const stored = sessionStorage.getItem('trial_recipes')
+            const stored = localStorage.getItem('trial_recipes')
             raw = stored ? JSON.parse(stored) : null
           } catch (_) {}
         }
@@ -266,7 +266,7 @@ export default function RecipeListPage() {
       let raw = state?.trialRecipes
       if (!raw?.length) {
         try {
-          const stored = sessionStorage.getItem('trial_recipes')
+          const stored = localStorage.getItem('trial_recipes')
           raw = stored ? JSON.parse(stored) : null
         } catch (_) {}
       }

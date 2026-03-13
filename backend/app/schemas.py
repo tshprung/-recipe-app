@@ -177,6 +177,47 @@ class UserSettings(BaseModel):
         return sanitize_custom_allergens_text(v)
 
 
+class UserSettingsUpdate(BaseModel):
+    """Partial update for PATCH /users/me/settings; all fields optional."""
+    ui_language: str | None = None
+    target_language: str | None = None
+    target_country: str | None = None
+    target_city: str | None = None
+    target_zip: str | None = None
+    dish_preferences: list[str] | None = None
+    household_adults: int | None = None
+    household_kids: int | None = None
+    diet_filters: list[str] | None = None
+    default_servings: int | None = None
+    allergens: list[str] | None = None
+    custom_allergens_text: str | None = None
+
+    @field_validator("allergens")
+    @classmethod
+    def validate_allergens(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        cleaned: list[str] = []
+        for raw in v or []:
+            code = (raw or "").strip().lower()
+            if not code:
+                continue
+            if code not in ALLOWED_ALLERGEN_CODES:
+                raise ValueError(f"Unknown allergen code: {code}")
+            if code not in cleaned:
+                cleaned.append(code)
+        return cleaned
+
+    @field_validator("default_servings")
+    @classmethod
+    def validate_default_servings(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if v < 1 or v > 24:
+            raise ValueError("default_servings must be between 1 and 24")
+        return v
+
+
 class UserOut(BaseModel):
     id: int
     email: str

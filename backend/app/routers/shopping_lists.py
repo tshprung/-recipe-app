@@ -128,10 +128,14 @@ def get_shopping_list(
         raise HTTPException(status_code=502, detail=f"Categorization failed: {e}")
 
     # Post-process: strip any prep/usage phrases the categorizer may have re-added
-    for cat in items:
+    for cat in list(items.keys()):
+        raw = items.get(cat)
+        if not isinstance(raw, list):
+            items[cat] = []
+            continue
         items[cat] = [
-            cleaned for s in items[cat]
-            if (cleaned := strip_cooking_instructions(s).strip())
+            cleaned for s in raw
+            if isinstance(s, str) and (cleaned := strip_cooking_instructions(s).strip())
         ]
 
     _invalidate_shopping_list_cache(current_user.id, db)

@@ -7,6 +7,13 @@ from openai import APIError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
+# Temporary: borrowed dish images for the 3 starter slots (soup/main/dessert-style). No rights; replace with proper assets later.
+STARTER_IMAGE_URLS = [
+    "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=70",  # soup
+    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=70",  # main
+    "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=600&q=70",  # dessert/salad
+]
+
 SYSTEM_PROMPT = """\
 You return exactly 3 classic recipes from well-known cooks or chefs of the given country.
 Each recipe must have: title, ingredients (list of strings), steps (list of strings), author_name, author_bio.
@@ -264,11 +271,9 @@ def add_starter_recipes_to_user(
     Used by ensure_starter_recipes_for_user and by onboarding claim.
     """
     from .. import models
-    from .recipe_image import get_or_create_recipe_image
 
     diet_tags = list(diet_filters) if diet_filters else []
-    created: list[models.Recipe] = []
-    for r in recipes_data:
+    for idx, r in enumerate(recipes_data):
         title = (r.get("title") or "").strip() or "Recipe"
         ingredients = r.get("ingredients") or []
         steps = r.get("steps") or []
@@ -280,6 +285,7 @@ def add_starter_recipes_to_user(
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
+        image_url = STARTER_IMAGE_URLS[idx] if idx < len(STARTER_IMAGE_URLS) else None
         recipe = models.Recipe(
             user_id=user.id,
             title_pl=title,
@@ -299,28 +305,22 @@ def add_starter_recipes_to_user(
             author_bio=(r.get("author_bio") or "").strip() or None,
             author_image_url=(r.get("author_image_url") or "").strip() or None,
             diet_tags=diet_tags,
+            image_url=image_url,
         )
         db.add(recipe)
-        created.append(recipe)
     user.starter_recipes_added = True
     db.commit()
-    for recipe in created:
-        try:
-            get_or_create_recipe_image(recipe, db)
-        except Exception:
-            pass
 
 
 def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict], db) -> list:
     """
-    Create Recipe rows for a trial session (no user_id). Generate dish images.
+    Create Recipe rows for a trial session (no user_id). Use borrowed dish image URLs for the 3 starters.
     Returns list of created Recipe models.
     """
     from .. import models
-    from .recipe_image import get_or_create_recipe_image
 
     created: list[models.Recipe] = []
-    for r in recipes_data:
+    for idx, r in enumerate(recipes_data):
         title = (r.get("title") or "").strip() or "Recipe"
         ingredients = r.get("ingredients") or []
         steps = r.get("steps") or []
@@ -332,6 +332,7 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
+        image_url = STARTER_IMAGE_URLS[idx] if idx < len(STARTER_IMAGE_URLS) else None
         recipe = models.Recipe(
             user_id=None,
             trial_session_id=trial_session.id,
@@ -352,14 +353,9 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
             author_bio=(r.get("author_bio") or "").strip() or None,
             author_image_url=(r.get("author_image_url") or "").strip() or None,
             diet_tags=tags_list,
+            image_url=image_url,
         )
         db.add(recipe)
         created.append(recipe)
-    db.commit()
-    for recipe in created:
-        try:
-            get_or_create_recipe_image(recipe, db)
-        except Exception:
-            pass
     db.commit()
     return created

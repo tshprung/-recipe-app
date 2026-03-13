@@ -29,6 +29,7 @@ const translations = {
     creditsUnlimited: 'Credits: ∞',
     settings: 'Settings',
     logOut: 'Log out',
+    signOut: 'Sign out',
     signIn: 'Sign in',
     backToLanding: 'Back to landing',
     // Settings
@@ -230,6 +231,7 @@ const translations = {
     creditsUnlimited: 'קרדיטים: ∞',
     settings: 'הגדרות',
     logOut: 'התנתק',
+    signOut: 'יציאה',
     signIn: 'כניסה',
     backToLanding: 'חזרה לדף הבית',
     translationAndLocation: 'תרגום ומיקום',
@@ -425,6 +427,7 @@ const translations = {
     creditsUnlimited: 'Kredyty: ∞',
     settings: 'Ustawienia',
     logOut: 'Wyloguj',
+    signOut: 'Wyloguj',
     signIn: 'Zaloguj',
     backToLanding: 'Powrót do strony startowej',
     translationAndLocation: 'Tłumaczenie i lokalizacja',

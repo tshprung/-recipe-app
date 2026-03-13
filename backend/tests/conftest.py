@@ -66,9 +66,7 @@ def create_tables():
 @pytest.fixture(autouse=True)
 def _no_recipe_image_generation():
     """Skip recipe image generation in tests (no OpenAI calls, no file I/O)."""
-    with patch("app.services.recipe_image.get_or_create_recipe_image"), patch(
-        "app.routers.recipes.get_or_create_recipe_image"
-    ):
+    with patch("app.services.recipe_image.get_or_create_recipe_image"):
         yield
 
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { api } from '../api/client'
+import { api, getTrialToken } from '../api/client'
 
 const COLORS = {
   bg: '#111111',
@@ -64,12 +64,27 @@ export default function LandingPage() {
 
   async function handleTryForFree() {
     setTrialError('')
+    const existingToken = getTrialToken()
+    if (existingToken) {
+      try {
+        const stored = localStorage.getItem('trial_recipes')
+        const trialRecipes = stored ? JSON.parse(stored) : []
+        const remainingStr = localStorage.getItem('trial_remaining_actions')
+        const remaining = remainingStr != null ? parseInt(remainingStr, 10) : 5
+        const remainingActions = Number.isFinite(remaining) && remaining >= 0 ? remaining : 5
+        setTrialToken(existingToken, remainingActions)
+        navigate('/', { state: { trialRecipes, remainingActions }, replace: true })
+      } catch (_) {
+        setTrialError('Could not restore trial.')
+      }
+      return
+    }
     setTrialLoading(true)
     try {
       const data = await api.post('/trial/start', {})
       setTrialToken(data.trial_token, data.remaining_actions ?? 5)
       try {
-        sessionStorage.setItem('trial_recipes', JSON.stringify(data.recipes || []))
+        localStorage.setItem('trial_recipes', JSON.stringify(data.recipes || []))
         localStorage.setItem('trial_remaining_actions', String(data.remaining_actions ?? 5))
       } catch (_) {}
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })

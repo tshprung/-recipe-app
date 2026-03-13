@@ -53,15 +53,15 @@ def delete_me(
 
 @router.patch("/me/settings", response_model=schemas.UserOut)
 def update_settings(
-    payload: schemas.UserSettings,
+    payload: schemas.UserSettingsUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    for field, value in payload.model_dump().items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return schemas.UserOut.model_validate(current_user)
 
 
 @router.post("/me/claim-starter-recipes", status_code=status.HTTP_204_NO_CONTENT)

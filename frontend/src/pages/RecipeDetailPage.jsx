@@ -129,7 +129,6 @@ export default function RecipeDetailPage() {
   const [altLoading, setAltLoading] = useState(false)
   const [altData, setAltData] = useState(null)
   const [altError, setAltError] = useState(null)
-  const [generateImageLoading, setGenerateImageLoading] = useState(false)
   const [uploadImageLoading, setUploadImageLoading] = useState(false)
   const [detailImageError, setDetailImageError] = useState(false)
   const fileInputRef = useRef(null)
@@ -196,19 +195,6 @@ export default function RecipeDetailPage() {
       setRecipe(updated)
     } catch (e) {
       console.error(e)
-    }
-  }
-
-  async function handleGenerateImage() {
-    if (!recipe?.id) return
-    setGenerateImageLoading(true)
-    try {
-      const updated = await api.post(`/recipes/${id}/generate-image`)
-      setRecipe(updated)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setGenerateImageLoading(false)
     }
   }
 
@@ -744,16 +730,6 @@ export default function RecipeDetailPage() {
                 </div>
                 {activeTab === 'original' && (
                 <div className="flex flex-wrap items-center gap-2">
-                  {!recipe.image_url && (
-                    <button
-                      type="button"
-                      onClick={handleGenerateImage}
-                      disabled={generateImageLoading}
-                      className="text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50"
-                    >
-                      {generateImageLoading ? '…' : t('generateRecipePhoto')}
-                    </button>
-                  )}
                   <input
                     ref={fileInputRef}
                     type="file"

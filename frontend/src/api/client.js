@@ -7,9 +7,10 @@ export function getStaticBase() {
   return base || ''
 }
 
-/** Full URL for a recipe image path (e.g. /static/recipe-images/1.jpg). */
+/** Full URL for a recipe image path (e.g. /static/recipe-images/1.jpg) or external URL (e.g. Unsplash). */
 export function getRecipeImageUrl(imageUrl) {
   if (!imageUrl) return null
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl
   const base = getStaticBase()
   return base ? `${base}${imageUrl}` : imageUrl
 }
