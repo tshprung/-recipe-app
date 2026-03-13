@@ -167,6 +167,8 @@ export default function RecipeDetailPage() {
   const [myIngredientsText, setMyIngredientsText] = useState('')
   const [matchResult, setMatchResult] = useState(null)
   const [matchLoading, setMatchLoading] = useState(false)
+  const [newCollectionInput, setNewCollectionInput] = useState('')
+  const [collectionsSaving, setCollectionsSaving] = useState(false)
 
   function getBaseServings() {
     if (recipe?.servings_override != null && recipe.servings_override >= 1) return recipe.servings_override
@@ -299,6 +301,35 @@ export default function RecipeDetailPage() {
     } finally {
       setMatchLoading(false)
     }
+  }
+
+  async function handleUpdateCollections(nextList) {
+    setCollectionsSaving(true)
+    try {
+      const updated = await api.patch(`/recipes/${id}/collections`, { collections: nextList })
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCollectionsSaving(false)
+    }
+  }
+
+  function handleAddCollection() {
+    const name = newCollectionInput.trim()
+    if (!name) return
+    const current = recipe?.collections ?? []
+    if (current.includes(name)) {
+      setNewCollectionInput('')
+      return
+    }
+    handleUpdateCollections([...current, name])
+    setNewCollectionInput('')
+  }
+
+  function handleRemoveCollection(name) {
+    const current = recipe?.collections ?? []
+    handleUpdateCollections(current.filter(c => c !== name))
   }
 
   async function handleUploadImage(file) {
@@ -730,6 +761,40 @@ export default function RecipeDetailPage() {
                   {tag}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Collections (user-defined) — original only, when recipe is saved */}
+          {activeTab === 'original' && recipe?.id > 0 && (
+            <div className="mb-4">
+              <span className="block text-xs font-semibold text-stone-500 mb-2">{t('collections')}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {(recipe.collections ?? []).map(c => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-1 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 rounded-full pl-3 pr-1 py-1"
+                  >
+                    {c}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCollection(c)}
+                      disabled={collectionsSaving}
+                      className="rounded-full p-0.5 hover:bg-amber-200 transition-colors disabled:opacity-50"
+                      aria-label={`Remove ${c}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={newCollectionInput}
+                  onChange={e => setNewCollectionInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCollection(); } }}
+                  placeholder={t('addCollectionPlaceholder')}
+                  className="text-xs border border-stone-200 rounded-full px-3 py-1.5 w-40 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
             </div>
           )}
 

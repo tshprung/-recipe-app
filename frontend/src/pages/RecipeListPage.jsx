@@ -197,10 +197,12 @@ export default function RecipeListPage() {
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [toast, setToast] = useState(null)
+  const [collectionList, setCollectionList] = useState([])
+  const [selectedCollection, setSelectedCollection] = useState(null)
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
-  const fetchRecipes = useCallback(async (query = '') => {
+  const fetchRecipes = useCallback(async (query = '', collection = null) => {
     // Call API when logged in or in trial (client sends user token or trial token).
     if (!user && !trialToken) {
       setLoading(false)
@@ -208,7 +210,10 @@ export default function RecipeListPage() {
     }
     setLoading(true)
     try {
-      const path = query.trim() ? `/recipes/?q=${encodeURIComponent(query.trim())}` : '/recipes/'
+      const params = new URLSearchParams()
+      if (query.trim()) params.set('q', query.trim())
+      if (collection && collection.trim()) params.set('collection', collection.trim())
+      const path = params.toString() ? `/recipes/?${params.toString()}` : '/recipes/'
       const data = await api.get(path)
       setRecipes(data)
     } catch (e) {
@@ -250,6 +255,7 @@ export default function RecipeListPage() {
             user_rating: r.user_rating ?? null,
             diet_tags: r.diet_tags ?? [],
             image_url: r.image_url ?? null,
+            collections: r.collections ?? [],
           }))
           setRecipes(mapped)
         }
@@ -258,6 +264,14 @@ export default function RecipeListPage() {
       setLoading(false)
     }
   }, [user, trialToken, location.state])
+
+  useEffect(() => {
+    if (user || trialToken) {
+      api.get('/recipes/collections').then(data => setCollectionList(data.collections || [])).catch(() => setCollectionList([]))
+    } else {
+      setCollectionList([])
+    }
+  }, [user, trialToken])
 
   useEffect(() => {
     if (!user && !trialToken) {
@@ -297,6 +311,7 @@ export default function RecipeListPage() {
           user_rating: r.user_rating ?? null,
           diet_tags: r.diet_tags ?? [],
           image_url: r.image_url ?? null,
+          collections: r.collections ?? [],
         }))
         setRecipes(mapped)
       } else {
@@ -304,8 +319,8 @@ export default function RecipeListPage() {
       }
       return
     }
-    fetchRecipes(appliedSearch)
-  }, [fetchRecipes, appliedSearch, user, trialToken, location.state])
+    fetchRecipes(appliedSearch, selectedCollection)
+  }, [fetchRecipes, appliedSearch, selectedCollection, user, trialToken, location.state])
 
   function handleSearchSubmit(e) {
     e.preventDefault()
@@ -351,7 +366,12 @@ export default function RecipeListPage() {
     removeRecipe(id)
   }
 
-  const visible = filter === 'favorites' ? recipes.filter(r => r.is_favorite) : recipes
+  let visible = recipes
+  if (selectedCollection) {
+    const coll = selectedCollection.trim().toLowerCase()
+    visible = visible.filter(r => (r.collections || []).some(c => String(c).trim().toLowerCase() === coll))
+  }
+  if (filter === 'favorites') visible = visible.filter(r => r.is_favorite)
   const favCount = recipes.filter(r => r.is_favorite).length
 
   return (
@@ -391,6 +411,36 @@ export default function RecipeListPage() {
           )}
         </div>
       </form>
+
+      {/* Collection filter */}
+      {collectionList.length > 0 && (
+        <div className="mb-4">
+          <span className="text-xs font-semibold text-stone-500 mr-2">{t('filterByCollection')}</span>
+          <div className="flex flex-wrap gap-2 mt-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedCollection(null)}
+              className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                selectedCollection === null ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              {t('allRecipes')}
+            </button>
+            {collectionList.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setSelectedCollection(c)}
+                className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                  selectedCollection === c ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Header: stack on mobile for better touch targets and spacing */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 justify-between items-stretch sm:items-start mb-6 sm:mb-8">

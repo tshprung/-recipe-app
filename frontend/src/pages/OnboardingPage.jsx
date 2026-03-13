@@ -65,6 +65,15 @@ const DIET_OPTIONS = [
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
+/** Default recipe/app language for a country (user can change). */
+function languageFromCountry(countryCode) {
+  if (!countryCode) return 'en'
+  const c = (countryCode || '').toUpperCase()
+  if (c === 'PL') return 'pl'
+  if (c === 'IL') return 'he'
+  return 'en'
+}
+
 /** Shown while starter recipes are prepared after registration (product, hints, tips). */
 const REGISTER_LOADING_SENTENCES = [
   'Preparing your 3 starter recipes for your region and diet…',
@@ -128,7 +137,7 @@ export default function OnboardingPage() {
     return () => clearInterval(interval)
   }, [postRegisterPreparing])
 
-  // Step 1: try geo on mount to pre-fill location
+  // Step 1: in background, geo-detect country and set country + national language (user can change)
   useEffect(() => {
     if (step !== 1) return
     let cancelled = false
@@ -138,9 +147,12 @@ export default function OnboardingPage() {
       .then((res) => {
         if (cancelled) return
         if (res?.country_code && COUNTRIES.some((c) => c.code === res.country_code)) {
+          const lang = languageFromCountry(res.country_code)
           setData((d) => ({
             ...d,
             target_country: res.country_code,
+            target_language: lang,
+            ui_language: lang,
             target_city: res.city || d.target_city,
             target_zip: res.zip || d.target_zip,
           }))
@@ -150,26 +162,6 @@ export default function OnboardingPage() {
       .finally(() => { if (!cancelled) setLocationDetecting(false) })
     return () => { cancelled = true }
   }, [step])
-
-  async function detectLocation() {
-    setLocationError(null)
-    setLocationDetecting(true)
-    try {
-      const res = await api.get('/meta/geo')
-      if (res?.country_code && COUNTRIES.some((c) => c.code === res.country_code)) {
-        setData((d) => ({
-          ...d,
-          target_country: res.country_code,
-          target_city: res.city || d.target_city,
-          target_zip: res.zip || d.target_zip,
-        }))
-      }
-    } catch (e) {
-      setLocationError(e?.message || 'Could not detect location')
-    } finally {
-      setLocationDetecting(false)
-    }
-  }
 
   // Zip-to-city lookup removed from onboarding to keep only language + country.
 
@@ -322,26 +314,18 @@ export default function OnboardingPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-1.5">Location</label>
-                <div className="flex gap-2 flex-wrap">
-                  <select
-                    value={data.target_country}
-                    onChange={(e) => set('target_country')(e.target.value)}
-                    className={inputCls}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={detectLocation}
-                    disabled={locationDetecting}
-                    className="rounded-xl px-4 py-3 text-sm font-medium text-stone-900 transition disabled:opacity-50 shrink-0"
-                    style={{ backgroundColor: COLORS.accent }}
-                  >
-                    {locationDetecting ? 'Detecting…' : 'Use my location'}
-                  </button>
-                </div>
+                {locationDetecting && (
+                  <p className="text-white/50 text-xs mb-1.5">Detecting your location…</p>
+                )}
+                <select
+                  value={data.target_country}
+                  onChange={(e) => set('target_country')(e.target.value)}
+                  className={inputCls}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </select>
                 {locationError && <p className="text-amber-400 text-xs mt-1">{locationError}</p>}
               </div>
               <div>

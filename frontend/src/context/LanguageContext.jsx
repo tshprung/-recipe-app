@@ -231,6 +231,11 @@ const translations = {
     viewRecipe: 'View recipe',
     noSuggestions: 'No suggestions this time.',
     tryDifferentFilters: 'Try different filters.',
+    collections: 'Collections',
+    addCollection: 'Add collection',
+    addCollectionPlaceholder: 'Type name and press Enter',
+    filterByCollection: 'Filter by collection',
+    allRecipes: 'All',
   },
   he: {
     loading: 'טוען…',
@@ -451,6 +456,11 @@ const translations = {
     viewRecipe: 'צפה במתכון',
     noSuggestions: 'הפעם אין הצעות.',
     tryDifferentFilters: 'נסה מסננים אחרים.',
+    collections: 'אוספים',
+    addCollection: 'הוסף אוסף',
+    addCollectionPlaceholder: 'הקלד שם ולחץ Enter',
+    filterByCollection: 'סנן לפי אוסף',
+    allRecipes: 'הכל',
   },
   pl: {
     loading: 'Ładowanie…',
@@ -671,6 +681,11 @@ const translations = {
     viewRecipe: 'Zobacz przepis',
     noSuggestions: 'Brak propozycji.',
     tryDifferentFilters: 'Spróbuj innych filtrów.',
+    collections: 'Kolekcje',
+    addCollection: 'Dodaj kolekcję',
+    addCollectionPlaceholder: 'Wpisz nazwę i naciśnij Enter',
+    filterByCollection: 'Filtruj po kolekcji',
+    allRecipes: 'Wszystkie',
   },
 }
 
