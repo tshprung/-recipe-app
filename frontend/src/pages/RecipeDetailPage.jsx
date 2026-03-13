@@ -239,6 +239,16 @@ export default function RecipeDetailPage() {
       const body = types.length === 1
         ? { variant_type: types[0] }
         : { variant_types: types }
+      if (!user && trialToken) {
+        try {
+          const raw = localStorage.getItem('trial_settings')
+          if (raw) {
+            const ts = JSON.parse(raw)
+            if (ts.target_language) body.target_language = ts.target_language
+            if (ts.target_country) body.target_country = ts.target_country
+          }
+        } catch (_) {}
+      }
       const result = await api.post(`/recipes/${id}/adapt`, body)
       if (result.can_adapt) {
         if (!user && trialToken) decrementTrialActions()
@@ -272,11 +282,22 @@ export default function RecipeDetailPage() {
     setAdaptError(null)
     setAdaptLoading(true)
     try {
-      const result = await api.post(`/recipes/${id}/adapt`, {
+      const altBody = {
         variant_type: pendingVariantType,
         custom_instruction: alt.instruction,
         custom_title: alt.title,
-      })
+      }
+      if (!user && trialToken) {
+        try {
+          const raw = localStorage.getItem('trial_settings')
+          if (raw) {
+            const ts = JSON.parse(raw)
+            if (ts.target_language) altBody.target_language = ts.target_language
+            if (ts.target_country) altBody.target_country = ts.target_country
+          }
+        } catch (_) {}
+      }
+      const result = await api.post(`/recipes/${id}/adapt`, altBody)
       if (result.can_adapt) {
         if (!user && trialToken) decrementTrialActions()
         setVariants(vs => [...vs, result.variant])

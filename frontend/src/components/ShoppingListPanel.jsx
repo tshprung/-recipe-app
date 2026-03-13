@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 
@@ -13,10 +14,14 @@ const CATEGORY_ICONS = {
   'Other': '🛒',
 }
 
+const EMPTY_ITEMS = { 'Vegetables and fruit': [], 'Dairy': [], 'Meat and fish': [], 'Spices and sauces': [], 'Other': [] }
+
 export default function ShoppingListPanel() {
   const { t } = useLanguage()
+  const { user, trialToken } = useAuth()
   const { isOpen, closePanel, recipeIds, clearList } = useShoppingList()
   const [clearError, setClearError] = useState('')
+  const isTrial = !user && trialToken
 
   const [items, setItems] = useState(null)      // null = not yet loaded
   const [itemsLoading, setItemsLoading] = useState(false)
@@ -32,15 +37,20 @@ export default function ShoppingListPanel() {
   // Reload items whenever the panel opens or the recipe set changes (while open)
   useEffect(() => {
     if (!isOpen) return
-    setItemsLoading(true)
     setChecked(new Set())
     setReportingKey(null)
     setReportSaved(new Set())
+    if (isTrial) {
+      setItems(EMPTY_ITEMS)
+      setItemsLoading(false)
+      return
+    }
+    setItemsLoading(true)
     api.get('/shopping-list/')
       .then(data => setItems(data.items))
       .catch(console.error)
       .finally(() => setItemsLoading(false))
-  }, [isOpen, recipeIds.size])
+  }, [isOpen, recipeIds.size, isTrial])
 
   function toggle(key) {
     setChecked(prev => {
@@ -159,6 +169,15 @@ export default function ShoppingListPanel() {
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-stone-400">{t('loadingIngredients')}</p>
+            </div>
+          ) : isTrial && recipeIds.size > 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-12">
+              <p className="text-sm text-stone-600 font-medium mb-1">
+                {recipeIds.size} {recipeIds.size === 1 ? t('recipe') : t('recipesCount')} {t('onList')}
+              </p>
+              <p className="text-xs text-stone-400 max-w-[240px]">
+                {t('signInToSeeMergedIngredients')}
+              </p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -284,6 +303,7 @@ export default function ShoppingListPanel() {
                   `🖨 ${t('print')}`
                 )}
               </button>
+              {!isTrial && (
               <button
                 onClick={handleEmail}
                 disabled={itemsLoading || emailStatus === 'loading'}
@@ -297,6 +317,7 @@ export default function ShoppingListPanel() {
                   <>✉ {t('sendToEmail')}</>
                 )}
               </button>
+              )}
             </div>
           </div>
         )}

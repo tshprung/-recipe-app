@@ -63,6 +63,7 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshUser() {
+    if (!getToken()) return
     try {
       const me = await api.get('/users/me')
       const user = storeRenewedToken(me)

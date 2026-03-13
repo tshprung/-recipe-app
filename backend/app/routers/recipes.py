@@ -793,8 +793,9 @@ def adapt_recipe_endpoint(
         target_lang = (current_user.target_language or "").strip() or "en"
         target_country = current_user.target_country
     else:
-        target_lang = (trial_session.language or "").strip() or "en"
-        target_country = trial_session.country
+        # Trial: use request body if provided (from Settings saved in localStorage), else session defaults
+        target_lang = (payload.target_language or trial_session.language or "").strip() or "en"
+        target_country = payload.target_country or trial_session.country
 
     try:
         if len(types) > 1:

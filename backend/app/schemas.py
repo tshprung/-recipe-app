@@ -340,6 +340,8 @@ class AdaptRequest(BaseModel):
     variant_types: list[str] | None = None  # multiple types applied in order (e.g. ["vegetarian", "kosher"])
     custom_instruction: str | None = None  # for user-chosen alternatives
     custom_title: str | None = None        # display title for the resulting variant tab
+    target_language: str | None = None    # trial: override language from Settings (e.g. "en")
+    target_country: str | None = None     # trial: override country from Settings (e.g. "US")
 
     @model_validator(mode="after")
     def require_variant_type_or_types(self):

@@ -206,6 +206,8 @@ const translations = {
     sendFailed: 'Send failed',
     of: 'of',
     addRecipesToSeeIngredients: 'Add recipes to see ingredients',
+    onList: 'on your list',
+    signInToSeeMergedIngredients: 'Sign in or register to see merged ingredients and email your list.',
     failedToClearList: 'Failed to clear list',
   },
   he: {
@@ -402,6 +404,8 @@ const translations = {
     sendFailed: 'השליחה נכשלה',
     of: 'מתוך',
     addRecipesToSeeIngredients: 'הוסף מתכונים כדי לראות מרכיבים',
+    onList: 'ברשימה שלך',
+    signInToSeeMergedIngredients: 'היכנס או הירשם כדי לראות מרכיבים מאוחדים ולשלוח את הרשימה במייל.',
     failedToClearList: 'ניקוי הרשימה נכשל',
   },
   pl: {
@@ -598,6 +602,8 @@ const translations = {
     sendFailed: 'Wysyłka nie powiodła się',
     of: 'z',
     addRecipesToSeeIngredients: 'Dodaj przepisy, aby zobaczyć składniki',
+    onList: 'na liście',
+    signInToSeeMergedIngredients: 'Zaloguj się lub zarejestruj, aby zobaczyć połączone składniki i wysłać listę e-mailem.',
     failedToClearList: 'Nie udało się wyczyścić listy',
   },
 }
