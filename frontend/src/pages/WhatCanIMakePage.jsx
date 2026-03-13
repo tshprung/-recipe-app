@@ -18,7 +18,7 @@ const DIET_OPTIONS = [
 
 export default function WhatCanIMakePage() {
   const { t } = useLanguage()
-  const { refreshUser } = useAuth()
+  const { refreshUser, user, trialToken, decrementTrialActions } = useAuth()
   const navigate = useNavigate()
   const [ingredientsText, setIngredientsText] = useState('')
   const [dietFilters, setDietFilters] = useState([])
@@ -61,7 +61,10 @@ export default function WhatCanIMakePage() {
       .then(data => {
         setResult(data)
         setLoading(false)
-        if (data?.source === 'ai') refreshUser()
+        if (data?.source === 'ai') {
+          if (!user && trialToken) decrementTrialActions()
+          refreshUser()
+        }
       })
       .catch(e => {
         if (e.trialExhausted) setShowTrialExhausted(true)
@@ -79,6 +82,7 @@ export default function WhatCanIMakePage() {
         ingredients: sug.ingredients ?? [],
         steps: sug.steps ?? [],
       })
+      if (!user && trialToken) decrementTrialActions()
       setAddRecipeSuccess({ id: created.id, title: sug.title })
       setTimeout(() => setAddRecipeSuccess(null), 5000)
     } catch (e) {
@@ -105,6 +109,10 @@ export default function WhatCanIMakePage() {
       .then(data => {
         setResult(data)
         setLoading(false)
+        if (data?.source === 'ai') {
+          if (!user && trialToken) decrementTrialActions()
+          refreshUser()
+        }
       })
       .catch(e => {
         if (e.trialExhausted) setShowTrialExhausted(true)

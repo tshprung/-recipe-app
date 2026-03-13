@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import create_trial_token
 from ..database import get_db
-from ..services.starter_recipes import get_starter_recipes
+from ..services.starter_recipes import get_starter_recipes, add_starter_recipes_to_trial_session
 
 router = APIRouter(prefix="/api/trial", tags=["trial"])
 
@@ -107,16 +107,21 @@ def trial_start(request: Request, db: Session = Depends(get_db)):
 
     trial_token = create_trial_token(token_id)
     recipes_data = get_starter_recipes(country_code, language)
+    created_recipes = add_starter_recipes_to_trial_session(session, recipes_data[:3], db)
+    db.refresh(session)
     recipes_out = [
         schemas.TrialRecipeOut(
-            title=r.get("title") or "Recipe",
-            ingredients=r.get("ingredients") or [],
-            steps=r.get("steps") or [],
-            author_name=r.get("author_name"),
-            author_bio=r.get("author_bio"),
-            author_image_url=r.get("author_image_url"),
+            id=recipe.id,
+            title=recipe.title_pl or "Recipe",
+            ingredients=recipe.ingredients_pl or [],
+            steps=recipe.steps_pl or [],
+            author_name=recipe.author_name,
+            author_bio=recipe.author_bio,
+            author_image_url=recipe.author_image_url,
+            image_url=recipe.image_url,
+            diet_tags=recipe.diet_tags or [],
         )
-        for r in recipes_data[:3]
+        for recipe in created_recipes
     ]
     return schemas.TrialStartOut(
         trial_token=trial_token,

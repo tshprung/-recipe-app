@@ -18,10 +18,17 @@ const LANG_STORAGE_KEY = 'recipe-app-lang'
 
 const REMEMBER_ME_KEY = 'recipe_app_remember_me'
 
-function getToken() {
+function getUserToken() {
   const usePersistent = localStorage.getItem(REMEMBER_ME_KEY) === '1'
   if (usePersistent) return localStorage.getItem('token')
   return sessionStorage.getItem('token')
+}
+
+/** Auth token for API: user token if logged in, else trial token so trial users can call create/adapt/etc. */
+function getToken() {
+  const userToken = getUserToken()
+  if (userToken) return userToken
+  return getTrialToken()
 }
 
 const TRIAL_TOKEN_KEY = 'trial_token'

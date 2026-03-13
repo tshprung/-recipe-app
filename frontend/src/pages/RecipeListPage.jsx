@@ -200,8 +200,8 @@ export default function RecipeListPage() {
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
   const fetchRecipes = useCallback(async (query = '') => {
-    // Never call GET /recipes/ in trial mode (no auth). If trialToken is set, use trial recipes only.
-    if (!user || trialToken) {
+    // Call API when logged in or in trial (client sends user token or trial token).
+    if (!user && !trialToken) {
       setLoading(false)
       return
     }
@@ -212,14 +212,54 @@ export default function RecipeListPage() {
       setRecipes(data)
     } catch (e) {
       console.error(e)
+      // Fallback for trial: use state/sessionStorage if API fails (e.g. first paint before token)
+      if (!user && trialToken) {
+        const state = location.state
+        let raw = state?.trialRecipes
+        if (!raw?.length) {
+          try {
+            const stored = sessionStorage.getItem('trial_recipes')
+            raw = stored ? JSON.parse(stored) : null
+          } catch (_) {}
+        }
+        if (raw?.length) {
+          const mapped = raw.map((r) => ({
+            id: r.id ?? -(r.title?.length ?? 0),
+            title_pl: r.title,
+            title_original: r.title,
+            ingredients_pl: r.ingredients ?? [],
+            ingredients_original: r.ingredients ?? [],
+            steps_pl: r.steps ?? [],
+            tags: r.tags ?? [],
+            substitutions: r.substitutions ?? {},
+            notes: r.notes ?? {},
+            user_notes: r.user_notes ?? null,
+            is_favorite: r.is_favorite ?? false,
+            raw_input: r.raw_input ?? '',
+            detected_language: r.detected_language ?? null,
+            target_language: r.target_language ?? '',
+            target_country: r.target_country ?? '',
+            target_city: r.target_city ?? '',
+            created_at: r.created_at ?? new Date().toISOString(),
+            author_name: r.author_name ?? null,
+            author_bio: r.author_bio ?? null,
+            author_image_url: r.author_image_url ?? null,
+            prep_time_minutes: r.prep_time_minutes ?? null,
+            cook_time_minutes: r.cook_time_minutes ?? null,
+            user_rating: r.user_rating ?? null,
+            diet_tags: r.diet_tags ?? [],
+            image_url: r.image_url ?? null,
+          }))
+          setRecipes(mapped)
+        }
+      }
     } finally {
       setLoading(false)
     }
-  }, [user, trialToken])
+  }, [user, trialToken, location.state])
 
   useEffect(() => {
-    // Trial mode (no user or trialToken set): use starter recipes from state/sessionStorage; never call GET /api/recipes/
-    if (!user || trialToken) {
+    if (!user && !trialToken) {
       setLoading(false)
       const state = location.state
       let raw = state?.trialRecipes
@@ -230,30 +270,30 @@ export default function RecipeListPage() {
         } catch (_) {}
       }
       if (raw?.length) {
-        const mapped = raw.map((r, idx) => ({
-          id: -(idx + 1), // temporary negative ids in trial mode
+        const mapped = raw.map((r) => ({
+          id: r.id ?? -(r.title?.length ?? 0),
           title_pl: r.title,
           title_original: r.title,
-          ingredients_pl: r.ingredients,
-          ingredients_original: r.ingredients,
-          steps_pl: r.steps,
-          tags: [],
-          substitutions: {},
-          notes: {},
-          user_notes: null,
-          is_favorite: false,
-          raw_input: '',
-          detected_language: null,
-          target_language: '',
-          target_country: '',
-          target_city: '',
-          created_at: new Date().toISOString(),
+          ingredients_pl: r.ingredients ?? [],
+          ingredients_original: r.ingredients ?? [],
+          steps_pl: r.steps ?? [],
+          tags: r.tags ?? [],
+          substitutions: r.substitutions ?? {},
+          notes: r.notes ?? {},
+          user_notes: r.user_notes ?? null,
+          is_favorite: r.is_favorite ?? false,
+          raw_input: r.raw_input ?? '',
+          detected_language: r.detected_language ?? null,
+          target_language: r.target_language ?? '',
+          target_country: r.target_country ?? '',
+          target_city: r.target_city ?? '',
+          created_at: r.created_at ?? new Date().toISOString(),
           author_name: r.author_name ?? null,
           author_bio: r.author_bio ?? null,
           author_image_url: r.author_image_url ?? null,
-          prep_time_minutes: null,
-          cook_time_minutes: null,
-          user_rating: null,
+          prep_time_minutes: r.prep_time_minutes ?? null,
+          cook_time_minutes: r.cook_time_minutes ?? null,
+          user_rating: r.user_rating ?? null,
           diet_tags: r.diet_tags ?? [],
           image_url: r.image_url ?? null,
         }))

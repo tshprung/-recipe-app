@@ -4,15 +4,47 @@ import { hashPasswordForTransport } from '../auth/passwordHash'
 
 const AuthContext = createContext(null)
 const LANG_STORAGE_KEY = 'recipe-app-lang'
+const TRIAL_REMAINING_KEY = 'trial_remaining_actions'
+const MAX_TRIAL_ACTIONS = 5
+
+function getTrialRemainingFromStorage() {
+  try {
+    const v = sessionStorage.getItem(TRIAL_REMAINING_KEY)
+    if (v != null) {
+      const n = parseInt(v, 10)
+      if (Number.isFinite(n) && n >= 0) return Math.min(n, MAX_TRIAL_ACTIONS)
+    }
+  } catch (_) {}
+  return MAX_TRIAL_ACTIONS
+}
+
+function setTrialRemainingStorage(n) {
+  try {
+    if (n != null) sessionStorage.setItem(TRIAL_REMAINING_KEY, String(n))
+    else sessionStorage.removeItem(TRIAL_REMAINING_KEY)
+  } catch (_) {}
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [trialToken, setTrialTokenState] = useState(null)
+  const [trialRemainingActions, setTrialRemainingActionsState] = useState(MAX_TRIAL_ACTIONS)
   const [loading, setLoading] = useState(true)
 
-  function setTrialToken(token) {
+  function setTrialToken(token, remainingActions = null) {
     setTrialTokenStorage(token)
     setTrialTokenState(token || null)
+    const remaining = remainingActions != null ? remainingActions : (token ? getTrialRemainingFromStorage() : MAX_TRIAL_ACTIONS)
+    setTrialRemainingActionsState(remaining)
+    setTrialRemainingStorage(remaining)
+  }
+
+  function decrementTrialActions() {
+    setTrialRemainingActionsState((prev) => {
+      const next = Math.max(0, prev - 1)
+      setTrialRemainingStorage(next)
+      return next
+    })
   }
 
   function syncUiLanguageToStorage(u) {
@@ -38,7 +70,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = getToken()
     const trial = getTrialToken()
-    if (trial) setTrialTokenState(trial)
+    if (trial) {
+      setTrialTokenState(trial)
+      setTrialRemainingActionsState(getTrialRemainingFromStorage())
+    }
     if (token) {
       api.get('/users/me')
         .then(me => {
@@ -115,6 +150,8 @@ export function AuthProvider({ children }) {
     clearToken()
     setUser(null)
     setTrialToken(null)
+    setTrialRemainingStorage(null)
+    setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
   }
 
   async function setTokenFromOAuth(accessToken) {
@@ -134,7 +171,11 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, refreshUser, login, register, logout, setTokenFromOAuth, trialToken, setTrialToken, loading }}>
+    <AuthContext.Provider value={{
+      user, setUser, refreshUser, login, register, logout, setTokenFromOAuth,
+      trialToken, setTrialToken, trialRemainingActions, decrementTrialActions,
+      loading,
+    }}>
       {children}
     </AuthContext.Provider>
   )

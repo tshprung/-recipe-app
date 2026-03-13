@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from .database import get_db
 from . import models
@@ -128,3 +129,37 @@ def get_current_user_optional(
     if user is None or user.is_blocked:
         return None
     return user
+
+
+def get_optional_user_and_trial(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> tuple[models.User | None, models.TrialSession | None]:
+    """Return (user, None) if valid user JWT, (None, trial_session) if valid trial token, else (None, None)."""
+    if not token or not token.strip():
+        return (None, None)
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return (None, None)
+    if payload.get("type") == "trial":
+        token_id = payload.get("sub")
+        if not token_id or not isinstance(token_id, str):
+            return (None, None)
+        trial_session = (
+            db.execute(select(models.TrialSession).where(models.TrialSession.token_id == token_id))
+            .scalars()
+            .first()
+        )
+        return (None, trial_session)
+    user_id = payload.get("sub")
+    if user_id is None:
+        return (None, None)
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return (None, None)
+    user = db.get(models.User, uid)
+    if user is None or user.is_blocked:
+        return (None, None)
+    return (user, None)

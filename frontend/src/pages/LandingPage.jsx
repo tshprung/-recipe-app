@@ -11,6 +11,14 @@ const COLORS = {
   secondary: '#C96A4A',
 }
 
+const TRIAL_LOADING_SENTENCES = [
+  'We are loading your personal view…',
+  'This app uses AI to adapt recipes to your needs.',
+  'Starter recipes are chosen for your region.',
+  'You’ll get 5 free AI actions to try adapt and more.',
+  'Almost there…',
+]
+
 const FOOD_IMAGES = [
   'https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=900&q=70',
   'https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&w=900&q=70',
@@ -38,18 +46,29 @@ export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [trialLoading, setTrialLoading] = useState(false)
   const [trialError, setTrialError] = useState('')
+  const [loadingSentenceIndex, setLoadingSentenceIndex] = useState(0)
   const year = useMemo(() => new Date().getFullYear(), [])
   const navigate = useNavigate()
   const { setTrialToken } = useAuth()
+
+  useEffect(() => {
+    if (!trialLoading) return
+    setLoadingSentenceIndex(0)
+    const interval = setInterval(() => {
+      setLoadingSentenceIndex(i => (i + 1) % TRIAL_LOADING_SENTENCES.length)
+    }, 3500)
+    return () => clearInterval(interval)
+  }, [trialLoading])
 
   async function handleTryForFree() {
     setTrialError('')
     setTrialLoading(true)
     try {
       const data = await api.post('/trial/start', {})
-      setTrialToken(data.trial_token)
+      setTrialToken(data.trial_token, data.remaining_actions ?? 5)
       try {
         sessionStorage.setItem('trial_recipes', JSON.stringify(data.recipes || []))
+        sessionStorage.setItem('trial_remaining_actions', String(data.remaining_actions ?? 5))
       } catch (_) {}
       navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
     } catch (err) {
@@ -65,6 +84,25 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.bg, color: COLORS.text }}>
+      {/* Trial loading overlay: rotating sentences while /trial/start runs */}
+      {trialLoading && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 px-4"
+          style={{ backgroundColor: 'rgba(17,17,17,0.95)' }}
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <Spinner className="w-10 h-10 text-white" />
+          <p
+            key={loadingSentenceIndex}
+            className="text-center text-white/90 text-lg sm:text-xl max-w-md transition-opacity duration-300"
+            style={{ minHeight: '2.5rem' }}
+          >
+            {TRIAL_LOADING_SENTENCES[loadingSentenceIndex]}
+          </p>
+        </div>
+      )}
+
       {/* Global background accents (kept subtle, below the hero image) */}
       <div aria-hidden="true" className="fixed inset-0 -z-20 overflow-hidden">
         <div
@@ -89,7 +127,7 @@ export default function LandingPage() {
                 <span className="text-lg">🍽️</span>
               </span>
               <span className="font-extrabold tracking-tight truncate">
-                myrecipes<span style={{ color: COLORS.accent }}>.cloud</span>
+                Intelligent Kitchen Helper
               </span>
             </Link>
 
@@ -171,15 +209,15 @@ export default function LandingPage() {
               style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS.accent }} />
-              AI that understands real home cooking
+              Your intelligent kitchen helper
             </div>
 
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight">
-              Recipes that fit <span style={{ color: COLORS.accent }}>your real kitchen</span>.
+              <span style={{ color: COLORS.accent }}>Intelligent Kitchen Helper</span>
             </h1>
 
             <p className="mt-5 text-base sm:text-lg text-white/80 max-w-xl">
-              Turn any recipe into one that works with the food you can buy, your diet and your country.
+              AI adapts recipes to your language, diet, and ingredients. One cookbook, one shopping list.
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -236,7 +274,7 @@ export default function LandingPage() {
         <div className="max-w-2xl">
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">How it makes life easier</h2>
           <p className="mt-3 text-white/70">
-            myrecipes.cloud quietly fixes the parts of recipes that don’t match your real kitchen.
+            Intelligent Kitchen Helper adapts recipes to your kitchen, diet, and ingredients — so you can cook with what you have.
           </p>
         </div>
 
@@ -305,8 +343,8 @@ export default function LandingPage() {
             },
             {
               icon: '✨',
-              title: '2. Adapt to you',
-              body: 'Tell it your diet and country. AI adjusts the recipe to match your reality.',
+              title: '2. AI adapts to you',
+              body: 'Tell it your diet and country. Your intelligent helper adjusts the recipe to match your reality.',
             },
             {
               icon: '🧺',
@@ -401,8 +439,8 @@ export default function LandingPage() {
         >
           <div className="grid lg:grid-cols-2 gap-8 items-center">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Build Your Personal Recipe Book</h2>
-              <p className="mt-3 text-white/70">Stop fighting recipes that don’t work for your kitchen.</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Your intelligent kitchen helper</h2>
+              <p className="mt-3 text-white/70">Let AI adapt recipes to your kitchen, diet, and ingredients.</p>
               <p className="mt-2 text-xs text-white/60">No credit card required.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
@@ -437,9 +475,7 @@ export default function LandingPage() {
                 🍽️
               </span>
               <div>
-                <div className="font-extrabold">
-                  myrecipes<span style={{ color: COLORS.accent }}>.cloud</span>
-                </div>
+                <div className="font-extrabold">Intelligent Kitchen Helper</div>
                 <div className="text-xs text-white/55">AI recipe adaptation for real kitchens.</div>
               </div>
             </div>
@@ -454,7 +490,7 @@ export default function LandingPage() {
             <div id="privacy">Privacy: we don’t sell your data or recipes.</div>
             <div id="contact">Contact: tshprung@gmail.com</div>
           </div>
-          <div className="mt-6 text-xs text-white/45">© {year} myrecipes.cloud. All rights reserved.</div>
+          <div className="mt-6 text-xs text-white/45">© {year} Intelligent Kitchen Helper (myrecipes.cloud). All rights reserved.</div>
         </div>
       </footer>
     </div>

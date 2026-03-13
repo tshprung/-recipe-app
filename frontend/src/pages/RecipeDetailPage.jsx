@@ -99,7 +99,7 @@ export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, refreshUser } = useAuth()
+  const { user, trialToken, refreshUser, decrementTrialActions } = useAuth()
   const { t } = useLanguage()
 
   const [recipe, setRecipe] = useState(null)
@@ -254,6 +254,7 @@ export default function RecipeDetailPage() {
         : { variant_types: types }
       const result = await api.post(`/recipes/${id}/adapt`, body)
       if (result.can_adapt) {
+        if (!user && trialToken) decrementTrialActions()
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
         await refreshUser()
@@ -290,6 +291,7 @@ export default function RecipeDetailPage() {
         custom_title: alt.title,
       })
       if (result.can_adapt) {
+        if (!user && trialToken) decrementTrialActions()
         setVariants(vs => [...vs, result.variant])
         setActiveTab(result.variant.variant_type)
         await refreshUser()

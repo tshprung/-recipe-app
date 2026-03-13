@@ -1,6 +1,6 @@
-# Recipe Translator
+# Intelligent Kitchen Helper
 
-Transforms Hebrew recipes into Polish with localized ingredient substitutions.
+AI-powered kitchen helper: translate and localize recipes, adapt to your diet and location, manage a cookbook, unified shopping list, and "what can I make?" from ingredients you have.
 
 **Stack:** FastAPI + SQLite (backend) · React + Tailwind + Vite (frontend) · JWT auth
 

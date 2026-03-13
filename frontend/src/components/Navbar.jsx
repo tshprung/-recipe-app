@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
-  const { user, logout } = useAuth()
+  const { user, logout, trialToken, trialRemainingActions } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -18,6 +18,7 @@ export default function Navbar() {
   const initials = user?.email?.[0]?.toUpperCase() ?? '?'
   const isSettings = location.pathname === '/settings'
   const listCount = recipeIds.size
+  const isTrial = !user && trialToken
 
   const used = user?.transformations_used ?? 0
   const limit = user?.transformations_limit
@@ -25,6 +26,7 @@ export default function Navbar() {
     limit === -1
       ? t('recipesQuotaUnlimited')
       : t('recipesQuota', { used, limit: limit ?? 0 })
+  const trialQuotaLabel = `${trialRemainingActions ?? 0} / 5`
 
   return (
     <nav className="bg-black/70 backdrop-blur border-b border-white/10 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)] text-stone-50">
@@ -78,6 +80,11 @@ export default function Navbar() {
               {quotaLabel}
             </span>
           )}
+          {isTrial && (
+            <span className="text-xs font-medium text-amber-400/90 mr-0.5 sm:mr-1" title="Free trial AI actions">
+              {trialQuotaLabel} <span className="text-stone-500 text-[10px]">trial</span>
+            </span>
+          )}
 
           {user?.is_admin && (
             <Link
@@ -105,20 +112,33 @@ export default function Navbar() {
           <div className="w-px h-5 bg-stone-700 mx-0.5 sm:mx-1 hidden sm:block" />
 
           <div className="flex items-center gap-1.5 sm:gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">
-              {initials}
-            </div>
-            <span className="text-sm text-stone-300 hidden md:block max-w-[160px] truncate">
-              {user?.email}
-            </span>
+            {user ? (
+              <>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">
+                  {initials}
+                </div>
+                <span className="text-sm text-stone-300 hidden md:block max-w-[160px] truncate">
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-300 hover:bg-red-500/15 hover:text-red-300 transition-colors"
+                >
+                  {t('logOut')}
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-stone-500 hidden sm:inline">Trial</span>
+                <Link
+                  to="/signin"
+                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  {t('signIn')}
+                </Link>
+              </>
+            )}
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-300 hover:bg-red-500/15 hover:text-red-300 transition-colors"
-          >
-            {t('logOut')}
-          </button>
         </div>
       </div>
     </nav>

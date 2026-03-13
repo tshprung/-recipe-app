@@ -87,12 +87,15 @@ class Token(BaseModel):
 # --- Trial (anonymous try-for-free) ---
 
 class TrialRecipeOut(BaseModel):
+    id: int
     title: str
     ingredients: list[str]
     steps: list[str]
     author_name: str | None = None
     author_bio: str | None = None
     author_image_url: str | None = None
+    image_url: str | None = None
+    diet_tags: list[str] = Field(default_factory=list)
 
 
 class TrialStartOut(BaseModel):

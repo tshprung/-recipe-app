@@ -39,7 +39,7 @@ describe('Navbar', () => {
 
   it('renders app title and subtitle', () => {
     renderNavbar()
-    expect(screen.getByText('Recipe Translator')).toBeInTheDocument()
+    expect(screen.getByText('Intelligent Kitchen Helper')).toBeInTheDocument()
     expect(screen.getByText('Recipe translation')).toBeInTheDocument()
   })
 

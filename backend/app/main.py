@@ -20,7 +20,7 @@ limiter = Limiter(
     default_limits=[] if os.getenv("TESTING") else ["10/minute"],
 )
 
-app = FastAPI(title="Recipe Translator API", version="0.1.0")
+app = FastAPI(title="Intelligent Kitchen Helper API", version="0.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(
     RateLimitExceeded,

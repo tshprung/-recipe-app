@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import get_current_user, get_current_user_optional
+from ..auth import get_current_user, get_current_user_optional, get_optional_user_and_trial
 from ..database import get_db
 from ..quota import enforce_trial_or_user_quota
 from ..services.adaptation import adapt_recipe
@@ -269,9 +269,15 @@ def _recipe_matches_query(recipe: models.Recipe, q: str) -> bool:
 def list_recipes(
     q: str | None = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
-    recipes = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).all()
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if current_user is not None:
+        recipes = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).all()
+    else:
+        recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == trial_session.id).all()
     if q and q.strip():
         recipes = [r for r in recipes if _recipe_matches_query(r, q)]
     return recipes
@@ -484,10 +490,13 @@ def _what_can_i_make_ai(
 def get_recipe(
     recipe_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     return recipe
 
@@ -496,11 +505,14 @@ def get_recipe(
 def generate_recipe_image(
     recipe_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
     """Generate or assign a dish image for the recipe (cache lookup first, then OpenAI on miss)."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     try:
         get_or_create_recipe_image(recipe, db)
@@ -519,11 +531,14 @@ def upload_recipe_image(
     recipe_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
     """Upload a custom recipe image (replaces existing). Accepts JPEG or PNG, max 3 MB."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     content_type = (file.content_type or "").strip().lower()
     if content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
@@ -557,11 +572,14 @@ def upload_recipe_image(
 def remove_recipe_image(
     recipe_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
     """Remove the recipe image (clears image_url)."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     recipe.image_url = None
     db.commit()
@@ -574,10 +592,13 @@ def update_notes(
     recipe_id: int,
     payload: schemas.RecipeUserNotesUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     recipe.user_notes = payload.user_notes
     db.commit()
@@ -590,10 +611,13 @@ def toggle_favorite(
     recipe_id: int,
     payload: schemas.RecipeFavoriteUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     recipe.is_favorite = payload.is_favorite
     db.commit()
@@ -606,10 +630,13 @@ def update_recipe_meta(
     recipe_id: int,
     payload: schemas.RecipeMetaUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
 
     updates = payload.model_dump(exclude_unset=True)
@@ -629,10 +656,13 @@ def update_recipe_meta(
 def list_variants(
     recipe_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipe = db.get(models.Recipe, recipe_id)
-    if not recipe or recipe.user_id != current_user.id:
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     return recipe.variants
 

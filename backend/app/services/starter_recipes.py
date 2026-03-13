@@ -309,3 +309,57 @@ def add_starter_recipes_to_user(
             get_or_create_recipe_image(recipe, db)
         except Exception:
             pass
+
+
+def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict], db) -> list:
+    """
+    Create Recipe rows for a trial session (no user_id). Generate dish images.
+    Returns list of created Recipe models.
+    """
+    from .. import models
+    from .recipe_image import get_or_create_recipe_image
+
+    created: list[models.Recipe] = []
+    for r in recipes_data:
+        title = (r.get("title") or "").strip() or "Recipe"
+        ingredients = r.get("ingredients") or []
+        steps = r.get("steps") or []
+        raw_input = (
+            title
+            + "\n\nIngredients:\n"
+            + "\n".join(f"- {s}" for s in ingredients)
+            + "\n\nSteps:\n"
+            + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
+        )
+        tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
+        recipe = models.Recipe(
+            user_id=None,
+            trial_session_id=trial_session.id,
+            title_pl=title,
+            title_original=title,
+            ingredients_pl=ingredients,
+            ingredients_original=ingredients,
+            steps_pl=steps,
+            tags=tags_list,
+            substitutions={},
+            notes={},
+            raw_input=raw_input,
+            detected_language=trial_session.language,
+            target_language=trial_session.language or "en",
+            target_country=trial_session.country or "PL",
+            target_city="",
+            author_name=(r.get("author_name") or "").strip() or None,
+            author_bio=(r.get("author_bio") or "").strip() or None,
+            author_image_url=(r.get("author_image_url") or "").strip() or None,
+            diet_tags=tags_list,
+        )
+        db.add(recipe)
+        created.append(recipe)
+    db.commit()
+    for recipe in created:
+        try:
+            get_or_create_recipe_image(recipe, db)
+        except Exception:
+            pass
+    db.commit()
+    return created
