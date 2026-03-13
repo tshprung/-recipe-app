@@ -38,6 +38,8 @@ const COUNTRIES = [
   { code: 'IT', name: 'Italy' },
 ]
 
+const TRIAL_SETTINGS_KEY = 'trial_settings'
+
 const ALLERGENS = [
   { code: 'gluten_cereals', label: 'Gluten (cereals)' },
   { code: 'crustaceans', label: 'Crustaceans' },
@@ -118,28 +120,64 @@ export default function SettingsPage() {
 
   // Sync form from user when user loads/updates (fixes wrong default when user had e.g. English saved)
   useEffect(() => {
-    if (!user) return
-    setForm({
-      ui_language: user.ui_language ?? 'en',
-      target_language: user.target_language ?? 'pl',
-      target_country: user.target_country ?? 'PL',
-      target_city: user.target_city ?? 'Wrocław',
-      target_zip: user.target_zip ?? '',
-      dish_preferences: user.dish_preferences ?? [],
-      household_adults: user.household_adults ?? null,
-      household_kids: user.household_kids ?? null,
-      diet_filters: user.diet_filters ?? [],
-      default_servings: user.default_servings ?? 1,
-      allergens: user.allergens ?? [],
-      custom_allergens_text: user.custom_allergens_text ?? '',
-    })
-  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.allergens, user?.custom_allergens_text])
+    if (user) {
+      setForm({
+        ui_language: user.ui_language ?? 'en',
+        target_language: user.target_language ?? 'pl',
+        target_country: user.target_country ?? 'PL',
+        target_city: user.target_city ?? 'Wrocław',
+        target_zip: user.target_zip ?? '',
+        dish_preferences: user.dish_preferences ?? [],
+        household_adults: user.household_adults ?? null,
+        household_kids: user.household_kids ?? null,
+        diet_filters: user.diet_filters ?? [],
+        default_servings: user.default_servings ?? 1,
+        allergens: user.allergens ?? [],
+        custom_allergens_text: user.custom_allergens_text ?? '',
+      })
+      return
+    }
+    if (trialToken) {
+      try {
+        const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
+        if (raw) {
+          const saved = JSON.parse(raw)
+          setForm(prev => ({
+            ...prev,
+            ui_language: saved.ui_language ?? prev.ui_language,
+            target_language: saved.target_language ?? prev.target_language,
+            target_country: saved.target_country ?? prev.target_country,
+            target_city: saved.target_city ?? prev.target_city,
+            target_zip: saved.target_zip ?? prev.target_zip,
+            dish_preferences: Array.isArray(saved.dish_preferences) ? saved.dish_preferences : prev.dish_preferences,
+            household_adults: saved.household_adults ?? prev.household_adults,
+            household_kids: saved.household_kids ?? prev.household_kids,
+            diet_filters: Array.isArray(saved.diet_filters) ? saved.diet_filters : prev.diet_filters,
+            default_servings: saved.default_servings ?? prev.default_servings,
+            allergens: Array.isArray(saved.allergens) ? saved.allergens : prev.allergens,
+            custom_allergens_text: saved.custom_allergens_text ?? prev.custom_allergens_text,
+          }))
+        }
+      } catch (_) {}
+    }
+  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.allergens, user?.custom_allergens_text, trialToken])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
     setError('')
     try {
+      if (!user && trialToken) {
+        try {
+          localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(form))
+          if (form.ui_language && form.ui_language !== lang) setLang(form.ui_language)
+          localStorage.setItem('recipe-app-lang', form.ui_language || 'en')
+        } catch (_) {}
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2500)
+        setSaving(false)
+        return
+      }
       const updated = await api.patch('/users/me/settings', form)
       setUser(updated)
       if (updated?.ui_language && updated.ui_language !== lang) {

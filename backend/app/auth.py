@@ -88,13 +88,16 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") == "trial":
+            raise credentials_exception  # Trial token is not a user; return 401 instead of 500
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+        uid = int(user_id)
+    except (JWTError, ValueError, TypeError):
         raise credentials_exception
 
-    user = db.get(models.User, int(user_id))
+    user = db.get(models.User, uid)
     if user is None:
         raise credentials_exception
     if user.is_blocked:
