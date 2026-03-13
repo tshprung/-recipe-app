@@ -56,6 +56,16 @@ export default function Navbar() {
         >
           {t('whatCanIMakeNav')}
         </Link>
+        <Link
+          to="/discover"
+          className={`hidden sm:flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+            location.pathname === '/discover'
+              ? 'bg-amber-500/15 text-amber-300'
+              : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
+          }`}
+        >
+          {t('discover')}
+        </Link>
         </div>
 
         {/* Right side: touch-friendly min sizes, responsive gaps */}

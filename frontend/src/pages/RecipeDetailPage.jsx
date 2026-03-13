@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api, getRecipeImageUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useShoppingList } from '../context/ShoppingListContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
 
 const TAG_COLORS = [
@@ -95,12 +96,44 @@ function variantDisplayLabel(variantType, t) {
   return parts.map(p => t(variantLabelKey(p))).join(' + ')
 }
 
+/** Parse leading number from ingredient amount (e.g. "2", "1/2", "2 1/2 cups", "1.5") -> number or null */
+function parseAmountLeading(value) {
+  if (value == null) return null
+  const s = String(value).trim()
+  const match = s.match(/^(\d+)\s+(\d+)\/(\d+)|^(\d+)\/(\d+)|^(\d+(?:\.\d+)?)/)
+  if (!match) return null
+  if (match[1] !== undefined) return parseInt(match[1], 10) + parseInt(match[2], 10) / parseInt(match[3], 10)
+  if (match[4] !== undefined) return parseInt(match[4], 10) / parseInt(match[5], 10)
+  return parseFloat(match[6])
+}
+
+/** Scale ingredient line by factor; supports string or { amount, name } */
+function scaleIngredientLine(ing, factor) {
+  if (factor === 1) return ing
+  if (typeof ing === 'object' && ing !== null) {
+    const amount = ing.amount != null ? String(ing.amount).trim() : ''
+    const n = parseAmountLeading(amount)
+    if (n != null) {
+      const scaled = Math.round(n * factor * 100) / 100
+      return { ...ing, amount: String(scaled) }
+    }
+    return ing
+  }
+  const str = String(ing)
+  const n = parseAmountLeading(str)
+  if (n == null) return str
+  const scaled = Math.round(n * factor * 100) / 100
+  const rest = str.replace(/^[\d\s\/.]+/, '').trim()
+  return rest ? `${scaled} ${rest}` : String(scaled)
+}
+
 export default function RecipeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const { t } = useLanguage()
+  const { addRecipe: addRecipeToList, isInList: isRecipeOnList, actionLoadingId: listActionLoadingId } = useShoppingList()
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -130,6 +163,31 @@ export default function RecipeDetailPage() {
   const [uploadImageLoading, setUploadImageLoading] = useState(false)
   const [detailImageError, setDetailImageError] = useState(false)
   const fileInputRef = useRef(null)
+  const [displayServings, setDisplayServings] = useState(4)
+  const [myIngredientsText, setMyIngredientsText] = useState('')
+  const [matchResult, setMatchResult] = useState(null)
+  const [matchLoading, setMatchLoading] = useState(false)
+
+  function getBaseServings() {
+    if (recipe?.servings_override != null && recipe.servings_override >= 1) return recipe.servings_override
+    if (user?.default_servings != null && user.default_servings >= 1) return user.default_servings
+    if (!user && trialToken) {
+      try {
+        const raw = localStorage.getItem('trial_settings')
+        if (raw) {
+          const s = JSON.parse(raw)
+          const n = s?.default_servings
+          if (typeof n === 'number' && n >= 1) return n
+        }
+      } catch (_) {}
+    }
+    const fromNotes = recipe?.notes?.porcje
+    if (fromNotes != null) {
+      const n = parseInt(String(fromNotes).replace(/\D/g, ''), 10)
+      if (Number.isFinite(n) && n >= 1) return n
+    }
+    return 4
+  }
 
   useEffect(() => {
     // If we navigated here with a trial starter recipe (negative id) in location.state,
@@ -139,6 +197,8 @@ export default function RecipeDetailPage() {
       setRecipe(stateRecipe)
       setNotes(stateRecipe.user_notes ?? '')
       setVariants([])
+      const base = stateRecipe?.servings_override ?? user?.default_servings ?? 4
+      setDisplayServings(base)
       setLoading(false)
       return
     }
@@ -151,6 +211,22 @@ export default function RecipeDetailPage() {
         setRecipe(data)
         setNotes(data.user_notes ?? '')
         setVariants(variantData)
+        const base = data?.servings_override ?? user?.default_servings ?? (() => {
+          try {
+            const raw = localStorage.getItem('trial_settings')
+            if (raw) {
+              const s = JSON.parse(raw)
+              if (typeof s?.default_servings === 'number' && s.default_servings >= 1) return s.default_servings
+            }
+          } catch (_) {}
+          const fromNotes = data?.notes?.porcje
+          if (fromNotes != null) {
+            const n = parseInt(String(fromNotes).replace(/\D/g, ''), 10)
+            if (Number.isFinite(n) && n >= 1) return n
+          }
+          return 4
+        })()
+        setDisplayServings(base)
       })
       .catch(e => setError(e.message || t('recipeNotFound')))
       .finally(() => setLoading(false))
@@ -193,6 +269,35 @@ export default function RecipeDetailPage() {
       setRecipe(updated)
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  async function handleSaveServingsAsDefault() {
+    try {
+      const updated = await api.patch(`/recipes/${id}/meta`, { servings_override: displayServings })
+      setRecipe(updated)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  async function handleCheckIngredients() {
+    const list = myIngredientsText
+      .split(/[\n,]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+    setMatchLoading(true)
+    setMatchResult(null)
+    try {
+      const data = await api.post(`/recipes/${id}/ingredient-match`, {
+        ingredients: list,
+        assume_pantry: true,
+      })
+      setMatchResult(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setMatchLoading(false)
     }
   }
 
@@ -383,6 +488,10 @@ export default function RecipeDetailPage() {
   const contentTags      = activeTab === 'original' ? detectContentTags(recipe.ingredients_pl) : []
   const variantWarnings  = activeTab !== 'original' ? (displayData?.notes?.ostrzeżenia ?? []) : []
   const adaptationSummary = activeTab !== 'original' ? (displayData?.notes?.adaptation_summary ?? '') : ''
+
+  const baseServings = getBaseServings()
+  const servingsFactor = baseServings > 0 ? displayServings / baseServings : 1
+  const scaledIngredients = (displayData?.ingredients_pl ?? []).map(ing => scaleIngredientLine(ing, servingsFactor))
 
   return (
     <div className="max-w-2xl mx-auto pb-16">
@@ -635,9 +744,40 @@ export default function RecipeDetailPage() {
             </div>
           )}
 
-          {/* Time + rating — fast glance for busy cooks */}
+          {/* Servings + Time + rating — fast glance for busy cooks */}
           {activeTab === 'original' && (
             <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-stone-500">{t('servings')}</span>
+                <div className="flex items-center gap-1 rounded-xl border border-stone-200 bg-stone-50 px-2 py-1">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayServings(s => Math.max(1, s - 1))}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-stone-600 hover:bg-stone-200 transition-colors"
+                    aria-label="Decrease servings"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-[2ch] text-center text-sm font-semibold text-stone-800">{displayServings}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayServings(s => Math.min(24, s + 1))}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-stone-600 hover:bg-stone-200 transition-colors"
+                    aria-label="Increase servings"
+                  >
+                    +
+                  </button>
+                </div>
+                {(recipe.servings_override != null ? recipe.servings_override !== displayServings : getBaseServings() !== displayServings) && (
+                  <button
+                    type="button"
+                    onClick={handleSaveServingsAsDefault}
+                    className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:underline"
+                  >
+                    {t('saveServingsAsDefault')}
+                  </button>
+                )}
+              </div>
               {(() => {
                 const prep = recipe.prep_time_minutes
                 const cook = recipe.cook_time_minutes
@@ -951,6 +1091,53 @@ export default function RecipeDetailPage() {
       {/* Ingredients */}
       {hasIngredients && (
         <Section title={t('ingredients')} icon="🧅">
+          {recipe?.id > 0 && (
+            <div className="mb-4 p-4 rounded-2xl border border-stone-200 bg-stone-50">
+              <label className="block text-xs font-semibold text-stone-600 mb-1.5">{t('ingredientsIHave')}</label>
+              <textarea
+                value={myIngredientsText}
+                onChange={e => setMyIngredientsText(e.target.value)}
+                placeholder={t('ingredientsIHavePlaceholder')}
+                rows={2}
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCheckIngredients}
+                  disabled={matchLoading}
+                  className="text-sm font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {matchLoading ? '…' : t('checkIngredients')}
+                </button>
+                {matchResult && (
+                  <>
+                    <span className="text-sm text-stone-600">
+                      {t('youHaveOfIngredients', { have: matchResult.have_count, need: matchResult.need_count })}
+                    </span>
+                    {isRecipeOnList(recipe.id) ? (
+                      <span className="text-xs text-stone-500">{t('onShoppingList')}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => addRecipeToList(recipe.id)}
+                        disabled={listActionLoadingId === recipe.id}
+                        className="text-sm font-medium text-amber-600 hover:text-amber-700 underline disabled:opacity-50"
+                      >
+                        {t('addRecipeToShoppingList')}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              {matchResult?.missing_ingredients?.length > 0 && (
+                <p className="mt-2 text-xs text-stone-500">
+                  Missing: {matchResult.missing_ingredients.slice(0, 8).join(', ')}
+                  {matchResult.missing_ingredients.length > 8 ? ` +${matchResult.missing_ingredients.length - 8} more` : ''}
+                </p>
+              )}
+            </div>
+          )}
           <Card>
             <div className="mb-3 pb-3 border-b border-stone-100">
               <p className="text-xs text-stone-500">
@@ -963,7 +1150,7 @@ export default function RecipeDetailPage() {
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">Translated</span>
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wide text-right">עברית</span>
                 </div>
-                {recipe.ingredients_pl.map((ing, i) => {
+                {scaledIngredients.map((ing, i) => {
                   const pl = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
                   const orig = recipe.ingredients_original?.[i]
                   const he = orig ? (typeof orig === 'object' ? `${orig.amount ?? ''} ${orig.name ?? ''}`.trim() : orig) : ''
@@ -990,7 +1177,7 @@ export default function RecipeDetailPage() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {displayData.ingredients_pl.map((ing, i) => {
+                {scaledIngredients.map((ing, i) => {
                   const label = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
                   return (
                     <li key={i} className="flex items-start gap-3 text-sm text-stone-700 py-1 border-b border-stone-50 last:border-0">

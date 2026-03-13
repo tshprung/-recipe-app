@@ -77,6 +77,7 @@ class Recipe(Base):
     ingredients_original: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     steps_pl: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    collections: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # user-defined e.g. ["Weeknight", "Kids"]
     substitutions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     notes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
@@ -96,6 +97,8 @@ class Recipe(Base):
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cook_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Per-recipe servings override; if null, use user default_servings for display/scaling
+    servings_override: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Recipe photo (dish image); filled by image service (cache or generate)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

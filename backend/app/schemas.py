@@ -298,6 +298,8 @@ class RecipeOut(BaseModel):
     user_rating: int | None = None
     diet_tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
+    servings_override: int | None = None
+    collections: list[str] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -306,6 +308,7 @@ class RecipeMetaUpdate(BaseModel):
     rating: int | None = Field(default=None, ge=1, le=5)
     prep_time_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
     cook_time_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
+    servings_override: int | None = Field(default=None, ge=1, le=24)
 
 
 class RecipeUserNotesUpdate(BaseModel):
@@ -314,6 +317,27 @@ class RecipeUserNotesUpdate(BaseModel):
 
 class RecipeFavoriteUpdate(BaseModel):
     is_favorite: bool
+
+
+class RecipeCollectionsUpdate(BaseModel):
+    collections: list[str] = Field(default_factory=list)  # e.g. ["Weeknight dinners", "Kids"]
+
+
+class RecipeCollectionsListOut(BaseModel):
+    collections: list[str]
+
+
+# --- Recipe ingredient match (have vs need) ---
+
+class RecipeIngredientMatchRequest(BaseModel):
+    ingredients: list[str] = Field(default_factory=list)
+    assume_pantry: bool = True
+
+
+class RecipeIngredientMatchOut(BaseModel):
+    have_count: int
+    need_count: int
+    missing_ingredients: list[str]
 
 
 # --- Shopping List ---
@@ -414,6 +438,17 @@ class AISuggestedRecipeOut(BaseModel):
 class WhatCanIMakeAIOut(BaseModel):
     source: str = "ai"
     suggestions: list[AISuggestedRecipeOut]
+
+
+class DiscoverRequest(BaseModel):
+    dish_types: list[str] | None = None  # e.g. ["pasta", "salads"]
+    diet_filters: list[str] | None = None  # e.g. ["vegetarian", "vegan"]
+    max_time_minutes: int | None = None  # e.g. 30, 60
+
+
+class DiscoverOut(BaseModel):
+    suggestions: list[AISuggestedRecipeOut]
+    remaining_actions: int | None = None  # trial only; for frontend sync
 
 
 class FromAISuggestionRequest(BaseModel):

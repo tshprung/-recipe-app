@@ -123,3 +123,89 @@ def suggest_recipe_from_ingredients(
         "steps": [str(x).strip() for x in data.get("steps", []) if x],
         "missing_ingredients": [str(x).strip() for x in data.get("missing_ingredients", []) if x],
     }
+
+
+DISCOVER_SYSTEM_PROMPT = """\
+You suggest 1 or 2 recipes that match the user's preferences (dish type, diet, max time).
+Output valid JSON only — no markdown, no prose.
+Return a list of recipes; each recipe has title, ingredients (list of strings), and steps (list of strings).
+Respect diet restrictions. Keep recipes practical and easy to follow.
+"""
+
+DISCOVER_USER_TEMPLATE = """\
+Dish types they like: {dish_list}
+Diet filters: {diet_list}
+Maximum total time in minutes (optional): {max_time}
+
+Output language: {output_lang}
+
+Return exactly this JSON (1 or 2 recipes):
+{{
+  "recipes": [
+    {{ "title": "<recipe title in {output_lang}>", "ingredients": ["...", "..."], "steps": ["...", "..."] }},
+    ...
+  ]
+}}
+"""
+
+
+def suggest_recipes_from_preferences(
+    dish_types: list[str] | None = None,
+    diet_filters: list[str] | None = None,
+    max_time_minutes: int | None = None,
+    target_language: str = "en",
+) -> list[dict]:
+    """
+    Return 1-2 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
+    Raises RuntimeError on missing API key or rate limit.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
+    dish_list = ", ".join((s or "").strip() for s in (dish_types or []) if (s or "").strip()) or "any"
+    diet_list = ", ".join((s or "").strip() for s in (diet_filters or []) if (s or "").strip()) or "none"
+    max_time = str(max_time_minutes) if max_time_minutes and max_time_minutes > 0 else "no limit"
+    output_lang = _output_lang_name(target_language)
+    prompt = DISCOVER_USER_TEMPLATE.format(
+        dish_list=dish_list,
+        diet_list=diet_list,
+        max_time=max_time,
+        output_lang=output_lang,
+    )
+    client = OpenAI(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": DISCOVER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=1500,
+            temperature=0.5,
+        )
+    except RateLimitError as e:
+        raise RuntimeError("OpenAI rate limit exceeded, please try again later.") from e
+    except APIError as e:
+        msg = str(e)
+        if "insufficient_quota" in msg or "exceeded your current quota" in msg:
+            raise RuntimeError("OpenAI quota exceeded.") from e
+        raise
+    content = response.choices[0].message.content
+    if not content:
+        return []
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+    recipes = data.get("recipes") or data.get("suggestions") or []
+    out = []
+    for r in recipes[:2]:
+        if isinstance(r, dict) and r.get("title"):
+            out.append({
+                "title": str(r.get("title", "")).strip(),
+                "ingredients": [str(x).strip() for x in r.get("ingredients", []) if x],
+                "steps": [str(x).strip() for x in r.get("steps", []) if x],
+                "missing_ingredients": None,
+            })
+    return out

@@ -5,7 +5,6 @@ import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
-const ONBOARDING_STORAGE_KEY = 'onboarding_claim'
 
 const COLORS = { bg: '#111111', card: '#1c1c1c', text: '#F8F8F6', accent: '#8FAF8F', secondary: '#C96A4A' }
 
@@ -66,6 +65,20 @@ const DIET_OPTIONS = [
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
 
+/** Shown while starter recipes are prepared after registration (product, hints, tips). */
+const REGISTER_LOADING_SENTENCES = [
+  'Preparing your 3 starter recipes for your region and diet…',
+  'This app uses AI to adapt any recipe to your language and dietary needs.',
+  'Tip: Paste a recipe URL and we’ll translate and organize it in your cookbook.',
+  'You can adapt any recipe to vegan, kosher, gluten-free, and more with one tap.',
+  'Use “What can I make?” to get suggestions from ingredients you have at home.',
+  'Your recipes stay in one place — scale servings, save favorites, and add notes.',
+  'Starter recipes are from famous cooks and tailored to your country and language.',
+  'Tip: Add recipes from blogs or sites — we extract the recipe and add it for you.',
+  'Diet filters (e.g. Kosher, vegan) are applied when we suggest and adapt recipes.',
+  'Almost there…',
+]
+
 const defaultOnboarding = () => ({
   target_country: 'PL',
   target_language: 'en',
@@ -87,8 +100,6 @@ export default function OnboardingPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [data, setData] = useState(defaultOnboarding)
-  const [claimToken, setClaimToken] = useState(null)
-  const [prepareError, setPrepareError] = useState(null)
   const [authTab, setAuthTab] = useState('register')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -102,9 +113,20 @@ export default function OnboardingPage() {
   const turnstileWidgetIdRef = useRef(null)
   const [locationDetecting, setLocationDetecting] = useState(false)
   const [locationError, setLocationError] = useState(null)
-  const [prepareLoading, setPrepareLoading] = useState(false)
+  const [postRegisterPreparing, setPostRegisterPreparing] = useState(false)
+  const [loadingSentenceIndex, setLoadingSentenceIndex] = useState(0)
 
   const set = (key) => (value) => setData((d) => ({ ...d, [key]: value }))
+
+  // Rotate sentence every 3.5s while post-register preparing
+  useEffect(() => {
+    if (!postRegisterPreparing) return
+    setLoadingSentenceIndex(0)
+    const interval = setInterval(() => {
+      setLoadingSentenceIndex((i) => (i + 1) % REGISTER_LOADING_SENTENCES.length)
+    }, 3500)
+    return () => clearInterval(interval)
+  }, [postRegisterPreparing])
 
   // Step 1: try geo on mount to pre-fill location
   useEffect(() => {
@@ -200,24 +222,6 @@ export default function OnboardingPage() {
     }))
   }
 
-  function buildClaimPayload() {
-    return {
-      claim_token: claimToken,
-      ui_language: data.ui_language,
-      target_language: data.target_language,
-      target_country: data.target_country,
-      target_city: data.target_city || null,
-      target_zip: data.target_zip || null,
-      dish_preferences: data.dish_preferences,
-      household_adults: data.household_adults,
-      household_kids: data.household_kids,
-      diet_filters: data.diet_filters,
-      default_servings: data.default_servings,
-      allergens: data.allergens,
-      custom_allergens_text: data.custom_allergens_text || null,
-    }
-  }
-
   async function handleAuthSubmit(e) {
     e.preventDefault()
     setAuthError('')
@@ -235,6 +239,7 @@ export default function OnboardingPage() {
     try {
       if (authTab === 'login') {
         await login(email, password, rememberMe)
+        navigate('/', { replace: true })
       } else {
         const settings = {
           ui_language: data.ui_language,
@@ -252,14 +257,17 @@ export default function OnboardingPage() {
         }
         await register(email, password, turnstileToken || null, settings, rememberMe)
         if (authTab === 'register') alert(t('verificationEmailSent'))
-      }
-      if (claimToken) {
+        // Prepare starter recipes only after account exists; show spinner + rotating sentences
+        setAuthLoading(false)
+        setPostRegisterPreparing(true)
         try {
-          await api.post('/users/me/claim-starter-recipes', buildClaimPayload())
+          await api.post('/users/me/fetch-starter-recipes')
           await refreshUser?.()
-        } catch (_) {}
+        } catch (_) {
+          // Non-blocking: user can fetch from Settings later
+        }
+        navigate('/', { replace: true })
       }
-      navigate('/', { replace: true })
     } catch (err) {
       setAuthError(err.message)
     } finally {
@@ -268,11 +276,7 @@ export default function OnboardingPage() {
   }
 
   function handleOAuthClick(provider) {
-    if (claimToken) {
-      try {
-        sessionStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(buildClaimPayload()))
-      } catch (_) {}
-    }
+    // No claim token anymore — we prepare recipes after register. OAuth users can fetch from Settings if needed.
     window.location.href = `${API_BASE}/auth/${provider}`
   }
 
@@ -280,6 +284,28 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: COLORS.bg, color: COLORS.text }}>
+      {/* Post-register: preparing starter recipes — spinner + rotating sentences */}
+      {postRegisterPreparing && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 px-4"
+          style={{ backgroundColor: 'rgba(17,17,17,0.96)' }}
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <span
+            className="inline-block w-10 h-10 rounded-full border-2 border-white border-t-transparent animate-spin"
+            aria-hidden
+          />
+          <p
+            key={loadingSentenceIndex}
+            className="text-center text-white/90 text-lg sm:text-xl max-w-md transition-opacity duration-300"
+            style={{ minHeight: '2.5rem' }}
+          >
+            {REGISTER_LOADING_SENTENCES[loadingSentenceIndex]}
+          </p>
+        </div>
+      )}
+
       <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-[30%] -left-48 h-[480px] w-[480px] rounded-full blur-3xl" style={{ backgroundColor: COLORS.accent, opacity: 0.08 }} />
         <div className="absolute -bottom-40 right-[-120px] h-[520px] w-[520px] rounded-full blur-3xl" style={{ backgroundColor: COLORS.secondary, opacity: 0.06 }} />
@@ -381,8 +407,7 @@ export default function OnboardingPage() {
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-white/95">Household & diet</h1>
-              <p className="text-white/60 text-sm mt-1">All optional — we’ll use this to tailor recipes and servings. Your diet choices (e.g. Kosher) will be applied to your 3 starter recipes.</p>
-              {prepareError && <p className="text-amber-400 text-xs mt-2">{prepareError}</p>}
+              <p className="text-white/60 text-sm mt-1">All optional — we’ll use this to tailor recipes and servings. After you create an account, we’ll add 3 starter recipes and apply your diet (e.g. Kosher) to them.</p>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -473,40 +498,17 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                disabled={prepareLoading}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white ring-1 ring-white/10 hover:ring-white/20 transition disabled:opacity-50"
+                className="rounded-xl px-4 py-2.5 text-sm font-medium text-white/70 hover:text-white ring-1 ring-white/10 hover:ring-white/20 transition"
               >
                 Back
               </button>
               <button
                 type="button"
-                disabled={prepareLoading}
-                onClick={async () => {
-                  setPrepareError(null)
-                  setPrepareLoading(true)
-                  try {
-                    const payload = {
-                      target_country: data.target_country,
-                      target_language: data.target_language,
-                      target_city: data.target_city || null,
-                      target_zip: data.target_zip || null,
-                      dish_preferences: data.dish_preferences || [],
-                      diet_filters: data.diet_filters || [],
-                      default_servings: data.default_servings ?? 4,
-                    }
-                    const res = await api.post('/onboarding/prepare-starter-recipes', payload)
-                    setClaimToken(res.claim_token)
-                    setStep(3)
-                  } catch (e) {
-                    setPrepareError(e?.message || 'Could not prepare recipes. You can still sign in and add recipes from Settings.')
-                  } finally {
-                    setPrepareLoading(false)
-                  }
-                }}
-                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-stone-900 shadow transition hover:opacity-95 disabled:opacity-50"
+                onClick={() => setStep(3)}
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-stone-900 shadow transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                {prepareLoading ? 'Preparing your recipes…' : 'Next'}
+                Next
               </button>
             </div>
           </>

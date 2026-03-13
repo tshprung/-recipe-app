@@ -15,7 +15,7 @@ from ..services.adaptation import adapt_recipe
 from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.recipe_image import save_user_upload
 from ..services.translation import translate_recipe
-from ..services.what_can_i_make_ai import suggest_recipe_from_ingredients
+from ..services.what_can_i_make_ai import suggest_recipe_from_ingredients, suggest_recipes_from_preferences
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -281,6 +281,7 @@ def _recipe_matches_query(recipe: models.Recipe, q: str) -> bool:
 @router.get("/", response_model=list[schemas.RecipeOut])
 def list_recipes(
     q: str | None = None,
+    collection: str | None = None,
     db: Session = Depends(get_db),
     user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
@@ -293,7 +294,31 @@ def list_recipes(
         recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == trial_session.id).all()
     if q and q.strip():
         recipes = [r for r in recipes if _recipe_matches_query(r, q)]
+    if collection and collection.strip():
+        coll = collection.strip().lower()
+        recipes = [r for r in recipes if (r.collections or []) and any((c or "").strip().lower() == coll for c in r.collections)]
     return recipes
+
+
+@router.get("/collections", response_model=schemas.RecipeCollectionsListOut)
+def list_collections(
+    db: Session = Depends(get_db),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
+):
+    """Return distinct collection names from the user's (or trial's) recipes."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if current_user is not None:
+        recipes = db.query(models.Recipe).filter(models.Recipe.user_id == current_user.id).all()
+    else:
+        recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == trial_session.id).all()
+    names: set[str] = set()
+    for r in recipes:
+        for c in (r.collections or []):
+            if isinstance(c, str) and c.strip():
+                names.add(c.strip())
+    return schemas.RecipeCollectionsListOut(collections=sorted(names))
 
 
 # Common pantry items assumed if assume_pantry is True (lowercase for matching)
@@ -442,6 +467,53 @@ def what_can_i_make(
     return schemas.WhatCanIMakeMyRecipesOut(source="my_recipes", matches=matches)
 
 
+@router.post("/discover", response_model=schemas.DiscoverOut)
+def discover_recipes(
+    payload: schemas.DiscoverRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User | None = Depends(get_current_user_optional),
+):
+    """Return 1-2 AI-suggested recipes based on dish type, diet, and optional max time. Consumes quota."""
+    trial_session = enforce_trial_or_user_quota(request, db, current_user)
+    if current_user is not None and not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email before using the app.",
+        )
+    if current_user is not None:
+        user_for_update = (
+            db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+        )
+        if not _has_unlimited_quota(current_user):
+            user_for_update.transformations_used += 1
+        db.commit()
+    if current_user is not None:
+        target_lang = (current_user.target_language or "").strip() or "en"
+    else:
+        target_lang = (trial_session.language or "").strip() or "en"
+    try:
+        recipes = suggest_recipes_from_preferences(
+            dish_types=payload.dish_types or None,
+            diet_filters=payload.diet_filters or None,
+            max_time_minutes=payload.max_time_minutes,
+            target_language=target_lang,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    out = schemas.DiscoverOut(
+        suggestions=[schemas.AISuggestedRecipeOut(
+            title=r["title"],
+            ingredients=r["ingredients"],
+            steps=r["steps"],
+            missing_ingredients=r.get("missing_ingredients"),
+        ) for r in recipes],
+    )
+    if trial_session is not None:
+        out.remaining_actions = MAX_TRIAL_ACTIONS - trial_session.used_actions
+    return out
+
+
 def _what_can_i_make_ai(
     payload: schemas.WhatCanIMakeRequest,
     current_user: models.User | None,
@@ -512,6 +584,33 @@ def get_recipe(
     if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
     return recipe
+
+
+@router.post("/{recipe_id}/ingredient-match", response_model=schemas.RecipeIngredientMatchOut)
+def recipe_ingredient_match(
+    recipe_id: int,
+    payload: schemas.RecipeIngredientMatchRequest,
+    db: Session = Depends(get_db),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
+):
+    """Given a recipe and a list of ingredients the user has, return have_count, need_count, and missing_ingredients."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    lines = _recipe_ingredient_lines(recipe)
+    if not lines:
+        return schemas.RecipeIngredientMatchOut(have_count=0, need_count=0, missing_ingredients=[])
+    user_set = _user_ingredients_set(payload.ingredients or [], payload.assume_pantry)
+    missing = [line for line in lines if not _ingredient_matches_user(line, user_set)]
+    have_count = len(lines) - len(missing)
+    return schemas.RecipeIngredientMatchOut(
+        have_count=have_count,
+        need_count=len(lines),
+        missing_ingredients=missing,
+    )
 
 
 _MAX_IMAGE_UPLOAD_BYTES = 3 * 1024 * 1024  # 3 MB
@@ -638,7 +737,28 @@ def update_recipe_meta(
         recipe.prep_time_minutes = updates["prep_time_minutes"]
     if "cook_time_minutes" in updates:
         recipe.cook_time_minutes = updates["cook_time_minutes"]
+    if "servings_override" in updates:
+        recipe.servings_override = updates["servings_override"]
 
+    db.commit()
+    db.refresh(recipe)
+    return recipe
+
+
+@router.patch("/{recipe_id}/collections", response_model=schemas.RecipeOut)
+def update_recipe_collections(
+    recipe_id: int,
+    payload: schemas.RecipeCollectionsUpdate,
+    db: Session = Depends(get_db),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
+):
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    recipe = db.get(models.Recipe, recipe_id)
+    if not recipe or not _recipe_owned_by(recipe, current_user, trial_session):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipe not found")
+    recipe.collections = [str(c).strip() for c in (payload.collections or []) if str(c).strip()]
     db.commit()
     db.refresh(recipe)
     return recipe
