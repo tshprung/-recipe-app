@@ -7,12 +7,41 @@ from openai import APIError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-# Temporary: borrowed dish images for the 3 starter slots (soup/main/dessert-style). No rights; replace with proper assets later.
-STARTER_IMAGE_URLS = [
-    "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=70",  # soup
-    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=70",  # main
-    "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=600&q=70",  # dessert/salad
+# Temporary: borrowed dish images by type so each starter recipe gets a matching image. No rights; replace with proper assets later.
+# Keys: "soup" (soups, stews, broths), "main" (main courses, dumplings, meat), "dessert" (desserts, cakes, salads).
+STARTER_IMAGE_BY_TYPE = {
+    "soup": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=70",  # soup bowl
+    "main": "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=600&q=70",  # main dish / pasta
+    "dessert": "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=600&q=70",  # dessert/cake
+}
+# Fallback order when type is ambiguous (soup, main, dessert).
+STARTER_IMAGE_URLS_FALLBACK = [
+    STARTER_IMAGE_BY_TYPE["soup"],
+    STARTER_IMAGE_BY_TYPE["main"],
+    STARTER_IMAGE_BY_TYPE["dessert"],
 ]
+
+
+def _recipe_dish_type(title: str, tags: list) -> str:
+    """Classify recipe as 'soup', 'main', or 'dessert' from title and tags for better image matching."""
+    text = " ".join([(title or "").lower()] + [str(t).lower() for t in (tags or [])])
+    # Soup/stew: zupa, soup, stew, bigos, broth, barszcz, rosół, etc.
+    soup_keywords = [
+        "soup", "zupa", "stew", "bigos", "broth", "barszcz", "rosół", "suppe", "soep",
+        "sopa", "soupe", "zuppa",
+    ]
+    if any(k in text for k in soup_keywords):
+        return "soup"
+    # Dessert/salad/cake: dessert, cake, sernik, ciasto, salad, sałatka, deser, tort, etc.
+    # Avoid short tokens that match other dishes (e.g. "pie" matches "pierogi").
+    dessert_keywords = [
+        "dessert", "cake", "sernik", "ciasto", "salad", "sałatka", "deser", "tort", "cookie",
+        "cookies", "sweet", "ice cream", "lody", "fruit salad", "salat", "kuchen", "torta",
+        "cheesecake", "ciastko", "cobbler", "brownie",
+    ]
+    if any(k in text for k in dessert_keywords):
+        return "dessert"
+    return "main"
 
 SYSTEM_PROMPT = """\
 You return exactly 3 classic recipes from well-known cooks or chefs of the given country.
@@ -285,7 +314,8 @@ def add_starter_recipes_to_user(
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
-        image_url = STARTER_IMAGE_URLS[idx] if idx < len(STARTER_IMAGE_URLS) else None
+        dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
+        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=user.id,
             title_pl=title,
@@ -332,7 +362,8 @@ def add_starter_recipes_to_trial_session(trial_session, recipes_data: list[dict]
             + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
         )
         tags_list = [str(x).strip() for x in r.get("tags", []) if x and str(x).strip()][:10]
-        image_url = STARTER_IMAGE_URLS[idx] if idx < len(STARTER_IMAGE_URLS) else None
+        dish_type = _recipe_dish_type(r.get("title") or "", tags_list)
+        image_url = STARTER_IMAGE_BY_TYPE.get(dish_type) or STARTER_IMAGE_URLS_FALLBACK[idx % 3]
         recipe = models.Recipe(
             user_id=None,
             trial_session_id=trial_session.id,
