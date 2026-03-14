@@ -354,6 +354,97 @@ def test_extract_recipes_from_page_returns_two_when_model_returns_two():
     assert result[1]["instructions"] == ["step 1", "step 2"]
 
 
+# Page text that mimics mako.co.il style: two distinct recipes (pancakes + fruit salad).
+# Each has its own title, מרכיבים (ingredients), and הוראות (instructions).
+TWO_RECIPE_MAKO_STYLE_PAGE = """
+פנקייק יוגורט
+מרכיבים:
+2 ביצים
+200 מ"ל חלב
+150 גרם קמח
+1 כפית אבקת אפייה
+ספריי שמן לטיגון
+הוראות:
+מערבבים את הביצים והחלב. מוסיפים קמח ואבקת אפייה. מטגנים במחבת עם שמן.
+
+סלט פירות
+מרכיבים:
+חצי מלון קלוף וחתוך לקוביות
+חצי אננס קלוף וחתוך לקוביות
+אשכול ענבים חצויים
+חופן עלי נענע קצוצים
+הוראות:
+מערבבים בקערה את כל הפירות. מוסיפים נענע ומשהים כחצי שעה.
+"""
+
+
+def test_extract_recipes_splits_mako_style_two_recipes_with_heuristic():
+    """When model returns 1 merged recipe but page has two מרכיבים blocks, heuristic splits and re-extracts → 2 recipes."""
+    from app.services.translation import extract_recipes_from_page
+
+    # First call (full page): model returns 1 merged recipe. Second/third (chunks): each returns 1 recipe.
+    merged = {
+        "recipes": [
+            {
+                "title": "פנקייק יוגורט",
+                "ingredients": ["ביצים", "חלב", "קמח", "מלון", "אננס"],
+                "instructions": ["מערבבים", "מטגנים", "מערבבים פירות"],
+            }
+        ]
+    }
+    pancake = {
+        "recipes": [
+            {"title": "פנקייק יוגורט", "ingredients": ["ביצים", "חלב", "קמח"], "instructions": ["מערבבים", "מטגנים"]}
+        ]
+    }
+    fruit_salad = {
+        "recipes": [
+            {"title": "סלט פירות", "ingredients": ["מלון", "אננס", "ענבים"], "instructions": ["מערבבים בקערה"]}
+        ]
+    }
+    call_responses = [merged, pancake, fruit_salad]
+    call_count = [0]
+
+    def create_mock(content):
+        mock = MagicMock()
+        mock.choices = [MagicMock(message=MagicMock(content=content))]
+        return mock
+
+    def fake_create(*args, **kwargs):
+        idx = min(call_count[0], len(call_responses) - 1)
+        call_count[0] += 1
+        return create_mock(json.dumps(call_responses[idx]))
+
+    with patch("app.services.translation.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = fake_create
+        mock_openai.return_value = mock_client
+        result = extract_recipes_from_page(TWO_RECIPE_MAKO_STYLE_PAGE)
+    assert len(result) >= 2, (
+        f"Heuristic should split page with two מרכיבים blocks and return 2 recipes, got {len(result)}"
+    )
+    titles = [r["title"] for r in result]
+    assert len(titles) == len(set(titles)), "Recipe titles must be distinct"
+
+
+def test_extract_recipes_splits_mako_style_two_recipes_integration():
+    """Integration: real API on mako-style page should yield 2 recipes (skipped if no valid OPENAI_API_KEY)."""
+    import os
+    import pytest
+    from app.services.translation import extract_recipes_from_page
+
+    key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not key or key.startswith("test-"):
+        pytest.skip("OPENAI_API_KEY not set or placeholder (set real key to run integration)")
+    result = extract_recipes_from_page(TWO_RECIPE_MAKO_STYLE_PAGE)
+    assert len(result) >= 2, (
+        f"Expected at least 2 recipes from mako-style page (pancakes + fruit salad), got {len(result)}. "
+        "Extractor should not merge two distinct recipes into one."
+    )
+    titles = [r["title"] for r in result]
+    assert len(titles) == len(set(titles)), "Recipe titles must be distinct"
+
+
 def test_create_recipe_calls_translate_with_user_target_settings(client, auth_headers):
     """Translation is called with user's target_language, target_country, target_city."""
     with patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED) as mock_translate:

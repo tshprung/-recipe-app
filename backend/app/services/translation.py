@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 from openai import APIError, OpenAI, RateLimitError
 
@@ -241,6 +242,42 @@ If you see "Recipe A" with ingredients and steps, then "Recipe B" with different
 ]
 Verify each recipe has both ingredients and instructions before including. If none found, return []."""
 
+# Markers that start an ingredients section (Hebrew mako, English, etc.). Used to detect multiple recipes.
+_RECIPE_INGREDIENTS_MARKERS = re.compile(
+    r"(\n|^)\s*(מרכיבים|Ingredients|Składniki)(\s*:|[\s\n])",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _count_ingredient_sections(page_text: str) -> int:
+    """Return how many times an ingredients-section marker appears (e.g. מרכיבים, Ingredients)."""
+    if not (page_text or "").strip():
+        return 0
+    return len(_RECIPE_INGREDIENTS_MARKERS.findall(page_text))
+
+
+def _split_page_at_second_ingredients_block(page_text: str) -> list[str] | None:
+    """
+    If the page has at least two ingredients blocks, split into two chunks so each chunk
+    contains one recipe (title + מרכיבים + הוראות). Returns [chunk1, chunk2] or None.
+    """
+    if not (page_text or "").strip():
+        return None
+    matches = list(_RECIPE_INGREDIENTS_MARKERS.finditer(page_text))
+    if len(matches) < 2:
+        return None
+    # Start of second ingredients block
+    second_start = matches[1].start()
+    # Include the line before second block as the second recipe's title
+    before_second = page_text[:second_start]
+    line_start = before_second.rfind("\n") + 1
+    title_line = before_second[line_start:].strip()
+    chunk1 = page_text[:second_start].strip()
+    chunk2 = (title_line + "\n\n" + page_text[second_start:].strip()) if title_line else page_text[second_start:].strip()
+    if not chunk1 or not chunk2:
+        return None
+    return [chunk1, chunk2]
+
 
 def extract_recipes_from_page(page_text: str) -> list[dict]:
     """
@@ -292,6 +329,14 @@ def extract_recipes_from_page(page_text: str) -> list[dict]:
             if not ingredients or not instructions:
                 continue
             out.append({"title": title, "ingredients": ingredients, "instructions": instructions})
+        # Heuristic: model sometimes merges two recipes (e.g. mako פנקייק + סלט פירות). If we got
+        # one recipe but the page has two ingredients blocks, split and re-extract each part.
+        if len(out) == 1 and _count_ingredient_sections(text) >= 2:
+            chunks = _split_page_at_second_ingredients_block(text)
+            if chunks:
+                out = []
+                for chunk in chunks:
+                    out.extend(extract_recipes_from_page(chunk))
         return out
     except (json.JSONDecodeError, KeyError, TypeError):
         return []
