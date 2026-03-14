@@ -410,16 +410,41 @@ export default function RecipeListPage() {
             {t('allRecipes')}
           </button>
           {collectionList.map(c => (
-            <button
+            <span
               key={c}
-              type="button"
-              onClick={() => setSelectedCollection(c)}
-              className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`inline-flex items-center rounded-xl overflow-hidden border border-transparent focus-within:ring-2 focus-within:ring-amber-400 ${
                 selectedCollection === c ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
               }`}
             >
-              {c}
-            </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCollection(c)}
+                className="min-h-[36px] px-3 py-1.5 text-sm font-medium"
+              >
+                {c}
+              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(t('deleteCollectionConfirm', { name: c }))) return
+                    api.post('/recipes/collections/remove', { name: c }).then(() => {
+                      setCollectionList(prev => prev.filter(x => x !== c))
+                      if (selectedCollection === c) setSelectedCollection(null)
+                      fetchRecipes(selectedCollection === c ? null : selectedCollection)
+                      showToast(t('collectionDeleted'))
+                    }).catch(err => showToast(err.message || t('collectionDeleteError')))
+                  }}
+                  className={`min-h-[36px] px-2 py-1.5 transition-colors ${
+                    selectedCollection === c ? 'text-white/80 hover:bg-white/20' : 'text-stone-400 hover:text-red-600 hover:bg-red-50'
+                  }`}
+                  aria-label={t('deleteCollection')}
+                  title={t('deleteCollection')}
+                >
+                  🗑
+                </button>
+              )}
+            </span>
           ))}
           {user && (
             <form onSubmit={handleCreateCollection} className="inline-flex gap-2 items-center">

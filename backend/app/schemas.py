@@ -332,6 +332,11 @@ class RecipeCollectionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
 
 
+class RecipeCollectionRemove(BaseModel):
+    """Remove a collection by name; removes it from all user recipes and from filter_names."""
+    name: str = Field(..., min_length=1, max_length=120)
+
+
 # --- Recipe ingredient match (have vs need) ---
 
 class RecipeIngredientMatchRequest(BaseModel):

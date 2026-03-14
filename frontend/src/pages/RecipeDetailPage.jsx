@@ -72,6 +72,8 @@ export default function RecipeDetailPage() {
   const [matchLoading, setMatchLoading] = useState(false)
   const [collectionList, setCollectionList] = useState([])
   const [collectionsSaving, setCollectionsSaving] = useState(false)
+  const [collectionsDropdownOpen, setCollectionsDropdownOpen] = useState(false)
+  const collectionsDropdownRef = useRef(null)
 
   function getBaseServings() {
     if (recipe?.servings_override != null && recipe.servings_override >= 1) return recipe.servings_override
@@ -141,6 +143,17 @@ export default function RecipeDetailPage() {
     if (!id || !(user || trialToken)) return
     api.get('/recipes/collections').then(data => setCollectionList(data.collections || [])).catch(() => setCollectionList([]))
   }, [id, user, trialToken])
+
+  useEffect(() => {
+    if (!collectionsDropdownOpen) return
+    function handleClickOutside(e) {
+      if (collectionsDropdownRef.current && !collectionsDropdownRef.current.contains(e.target)) {
+        setCollectionsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [collectionsDropdownOpen])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -223,17 +236,16 @@ export default function RecipeDetailPage() {
     }
   }
 
-  function handleAddCollection(name) {
+  function handleToggleCollection(name) {
     const n = (name || '').trim()
     if (!n) return
     const current = recipe?.collections ?? []
-    if (current.some(c => (c || '').trim() === n)) return
-    handleUpdateCollections([...current, n])
-  }
-
-  function handleRemoveCollection(name) {
-    const current = recipe?.collections ?? []
-    handleUpdateCollections(current.filter(c => c !== name))
+    const has = current.some(c => (c || '').trim() === n)
+    if (has) {
+      handleUpdateCollections(current.filter(c => (c || '').trim() !== n))
+    } else {
+      handleUpdateCollections([...current, n])
+    }
   }
 
   async function handleUploadImage(file) {
@@ -668,46 +680,55 @@ export default function RecipeDetailPage() {
             </div>
           )}
 
-          {/* Collections (user-defined) — original only, when recipe is saved */}
+          {/* Collections (user-defined) — original only, when recipe is saved; dropdown with checkboxes */}
           {activeTab === 'original' && recipe?.id > 0 && (
-            <div className="mb-4">
+            <div className="mb-4" ref={collectionsDropdownRef}>
               <span className="block text-xs font-semibold text-stone-500 mb-2">{t('collections')}</span>
               <div className="flex flex-wrap items-center gap-2">
-                {(recipe.collections ?? []).map(c => (
-                  <span
-                    key={c}
-                    className="inline-flex items-center gap-1 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 rounded-full pl-3 pr-1 py-1"
-                  >
-                    {c}
+                {(recipe.collections ?? []).length > 0 && (
+                  <span className="text-xs text-stone-500">
+                    {(recipe.collections ?? []).join(', ')}
+                  </span>
+                )}
+                {collectionList.length > 0 ? (
+                  <div className="relative">
                     <button
                       type="button"
-                      onClick={() => handleRemoveCollection(c)}
+                      onClick={() => setCollectionsDropdownOpen(o => !o)}
                       disabled={collectionsSaving}
-                      className="rounded-full p-0.5 hover:bg-amber-200 transition-colors disabled:opacity-50"
-                      aria-label={`Remove ${c}`}
+                      className="min-h-[36px] px-3 py-1.5 text-xs font-medium rounded-xl border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-50"
+                      aria-expanded={collectionsDropdownOpen}
+                      aria-haspopup="listbox"
+                      aria-label={t('addToCollection')}
                     >
-                      ×
+                      {t('addToCollection')} ▾
                     </button>
-                  </span>
-                ))}
-                {collectionList.length > 0 ? (
-                  <select
-                    value=""
-                    onChange={e => {
-                      const v = e.target.value
-                      if (v) { handleAddCollection(v); e.target.value = '' }
-                    }}
-                    disabled={collectionsSaving}
-                    className="text-xs border border-stone-200 rounded-full pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-stone-800"
-                    aria-label={t('addToCollection')}
-                  >
-                    <option value="">{t('addToCollection')}</option>
-                    {(collectionList || [])
-                      .filter(c => !(recipe.collections || []).some(r => (r || '').trim() === (c || '').trim()))
-                      .map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                  </select>
+                    {collectionsDropdownOpen && (
+                      <div
+                        role="listbox"
+                        className="absolute left-0 top-full mt-1 z-10 min-w-[200px] max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg py-1"
+                      >
+                        {collectionList.map(c => {
+                          const checked = (recipe.collections ?? []).some(r => (r || '').trim() === (c || '').trim())
+                          return (
+                            <label
+                              key={c}
+                              className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer text-sm text-stone-800"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => handleToggleCollection(c)}
+                                disabled={collectionsSaving}
+                                className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+                              />
+                              <span>{c}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <span className="text-xs text-stone-400">{t('createCollectionFromListHint')}</span>
                 )}

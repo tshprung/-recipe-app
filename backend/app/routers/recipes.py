@@ -425,6 +425,30 @@ def create_collection(
     return schemas.RecipeCollectionsListOut(collections=sorted(names))
 
 
+@router.post("/collections/remove", status_code=status.HTTP_204_NO_CONTENT)
+def remove_collection(
+    payload: schemas.RecipeCollectionRemove,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Delete a collection: remove it from all user recipes and from filter_names."""
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Collection name is required.")
+    name_lower = name.lower()
+    user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    recipes = db.query(models.Recipe).filter(models.Recipe.user_id == user.id).all()
+    for r in recipes:
+        if r.collections:
+            new_list = [c for c in r.collections if (c or "").strip().lower() != name_lower]
+            if len(new_list) != len(r.collections):
+                r.collections = new_list
+    if user.filter_names:
+        user.filter_names = [n for n in user.filter_names if (n or "").strip().lower() != name_lower]
+    db.commit()
+    return None
+
+
 @router.post(
     "/what-can-i-make",
     response_model=schemas.WhatCanIMakeMyRecipesOut | schemas.WhatCanIMakeAIOut,

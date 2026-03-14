@@ -206,38 +206,59 @@ def translate_recipe(
     return result
 
 
-SPLIT_RECIPES_PROMPT = """\
-This web page text may contain one or more recipes. Your task is to split it into separate recipe texts.
+EXTRACT_RECIPES_SYSTEM = """You are extracting recipes from a webpage.
 
-Return ONLY valid JSON with this exact shape:
-{ "recipes": [ "full text of recipe 1", "full text of recipe 2", ... ] }
+Your goal is to detect ALL complete recipes that appear on the page.
 
-- Each element in "recipes" must be the complete raw text of one recipe (ingredients + instructions/steps).
-- If there is exactly one recipe, return one element.
-- If there are multiple recipes (e.g. an article with "Recipe 1" and "Recipe 2"), split and return each as a separate string.
-- If the text is not a recipe page or no recipe could be identified, return { "recipes": [] }.
-- Do not add any text outside the JSON. No markdown, no explanation.
+Definition of a recipe: A recipe is any section that contains BOTH (1) a list of ingredients and (2) preparation instructions/steps.
+
+Rules:
+1. Do NOT assume there is only one recipe per page. Scan the entire page and detect every ingredients + instructions pair.
+2. If multiple ingredient sections exist with their own preparation steps, treat them as separate recipes.
+
+Sub-recipe detection: If the page contains components such as sauce, salad, topping, filling, frosting, side dish, and that component includes its own ingredients and preparation steps, extract it as a separate recipe.
+- SPLIT examples: Pancakes + Fruit Salad; Cake + Frosting; Burger + Sauce; Salad + Dressing.
+- Keep ONE recipe when: "For the cake" + "For the frosting" are clearly part of assembling the same dessert; marinade used directly in the same cooking process.
+
+Structure: Each recipe must be returned independently. Do not share ingredients between recipes unless the page explicitly repeats them.
+
+Ignore: links to other pages, recommended recipes, lists of related recipes, advertisements. Only extract recipes fully present on the current page.
+
+Quality: Include only sections that have BOTH ingredients and instructions. Discard ingredients-only or instructions-only sections.
+Use headings (H1–H4) that precede an ingredient list as potential recipe titles. Detect ingredient lists by bullet/numbered lists and quantities (g, ml, cups, tbsp, tsp).
 """
 
+EXTRACT_RECIPES_OUTPUT = """Return a JSON array only. No markdown, no explanation.
+[
+  {
+    "title": "Recipe title",
+    "ingredients": ["ingredient 1", "ingredient 2"],
+    "instructions": ["step 1", "step 2"]
+  }
+]
+Verify each recipe has both ingredients and instructions before including. If none found, return []."""
 
-def split_page_into_recipes(page_text: str) -> list[str]:
+
+def extract_recipes_from_page(page_text: str) -> list[dict]:
     """
-    Use the model to detect how many recipes are in the page and split into one string per recipe.
-    Returns a list of recipe text chunks (may be empty, or one or more).
+    Extract all complete recipes from page text. Returns list of
+    {"title": str, "ingredients": list[str], "instructions": list[str]}.
+    Only includes items that have both ingredients and instructions.
+    When OPENAI_API_KEY is unset, returns empty list (caller may fall back to whole page).
     """
     if not (page_text or "").strip():
         return []
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return [(page_text or "").strip()]
+        return []  # No AI; split_page_into_recipes will fall back to whole page
     client = OpenAI(api_key=api_key)
-    # Truncate to avoid token limits; keep enough for several recipes
     text = (page_text or "").strip()[:15000]
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "user", "content": SPLIT_RECIPES_PROMPT + "\n\nPage text:\n---\n" + text + "\n---"},
+                {"role": "system", "content": EXTRACT_RECIPES_SYSTEM},
+                {"role": "user", "content": EXTRACT_RECIPES_OUTPUT + "\n\nPage text:\n---\n" + text + "\n---"},
             ],
             response_format={"type": "json_object"},
             temperature=0,
@@ -248,9 +269,50 @@ def split_page_into_recipes(page_text: str) -> list[str]:
             if content.startswith("json"):
                 content = content[4:]
         data = json.loads(content)
-        recipes = data.get("recipes")
+        # Accept either top-level array or { "recipes": [...] }
+        recipes = data if isinstance(data, list) else data.get("recipes")
         if not isinstance(recipes, list):
             return []
-        return [r for r in recipes if isinstance(r, str) and (r or "").strip()]
+        out = []
+        for r in recipes:
+            if not isinstance(r, dict):
+                continue
+            title = (r.get("title") or "").strip() or "Untitled"
+            ingredients = r.get("ingredients") or r.get("ingredients_pl") or []
+            instructions = r.get("instructions") or r.get("steps") or r.get("steps_pl") or []
+            if not isinstance(ingredients, list):
+                ingredients = []
+            if not isinstance(instructions, list):
+                instructions = []
+            ingredients = [str(x).strip() for x in ingredients if x]
+            instructions = [str(x).strip() for x in instructions if x]
+            if not ingredients or not instructions:
+                continue
+            out.append({"title": title, "ingredients": ingredients, "instructions": instructions})
+        return out
     except (json.JSONDecodeError, KeyError, TypeError):
         return []
+
+
+def _structured_recipe_to_raw_input(recipe: dict) -> str:
+    """Convert extracted {title, ingredients, instructions} to raw text for translate_recipe."""
+    title = (recipe.get("title") or "").strip() or "Untitled"
+    ingredients = recipe.get("ingredients") or []
+    instructions = recipe.get("instructions") or []
+    lines_ing = "\n".join(f"- {s}" for s in ingredients if s)
+    lines_steps = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(instructions) if s)
+    return f"{title}\n\nIngredients:\n{lines_ing}\n\nSteps:\n{lines_steps}"
+
+
+def split_page_into_recipes(page_text: str) -> list[str]:
+    """
+    Extract all complete recipes from the page (including sub-recipes like sauce, frosting)
+    and return one raw text chunk per recipe for translation.
+    When extraction returns nothing (e.g. no API key), falls back to whole page as one chunk.
+    """
+    if not (page_text or "").strip():
+        return []
+    structured = extract_recipes_from_page(page_text)
+    if not structured:
+        return [(page_text or "").strip()]
+    return [_structured_recipe_to_raw_input(r) for r in structured]
