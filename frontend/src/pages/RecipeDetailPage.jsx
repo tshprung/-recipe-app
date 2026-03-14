@@ -706,7 +706,7 @@ export default function RecipeDetailPage() {
                     {collectionsDropdownOpen && (
                       <div
                         role="listbox"
-                        className="absolute left-0 top-full mt-1 z-10 min-w-[200px] max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg py-1"
+                        className="absolute left-0 rtl:left-auto rtl:right-0 top-full mt-1 z-10 min-w-[200px] max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg py-1"
                       >
                         {collectionList.map(c => {
                           const checked = (recipe.collections ?? []).some(r => (r || '').trim() === (c || '').trim())
