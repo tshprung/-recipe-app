@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api, getRecipeImageUrl } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -35,7 +36,7 @@ export default function RecipeDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { addRecipe: addRecipeToList, isInList: isRecipeOnList, actionLoadingId: listActionLoadingId } = useShoppingList()
 
   const [recipe, setRecipe] = useState(null)
@@ -73,7 +74,10 @@ export default function RecipeDetailPage() {
   const [collectionList, setCollectionList] = useState([])
   const [collectionsSaving, setCollectionsSaving] = useState(false)
   const [collectionsDropdownOpen, setCollectionsDropdownOpen] = useState(false)
+  const [collectionsDropdownPosition, setCollectionsDropdownPosition] = useState(null)
   const collectionsDropdownRef = useRef(null)
+  const collectionsTriggerRef = useRef(null)
+  const collectionsPortalRef = useRef(null)
 
   function getBaseServings() {
     if (recipe?.servings_override != null && recipe.servings_override >= 1) return recipe.servings_override
@@ -146,10 +150,26 @@ export default function RecipeDetailPage() {
 
   useEffect(() => {
     if (!collectionsDropdownOpen) return
+    const btn = collectionsTriggerRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    const isRtl = lang === 'he'
+    const gap = 4
+    setCollectionsDropdownPosition({
+      top: rect.bottom + gap,
+      ...(isRtl
+        ? { right: window.innerWidth - rect.right, left: undefined }
+        : { left: rect.left, right: undefined }),
+    })
+  }, [collectionsDropdownOpen, lang])
+
+  useEffect(() => {
+    if (!collectionsDropdownOpen) return
     function handleClickOutside(e) {
-      if (collectionsDropdownRef.current && !collectionsDropdownRef.current.contains(e.target)) {
-        setCollectionsDropdownOpen(false)
-      }
+      const inTrigger = collectionsDropdownRef.current?.contains(e.target)
+      const inPortal = collectionsPortalRef.current?.contains(e.target)
+      if (inTrigger || inPortal) return
+      setCollectionsDropdownOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -693,6 +713,7 @@ export default function RecipeDetailPage() {
                 {collectionList.length > 0 ? (
                   <div className="relative">
                     <button
+                      ref={collectionsTriggerRef}
                       type="button"
                       onClick={() => setCollectionsDropdownOpen(o => !o)}
                       disabled={collectionsSaving}
@@ -703,31 +724,45 @@ export default function RecipeDetailPage() {
                     >
                       {t('addToCollection')} ▾
                     </button>
-                    {collectionsDropdownOpen && (
-                      <div
-                        role="listbox"
-                        className="absolute left-0 rtl:left-auto rtl:right-0 top-full mt-1 z-10 min-w-[200px] max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg py-1"
-                      >
-                        {collectionList.map(c => {
-                          const checked = (recipe.collections ?? []).some(r => (r || '').trim() === (c || '').trim())
-                          return (
-                            <label
-                              key={c}
-                              className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer text-sm text-stone-800"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => handleToggleCollection(c)}
-                                disabled={collectionsSaving}
-                                className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-                              />
-                              <span>{c}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    )}
+                    {collectionsDropdownOpen &&
+                      collectionsDropdownPosition &&
+                      createPortal(
+                        <div
+                          ref={collectionsPortalRef}
+                          className="fixed z-[100] max-w-[min(320px,calc(100vw-1rem))]"
+                          style={{
+                            top: collectionsDropdownPosition.top,
+                            left: collectionsDropdownPosition.left,
+                            right: collectionsDropdownPosition.right,
+                          }}
+                          dir="auto"
+                        >
+                          <div
+                            role="listbox"
+                            className="min-w-[200px] max-h-60 overflow-y-auto overflow-x-hidden rounded-xl border border-stone-200 bg-white shadow-lg py-1"
+                          >
+                            {collectionList.map(c => {
+                              const checked = (recipe.collections ?? []).some(r => (r || '').trim() === (c || '').trim())
+                              return (
+                                <label
+                                  key={c}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer text-sm text-stone-800"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => handleToggleCollection(c)}
+                                    disabled={collectionsSaving}
+                                    className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+                                  />
+                                  <span className="min-w-0 break-words">{c}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>,
+                        document.body
+                      )}
                   </div>
                 ) : (
                   <span className="text-xs text-stone-400">{t('createCollectionFromListHint')}</span>

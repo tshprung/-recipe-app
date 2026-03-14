@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
@@ -6,15 +6,21 @@ import RecipeDetailPage from './RecipeDetailPage'
 import { api } from '../api/client'
 import { LanguageProvider } from '../context/LanguageContext'
 import { AuthProvider } from '../context/AuthContext'
+import { ShoppingListProvider } from '../context/ShoppingListContext'
+import { LANG_STORAGE_KEY } from '../constants/storageKeys'
 
-vi.mock('../api/client', () => ({
-  api: {
-    get: vi.fn(),
-    post: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-  },
-}))
+vi.mock('../api/client', async importOriginal => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      get: vi.fn(),
+      post: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+    },
+  }
+})
 
 const MOCK_RECIPE = {
   id: 1,
@@ -71,11 +77,13 @@ function renderPage(id = '1') {
   return render(
     <AuthProvider>
       <LanguageProvider>
-        <MemoryRouter initialEntries={[`/recipes/${id}`]}>
-          <Routes>
-            <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <ShoppingListProvider>
+          <MemoryRouter initialEntries={[`/recipes/${id}`]}>
+            <Routes>
+              <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ShoppingListProvider>
       </LanguageProvider>
     </AuthProvider>
   )
@@ -195,6 +203,11 @@ describe('RecipeDetailPage — re-localize', () => {
     })
   })
 
+  it('loads recipe when user has different locale', async () => {
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+    expect(screen.getByText('Zupa Pomidorowa')).toBeInTheDocument()
+  })
 })
 
 describe('RecipeDetailPage — error handling', () => {
@@ -289,5 +302,38 @@ describe('RecipeDetailPage — return to original', () => {
     await waitFor(() => {
       expect(screen.queryByText('1 cebula bez masła')).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('RecipeDetailPage — collections dropdown (RTL)', () => {
+  const hebrewCollectionName = 'אוספים'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.setItem(LANG_STORAGE_KEY, 'he')
+    api.get.mockImplementation(path => {
+      if (path === '/users/me') return Promise.resolve(DEFAULT_USER)
+      if (path === '/recipes/collections') return Promise.resolve({ collections: [hebrewCollectionName] })
+      if (path.endsWith('/variants')) return Promise.resolve([])
+      return Promise.resolve(MOCK_RECIPE)
+    })
+  })
+
+  it('collections dropdown is visible and shows Hebrew collection names when UI is in Hebrew', async () => {
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+
+    const addButton = await screen.findByRole('button', { name: /הוסף לאוסף/ })
+    await userEvent.click(addButton)
+
+    await waitFor(() => {
+      const listbox = screen.getByRole('listbox')
+      expect(listbox).toBeInTheDocument()
+      expect(within(listbox).getByText(hebrewCollectionName)).toBeInTheDocument()
+    })
+
+    const listbox = screen.getByRole('listbox')
+    const dropdownWrapper = listbox.closest('[dir="auto"]')
+    expect(dropdownWrapper).toBeInTheDocument()
   })
 })
