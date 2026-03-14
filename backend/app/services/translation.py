@@ -215,6 +215,8 @@ Definition of a recipe: A recipe is any section that contains BOTH (1) a list of
 Rules:
 1. Do NOT assume there is only one recipe per page. Scan the entire page and detect every ingredients + instructions pair.
 2. If multiple ingredient sections exist with their own preparation steps, treat them as separate recipes.
+3. Never merge two distinct recipes into one. If the page has two (or more) separate recipes—each with its own ingredients and steps—you MUST return two (or more) separate objects in the array. One array element per recipe.
+4. Use repeated structure to find boundaries: look for a heading or title followed by an ingredient list and then preparation steps. Each such block is one recipe. This applies in any language (e.g. Hebrew מתכון 1 / מתכון 2, or "Recipe 1" / "Recipe 2").
 
 Sub-recipe detection: If the page contains components such as sauce, salad, topping, filling, frosting, side dish, and that component includes its own ingredients and preparation steps, extract it as a separate recipe.
 - SPLIT examples: Pancakes + Fruit Salad; Cake + Frosting; Burger + Sauce; Salad + Dressing.
@@ -229,6 +231,7 @@ Use headings (H1–H4) that precede an ingredient list as potential recipe title
 """
 
 EXTRACT_RECIPES_OUTPUT = """Return a JSON array only. No markdown, no explanation.
+If you see "Recipe A" with ingredients and steps, then "Recipe B" with different ingredients and steps, return exactly 2 objects.
 [
   {
     "title": "Recipe title",

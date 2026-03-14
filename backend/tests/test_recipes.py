@@ -1,4 +1,5 @@
 """Tests for recipe CRUD endpoints."""
+import json
 from unittest.mock import MagicMock, patch
 
 from tests.conftest import MOCK_TRANSLATED, CAPTCHA_DUMMY, password_hash
@@ -286,6 +287,71 @@ def test_create_recipe_from_url_fetches_and_translates(client, auth_headers):
     # Fetched text should be sanitized (no script tags)
     assert "nope" not in data["raw_input"]
     assert "מרק" in data["raw_input"] or "pomidory" in data["raw_input"]
+
+
+def test_create_recipe_from_url_two_recipes_returns_two(client, auth_headers):
+    """When page has two recipes, extraction yields 2 chunks and API returns 2 created recipes."""
+    html = "<html><body><p>Recipe 1 and Recipe 2 page</p></body></html>"
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = html
+    mock_resp.content = html.encode("utf-8")
+
+    def split_mock(page_text):
+        # Simulate extractor finding two recipes: return two chunks
+        return [
+            "First Recipe\n\nIngredients:\n- flour\n\nSteps:\n1. Mix.",
+            "Second Recipe\n\nIngredients:\n- sugar\n\nSteps:\n1. Bake.",
+        ] if (page_text or "").strip() else []
+
+    first_translated = {**MOCK_TRANSLATED, "title_pl": "First", "title_original": "First Recipe"}
+    second_translated = {**MOCK_TRANSLATED, "title_pl": "Second", "title_original": "Second Recipe"}
+
+    with patch("app.routers.recipes.httpx.get", return_value=mock_resp), patch(
+        "app.routers.recipes.split_page_into_recipes", side_effect=split_mock
+    ), patch(
+        "app.routers.recipes.translate_recipe",
+        side_effect=[first_translated, second_translated],
+    ):
+        r = client.post(
+            "/api/recipes/",
+            json={"source_url": "https://example.com/two-recipes"},
+            headers=auth_headers,
+        )
+    assert r.status_code == 201
+    data = r.json()
+    assert "recipes" in data
+    recipes = data["recipes"]
+    assert len(recipes) == 2
+    assert recipes[0]["title_pl"] == "First"
+    assert recipes[1]["title_pl"] == "Second"
+
+
+def test_extract_recipes_from_page_returns_two_when_model_returns_two():
+    """Extractor returns 2 recipes when OpenAI response contains 2."""
+    from app.services.translation import extract_recipes_from_page
+
+    two_recipes = {
+        "recipes": [
+            {"title": "Recipe A", "ingredients": ["a1", "a2"], "instructions": ["step 1"]},
+            {"title": "Recipe B", "ingredients": ["b1"], "instructions": ["step 1", "step 2"]},
+        ]
+    }
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock(message=MagicMock(content=json.dumps(two_recipes)))]
+
+    with patch("app.services.translation.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.return_value = mock_response
+        result = extract_recipes_from_page("Page with two recipes")
+    assert len(result) == 2
+    assert result[0]["title"] == "Recipe A"
+    assert result[0]["ingredients"] == ["a1", "a2"]
+    assert result[0]["instructions"] == ["step 1"]
+    assert result[1]["title"] == "Recipe B"
+    assert result[1]["ingredients"] == ["b1"]
+    assert result[1]["instructions"] == ["step 1", "step 2"]
 
 
 def test_create_recipe_calls_translate_with_user_target_settings(client, auth_headers):
