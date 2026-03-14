@@ -194,15 +194,15 @@ export default function RecipeListPage() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [filter, setFilter] = useState('all')
-  const [searchInput, setSearchInput] = useState('')
-  const [appliedSearch, setAppliedSearch] = useState('')
   const [toast, setToast] = useState(null)
   const [collectionList, setCollectionList] = useState([])
   const [selectedCollection, setSelectedCollection] = useState(null)
+  const [newFilterName, setNewFilterName] = useState('')
+  const [creatingFilter, setCreatingFilter] = useState(false)
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
-  const fetchRecipes = useCallback(async (query = '', collection = null) => {
+  const fetchRecipes = useCallback(async (collection = null) => {
     // Call API when logged in or in trial (client sends user token or trial token).
     if (!user && !trialToken) {
       setLoading(false)
@@ -211,7 +211,6 @@ export default function RecipeListPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (query.trim()) params.set('q', query.trim())
       if (collection && collection.trim()) params.set('collection', collection.trim())
       const path = params.toString() ? `/recipes/?${params.toString()}` : '/recipes/'
       const data = await api.get(path)
@@ -319,12 +318,26 @@ export default function RecipeListPage() {
       }
       return
     }
-    fetchRecipes(appliedSearch, selectedCollection)
-  }, [fetchRecipes, appliedSearch, selectedCollection, user, trialToken, location.state])
+    fetchRecipes(selectedCollection)
+  }, [fetchRecipes, selectedCollection, user, trialToken, location.state])
 
-  function handleSearchSubmit(e) {
+  async function handleCreateFilter(e) {
     e.preventDefault()
-    setAppliedSearch(searchInput.trim())
+    const name = (newFilterName || '').trim()
+    if (!name || !user) return
+    setCreatingFilter(true)
+    try {
+      const data = await api.post('/recipes/collections', { name })
+      setCollectionList(data.collections || [])
+      setNewFilterName('')
+      setSelectedCollection(name)
+      fetchRecipes(name)
+      showToast(t('filterCreated'))
+    } catch (err) {
+      showToast(err.message || t('filterCreateError'))
+    } finally {
+      setCreatingFilter(false)
+    }
   }
 
   function showToast(msg) {
@@ -383,73 +396,59 @@ export default function RecipeListPage() {
         </div>
       )}
 
-      {/* Search */}
-      <form onSubmit={handleSearchSubmit} className="mb-4">
-        <div className="flex gap-2">
-          <input
-            type="search"
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            placeholder={t('searchRecipes')}
-            className="flex-1 min-w-0 rounded-xl border border-stone-200 px-4 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
-            aria-label={t('searchRecipes')}
-          />
+      {/* Filters (collections) + Create filter */}
+      <div className="mb-4">
+        <span className="text-xs font-semibold text-stone-500 mr-2">{t('filterByCollection')}</span>
+        <div className="flex flex-wrap gap-2 mt-1.5 items-center">
           <button
-            type="submit"
-            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-stone-100 text-stone-700 text-sm font-semibold hover:bg-stone-200 transition-colors"
+            type="button"
+            onClick={() => setSelectedCollection(null)}
+            className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+              selectedCollection === null ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+            }`}
           >
-            {t('search')}
+            {t('allRecipes')}
           </button>
-          {appliedSearch && (
+          {collectionList.map(c => (
             <button
+              key={c}
               type="button"
-              onClick={() => { setSearchInput(''); setAppliedSearch('') }}
-              className="min-h-[44px] px-3 py-2.5 rounded-xl text-stone-500 text-sm hover:bg-stone-100 transition-colors"
-            >
-              {t('clear')}
-            </button>
-          )}
-        </div>
-      </form>
-
-      {/* Collection filter */}
-      {collectionList.length > 0 && (
-        <div className="mb-4">
-          <span className="text-xs font-semibold text-stone-500 mr-2">{t('filterByCollection')}</span>
-          <div className="flex flex-wrap gap-2 mt-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedCollection(null)}
+              onClick={() => setSelectedCollection(c)}
               className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
-                selectedCollection === null ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                selectedCollection === c ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
               }`}
             >
-              {t('allRecipes')}
+              {c}
             </button>
-            {collectionList.map(c => (
+          ))}
+          {user && (
+            <form onSubmit={handleCreateFilter} className="inline-flex gap-2 items-center">
+              <input
+                type="text"
+                value={newFilterName}
+                onChange={e => setNewFilterName(e.target.value)}
+                placeholder={t('newFilterPlaceholder')}
+                className="min-h-[36px] w-36 rounded-xl border border-stone-200 px-3 py-1.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                aria-label={t('createFilter')}
+              />
               <button
-                key={c}
-                type="button"
-                onClick={() => setSelectedCollection(c)}
-                className={`min-h-[36px] px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
-                  selectedCollection === c ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
+                type="submit"
+                disabled={creatingFilter || !newFilterName.trim()}
+                className="min-h-[36px] px-3 py-1.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {c}
+                {creatingFilter ? '…' : t('createFilter')}
               </button>
-            ))}
-          </div>
+            </form>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Header: stack on mobile for better touch targets and spacing */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 justify-between items-stretch sm:items-start mb-6 sm:mb-8">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-stone-800">{t('myRecipes')}</h2>
           <p className="text-stone-400 text-sm mt-0.5">
-            {appliedSearch
-              ? (recipes.length === 0 ? t('noSearchResults') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`)
-              : (recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`)}
+            {recipes.length === 0 ? t('noRecipes') : `${recipes.length} ${recipes.length === 1 ? t('recipe') : t('recipesCount')}`}
           </p>
         </div>
 
@@ -501,20 +500,8 @@ export default function RecipeListPage() {
         <div className="flex justify-center py-20">
           <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : visible.length === 0 && filter === 'all' && !appliedSearch ? (
+      ) : visible.length === 0 && filter === 'all' ? (
         <EmptyState onAdd={() => setShowAdd(true)} />
-      ) : visible.length === 0 && appliedSearch ? (
-        <div className="text-center py-20">
-          <div className="text-5xl mb-4">🔍</div>
-          <p className="text-stone-500 font-medium mb-1">{t('noSearchResults')}</p>
-          <button
-            type="button"
-            onClick={() => { setSearchInput(''); setAppliedSearch('') }}
-            className="text-sm text-amber-600 hover:underline font-medium"
-          >
-            {t('clear')} {t('search')}
-          </button>
-        </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-5xl mb-4">⭐</div>

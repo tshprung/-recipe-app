@@ -8,7 +8,7 @@ import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
 import { VARIANT_OPTIONS, VARIANT_BADGE, variantLabelKey } from '../constants/recipes'
 import { TRIAL_SETTINGS_KEY } from '../constants/storageKeys'
 import { TAG_COLORS, NOTE_META, CONTENT_KEYWORDS } from './RecipeDetail/constants'
-import { parseAmountLeading, scaleIngredientLine, variantDisplayLabel, detectContentTags } from './RecipeDetail/utils'
+import { parseAmountLeading, scaleIngredientLine, variantDisplayLabel, detectContentTags, stripIngredientParenthetical } from './RecipeDetail/utils'
 
 function Section({ title, icon, children }) {
   return (
@@ -1119,7 +1119,8 @@ export default function RecipeDetailPage() {
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wide text-right">עברית</span>
                 </div>
                 {scaledIngredients.map((ing, i) => {
-                  const pl = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
+                  const plRaw = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
+                  const pl = stripIngredientParenthetical(plRaw)
                   const orig = recipe.ingredients_original?.[i]
                   const he = orig ? (typeof orig === 'object' ? `${orig.amount ?? ''} ${orig.name ?? ''}`.trim() : orig) : ''
                   return (
@@ -1129,7 +1130,7 @@ export default function RecipeDetailPage() {
                         {true && (
                           <button
                             type="button"
-                            onClick={() => openIngredientAlternatives(pl, i)}
+                            onClick={() => openIngredientAlternatives(plRaw, i)}
                             className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
                             title={t('ingredientAlternatives')}
                             aria-label={t('ingredientAlternatives')}
@@ -1146,7 +1147,8 @@ export default function RecipeDetailPage() {
             ) : (
               <ul className="space-y-2">
                 {scaledIngredients.map((ing, i) => {
-                  const label = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
+                  const labelRaw = typeof ing === 'object' ? `${ing.amount ?? ''} ${ing.name ?? ''}`.trim() : ing
+                  const label = stripIngredientParenthetical(labelRaw)
                   return (
                     <li key={i} className="flex items-start gap-3 text-sm text-stone-700 py-1 border-b border-stone-50 last:border-0">
                       <span className="w-5 h-5 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
@@ -1157,7 +1159,7 @@ export default function RecipeDetailPage() {
                         {true && (
                           <button
                             type="button"
-                            onClick={() => openIngredientAlternatives(label, i)}
+                            onClick={() => openIngredientAlternatives(labelRaw, i)}
                             className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
                             title={t('ingredientAlternatives')}
                             aria-label={t('ingredientAlternatives')}

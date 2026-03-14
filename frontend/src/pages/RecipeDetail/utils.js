@@ -1,6 +1,22 @@
 import { variantLabelKey } from '../../constants/recipes'
 import { CONTENT_KEYWORDS } from './constants'
 
+/**
+ * Remove the original-name parenthetical from an ingredient line for display.
+ * E.g. "Tomato (עגבניה)" or "cilantro (kolendra, English)" -> "Tomato" / "cilantro"
+ * Does not remove weight parentheticals like "(45 g)" or "(100 grams)".
+ */
+export function stripIngredientParenthetical(line) {
+  if (line == null || typeof line !== 'string') return line
+  const s = line.trim()
+  // Match trailing " (something)" but not weight: (N g) or (N grams)
+  const m = s.match(/^(.+?)\s+\(([^)]+)\)\s*$/)
+  if (!m) return s
+  const inside = m[2].trim()
+  if (/^\d+(\.\d+)?\s*(g|grams?)\s*$/i.test(inside)) return s
+  return m[1].trim()
+}
+
 /** Parse leading number from ingredient amount (e.g. "2", "1/2", "2 1/2 cups", "1.5") -> number or null */
 export function parseAmountLeading(value) {
   if (value == null) return null

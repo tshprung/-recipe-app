@@ -48,6 +48,8 @@ class User(Base):
     target_country: Mapped[str] = mapped_column(String(10), default="PL", nullable=False)
     target_city: Mapped[str] = mapped_column(String(100), default="Wrocław", nullable=False)
     target_zip: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # User-created filter/collection names (shown in filter list even before any recipe has them)
+    filter_names: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

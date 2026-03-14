@@ -19,14 +19,13 @@ from .recipes_helpers import (
     normalize_adapt_types,
     normalize_ingredient_line,
     recipe_ingredient_lines,
-    recipe_matches_query,
     recipes_for_user_or_trial,
     user_ingredients_set,
     what_can_i_make_my_recipes,
 )
 from ..services.ingredient_alternatives import get_ingredient_alternatives
 from ..services.recipe_image import save_user_upload
-from ..services.translation import translate_recipe
+from ..services.translation import split_page_into_recipes, translate_recipe
 from ..services.what_can_i_make_ai import suggest_recipe_from_ingredients, suggest_recipes_from_preferences
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
@@ -124,9 +123,90 @@ def _fetch_and_extract_text(url: str) -> str:
     return text
 
 
+def _create_recipes_from_chunks(
+    chunks: list[str],
+    source_url: str,
+    payload: schemas.RecipeCreate,
+    db: Session,
+    current_user: models.User | None,
+    trial_session,
+):
+    """Translate and create one recipe per chunk; return RecipeCreateMultiOut."""
+    if current_user is not None:
+        user_for_update = (
+            db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+        )
+    if current_user is not None:
+        target_language = current_user.target_language
+        target_country = current_user.target_country
+        target_city = current_user.target_city
+    else:
+        target_language = (payload.target_language or trial_session.language)
+        target_country = payload.target_country or trial_session.country
+        target_city = ""
+
+    created: list[models.Recipe] = []
+    for raw_input in chunks:
+        try:
+            translated = translate_recipe(
+                raw_input=raw_input,
+                target_language=target_language,
+                target_country=target_country,
+                target_city=target_city,
+            )
+        except ValueError as e:
+            if str(e).startswith("NOT_A_RECIPE:"):
+                continue
+            raise
+        except Exception:
+            raise
+        notes = translated.get("notes", {}) or {}
+        notes.setdefault("source_url", source_url)
+        recipe = models.Recipe(
+            user_id=current_user.id if current_user is not None else None,
+            trial_session_id=trial_session.id if trial_session is not None else None,
+            title_pl=translated.get("title_pl", "Untitled"),
+            title_original=translated.get("title_original", (raw_input or "")[:100]),
+            prep_time_minutes=translated.get("prep_time_minutes"),
+            cook_time_minutes=translated.get("cook_time_minutes"),
+            ingredients_pl=translated.get("ingredients_pl", []),
+            ingredients_original=translated.get("ingredients_original", []),
+            steps_pl=translated.get("steps_pl", []),
+            tags=translated.get("tags", []),
+            substitutions=translated.get("substitutions", {}),
+            notes=notes,
+            raw_input=raw_input,
+            detected_language=translated.get("detected_language"),
+            target_language=target_language,
+            target_country=target_country,
+            target_city=target_city,
+        )
+        if current_user is not None and not _has_unlimited_quota(current_user):
+            user_for_update.transformations_used += 1
+        db.add(recipe)
+        created.append(recipe)
+    if not created:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This doesn't look like a recipe. Please paste the ingredients + steps, or try a different URL."
+            ),
+        )
+    db.commit()
+    for r in created:
+        db.refresh(r)
+    remaining = None
+    if trial_session is not None:
+        remaining = MAX_TRIAL_ACTIONS - trial_session.used_actions
+    return schemas.RecipeCreateMultiOut(
+        recipes=[schemas.RecipeOut.model_validate(r) for r in created],
+        remaining_actions=remaining,
+    )
+
+
 @router.post(
     "/",
-    response_model=schemas.RecipeOut | schemas.RecipeCreateTrialResponse,
+    response_model=schemas.RecipeOut | schemas.RecipeCreateTrialResponse | schemas.RecipeCreateMultiOut,
     status_code=status.HTTP_201_CREATED,
 )
 def create_recipe(
@@ -142,8 +222,29 @@ def create_recipe(
             detail="Verify your email before using the app.",
         )
 
-    if (payload.source_url or "").strip():
-        raw_input = _fetch_and_extract_text(payload.source_url.strip())
+    source_url = (payload.source_url or "").strip()
+    if source_url:
+        page_text = _fetch_and_extract_text(source_url)
+        chunks = split_page_into_recipes(page_text)
+        if not chunks:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This doesn't look like a recipe. Please paste the ingredients + steps, or try a different URL. "
+                    "If you think this is a mistake, contact tshprung.us@gmail.com."
+                ),
+            )
+        # Multiple recipes from one URL: translate and create each
+        if len(chunks) > 1:
+            return _create_recipes_from_chunks(
+                chunks=chunks,
+                source_url=source_url,
+                payload=payload,
+                db=db,
+                current_user=current_user,
+                trial_session=trial_session,
+            )
+        raw_input = chunks[0]
     else:
         raw_input = _sanitize_text(payload.raw_input or "", max_len=10000)
 
@@ -158,8 +259,6 @@ def create_recipe(
             target_country = current_user.target_country
             target_city = current_user.target_city
         else:
-            # Trial: allow client to provide overrides from Settings; otherwise fall back
-            # to the language/country captured when the trial started.
             target_language = (payload.target_language or trial_session.language)
             target_country = payload.target_country or trial_session.country
             target_city = ""
@@ -186,8 +285,8 @@ def create_recipe(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Translation failed: {e}")
 
     notes = translated.get("notes", {}) or {}
-    if (payload.source_url or "").strip():
-        notes.setdefault("source_url", payload.source_url.strip())
+    if source_url:
+        notes.setdefault("source_url", source_url)
 
     recipe = models.Recipe(
         user_id=current_user.id if current_user is not None else None,
@@ -209,7 +308,6 @@ def create_recipe(
         target_city=target_city,
     )
 
-    # Consume user quota only when logged in (trial already incremented in enforce_trial_or_user_quota)
     if current_user is not None and not _has_unlimited_quota(current_user):
         user_for_update.transformations_used += 1
 
@@ -264,7 +362,6 @@ def create_recipe_from_ai_suggestion(
 
 @router.get("/", response_model=list[schemas.RecipeOut])
 def list_recipes(
-    q: str | None = None,
     collection: str | None = None,
     db: Session = Depends(get_db),
     user_and_trial: tuple = Depends(get_optional_user_and_trial),
@@ -273,8 +370,6 @@ def list_recipes(
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipes = recipes_for_user_or_trial(db, current_user, trial_session)
-    if q and q.strip():
-        recipes = [r for r in recipes if recipe_matches_query(r, q)]
     if collection and collection.strip():
         coll = collection.strip().lower()
         recipes = [r for r in recipes if (r.collections or []) and any((c or "").strip().lower() == coll for c in r.collections)]
@@ -286,12 +381,43 @@ def list_collections(
     db: Session = Depends(get_db),
     user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
-    """Return distinct collection names from the user's (or trial's) recipes."""
+    """Return distinct collection/filter names from recipes plus user-created filter names."""
     current_user, trial_session = user_and_trial
     if current_user is None and trial_session is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     recipes = recipes_for_user_or_trial(db, current_user, trial_session)
     names: set[str] = set()
+    for r in recipes:
+        for c in (r.collections or []):
+            if isinstance(c, str) and c.strip():
+                names.add(c.strip())
+    if current_user is not None and getattr(current_user, "filter_names", None):
+        for name in current_user.filter_names or []:
+            if isinstance(name, str) and name.strip():
+                names.add(name.strip())
+    return schemas.RecipeCollectionsListOut(collections=sorted(names))
+
+
+@router.post("/collections", response_model=schemas.RecipeCollectionsListOut)
+def create_collection(
+    payload: schemas.RecipeCollectionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Create a new filter/collection name. Logged-in users only; name is added to your filter list."""
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filter name is required.")
+    user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+    existing = list(user.filter_names or [])
+    name_lower = name.lower()
+    if any((n or "").strip().lower() == name_lower for n in existing):
+        return schemas.RecipeCollectionsListOut(collections=sorted(set((n or "").strip() for n in existing) | {name}))
+    user.filter_names = existing + [name]
+    db.commit()
+    db.refresh(user)
+    names = set((n or "").strip() for n in (user.filter_names or []))
+    recipes = recipes_for_user_or_trial(db, user, None)
     for r in recipes:
         for c in (r.collections or []):
             if isinstance(c, str) and c.strip():
@@ -767,10 +893,16 @@ def adapt_recipe_endpoint(
     if current_user is not None:
         target_lang = (current_user.target_language or "").strip() or "en"
         target_country = current_user.target_country
+        avoid_terms = []
+        if current_user.custom_allergens_text:
+            raw = current_user.custom_allergens_text
+            parts = [p.strip() for p in raw.replace(";", ",").split(",")]
+            avoid_terms = [p for p in parts if p]
     else:
         # Trial: use request body if provided (from Settings saved in localStorage), else session defaults
         target_lang = (payload.target_language or trial_session.language or "").strip() or "en"
         target_country = payload.target_country or trial_session.country
+        avoid_terms = []
 
     try:
         if len(types) > 1:
@@ -780,6 +912,7 @@ def adapt_recipe_endpoint(
                 result = adapt_recipe(
                     current, t, custom_instruction=None, target_language=target_lang,
                     target_country=target_country,
+                    avoid_terms=avoid_terms or None,
                 )
                 if not result.get("can_adapt"):
                     return {
@@ -801,6 +934,7 @@ def adapt_recipe_endpoint(
             result = adapt_recipe(
                 recipe, single_type, custom_instruction, target_language=target_lang,
                 target_country=target_country,
+                avoid_terms=avoid_terms or None,
             )
             if not result.get("can_adapt"):
                 return {

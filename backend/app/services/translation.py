@@ -204,3 +204,53 @@ def translate_recipe(
 
     result["detected_language"] = source_lang
     return result
+
+
+SPLIT_RECIPES_PROMPT = """\
+This web page text may contain one or more recipes. Your task is to split it into separate recipe texts.
+
+Return ONLY valid JSON with this exact shape:
+{ "recipes": [ "full text of recipe 1", "full text of recipe 2", ... ] }
+
+- Each element in "recipes" must be the complete raw text of one recipe (ingredients + instructions/steps).
+- If there is exactly one recipe, return one element.
+- If there are multiple recipes (e.g. an article with "Recipe 1" and "Recipe 2"), split and return each as a separate string.
+- If the text is not a recipe page or no recipe could be identified, return { "recipes": [] }.
+- Do not add any text outside the JSON. No markdown, no explanation.
+"""
+
+
+def split_page_into_recipes(page_text: str) -> list[str]:
+    """
+    Use the model to detect how many recipes are in the page and split into one string per recipe.
+    Returns a list of recipe text chunks (may be empty, or one or more).
+    """
+    if not (page_text or "").strip():
+        return []
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return [(page_text or "").strip()]
+    client = OpenAI(api_key=api_key)
+    # Truncate to avoid token limits; keep enough for several recipes
+    text = (page_text or "").strip()[:15000]
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": SPLIT_RECIPES_PROMPT + "\n\nPage text:\n---\n" + text + "\n---"},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        content = (response.choices[0].message.content or "").strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        data = json.loads(content)
+        recipes = data.get("recipes")
+        if not isinstance(recipes, list):
+            return []
+        return [r for r in recipes if isinstance(r, str) and (r or "").strip()]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return []

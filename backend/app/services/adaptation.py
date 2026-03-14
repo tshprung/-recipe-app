@@ -60,6 +60,7 @@ Adapt this recipe to be $diet_label.
 OUTPUT LANGUAGE: All of title_pl, ingredients_pl, steps_pl, and notes.adaptation_summary MUST be written in $output_lang only. The recipe you receive may be in any language; your output must be entirely in $output_lang.
 
 $ingredient_parenthetical_rule
+$avoid_terms_rule
 
 Rules:
 - Replace every non-compliant ingredient with the closest compliant equivalent appropriate for the recipe's market.
@@ -105,6 +106,7 @@ Adapt this recipe using the following instruction: $instruction
 OUTPUT LANGUAGE: All of title_pl, ingredients_pl, steps_pl, and notes.adaptation_summary MUST be written in $output_lang only.
 
 $ingredient_parenthetical_rule
+$avoid_terms_rule
 
 Rules:
 - Apply the instruction faithfully while keeping the recipe's character. Use market-appropriate equivalents for any new ingredients.
@@ -171,12 +173,27 @@ def _ingredient_parenthetical_rule(target_language: str, target_country: str | N
     )
 
 
+def _avoid_terms_rule(avoid_terms: list[str] | None) -> str:
+    """Build prompt line for user allergen/avoid terms (any language)."""
+    if not avoid_terms:
+        return ""
+    parts = [p.strip() for p in avoid_terms if (p or "").strip()]
+    if not parts:
+        return ""
+    return (
+        "\n\nAlso avoid these ingredients (user allergens / free text; may be in any language): "
+        + ", ".join(parts)
+        + ". Do not use them; substitute or omit."
+    )
+
+
 def adapt_recipe(
     recipe,
     variant_type: str,
     custom_instruction: str | None = None,
     target_language: str = "en",
     target_country: str | None = None,
+    avoid_terms: list[str] | None = None,
 ) -> dict:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -186,6 +203,7 @@ def adapt_recipe(
     title_pl, _, _ = _get_recipe_attrs(recipe)
     ingredients_text, steps_text = _build_recipe_text(recipe)
     ingredient_rule = _ingredient_parenthetical_rule(target_language, target_country)
+    avoid_terms_rule = _avoid_terms_rule(avoid_terms)
 
     if custom_instruction:
         prompt = CUSTOM_TEMPLATE.safe_substitute(
@@ -195,6 +213,7 @@ def adapt_recipe(
             ingredients=ingredients_text,
             steps=steps_text,
             ingredient_parenthetical_rule=ingredient_rule,
+            avoid_terms_rule=avoid_terms_rule,
         )
     else:
         diet_label = DIET_LABELS.get(variant_type, variant_type)
@@ -205,6 +224,7 @@ def adapt_recipe(
             ingredients=ingredients_text,
             steps=steps_text,
             ingredient_parenthetical_rule=ingredient_rule,
+            avoid_terms_rule=avoid_terms_rule,
         )
 
     client = OpenAI(api_key=api_key)

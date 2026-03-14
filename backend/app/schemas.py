@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from datetime import datetime
 from typing import Union
 
@@ -28,13 +29,15 @@ ALLOWED_ALLERGEN_CODES = {
 def sanitize_custom_allergens_text(text: str | None) -> str | None:
     """
     Best-effort sanitization for user-entered text that may later be shown in UI
-    and used for best-effort filtering prompts.
+    and used for best-effort filtering prompts. Preserves all languages (Unicode).
     """
     if text is None:
         return None
     cleaned = " ".join((text or "").split())
     if not cleaned:
         return None
+    # Normalize Unicode so we store consistently (e.g. é as single codepoint)
+    cleaned = unicodedata.normalize("NFC", cleaned)
     # Keep it short to avoid prompt abuse / accidental huge payloads.
     return cleaned[:500]
 
@@ -262,6 +265,12 @@ class RecipeCreateTrialResponse(BaseModel):
     remaining_actions: int
 
 
+class RecipeCreateMultiOut(BaseModel):
+    """Response when creating multiple recipes from one URL (page had several recipes)."""
+    recipes: list["RecipeOut"]
+    remaining_actions: int | None = None  # Set for trial so client can sync
+
+
 class RecipeOut(BaseModel):
     id: int
     user_id: int | None = None
@@ -316,6 +325,11 @@ class RecipeCollectionsUpdate(BaseModel):
 
 class RecipeCollectionsListOut(BaseModel):
     collections: list[str]
+
+
+class RecipeCollectionCreate(BaseModel):
+    """Create a new filter/collection name (so user can assign it to recipes later)."""
+    name: str = Field(..., min_length=1, max_length=120)
 
 
 # --- Recipe ingredient match (have vs need) ---

@@ -2,4 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* RTL: align Hebrew (and other RTL) text to the right */
+[dir="rtl"] input,
+[dir="rtl"] textarea {
+  text-align: right;
+}
+
 /* Safe area insets are applied per-component (navbar, modal, main) for notched phones */

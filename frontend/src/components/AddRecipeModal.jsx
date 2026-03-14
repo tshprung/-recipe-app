@@ -56,7 +56,8 @@ export default function AddRecipeModal({ onClose, onCreated }) {
       const data = await api.post('/recipes/', body)
       if (typeof data?.remaining_actions === 'number') syncTrialRemaining(data.remaining_actions)
       await refreshUser()
-      onCreated(data?.recipe ?? data)
+      const toAdd = Array.isArray(data?.recipes) ? data.recipes : [data?.recipe ?? data]
+      toAdd.forEach(r => onCreated(r))
     } catch (err) {
       if (err.status === 402 || err.trialExhausted) {
         syncTrialRemaining(0)

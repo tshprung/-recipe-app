@@ -227,6 +227,10 @@ export const translations = {
     addCollectionPlaceholder: 'Type name and press Enter',
     filterByCollection: 'Filter by collection',
     allRecipes: 'All',
+    createFilter: 'Create filter',
+    newFilterPlaceholder: 'New filter name',
+    filterCreated: 'Filter created',
+    filterCreateError: 'Could not create filter',
   },
   he: {
     loading: 'טוען…',
@@ -447,6 +451,10 @@ export const translations = {
     addCollectionPlaceholder: 'הקלד שם ולחץ Enter',
     filterByCollection: 'סנן לפי אוסף',
     allRecipes: 'הכל',
+    createFilter: 'צור מסנן',
+    newFilterPlaceholder: 'שם מסנן חדש',
+    filterCreated: 'המסנן נוצר',
+    filterCreateError: 'לא ניתן ליצור מסנן',
   },
   pl: {
     loading: 'Ładowanie…',
@@ -667,5 +675,9 @@ export const translations = {
     addCollectionPlaceholder: 'Wpisz nazwę i naciśnij Enter',
     filterByCollection: 'Filtruj po kolekcji',
     allRecipes: 'Wszystkie',
+    createFilter: 'Utwórz filtr',
+    newFilterPlaceholder: 'Nazwa filtra',
+    filterCreated: 'Filtr utworzony',
+    filterCreateError: 'Nie udało się utworzyć filtra',
   },
 }
