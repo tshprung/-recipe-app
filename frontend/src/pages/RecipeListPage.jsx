@@ -197,8 +197,8 @@ export default function RecipeListPage() {
   const [toast, setToast] = useState(null)
   const [collectionList, setCollectionList] = useState([])
   const [selectedCollection, setSelectedCollection] = useState(null)
-  const [newFilterName, setNewFilterName] = useState('')
-  const [creatingFilter, setCreatingFilter] = useState(false)
+  const [newCollectionName, setNewCollectionName] = useState('')
+  const [creatingCollection, setCreatingCollection] = useState(false)
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
@@ -321,22 +321,22 @@ export default function RecipeListPage() {
     fetchRecipes(selectedCollection)
   }, [fetchRecipes, selectedCollection, user, trialToken, location.state])
 
-  async function handleCreateFilter(e) {
+  async function handleCreateCollection(e) {
     e.preventDefault()
-    const name = (newFilterName || '').trim()
+    const name = (newCollectionName || '').trim()
     if (!name || !user) return
-    setCreatingFilter(true)
+    setCreatingCollection(true)
     try {
       const data = await api.post('/recipes/collections', { name })
       setCollectionList(data.collections || [])
-      setNewFilterName('')
+      setNewCollectionName('')
       setSelectedCollection(name)
       fetchRecipes(name)
-      showToast(t('filterCreated'))
+      showToast(t('collectionCreated'))
     } catch (err) {
-      showToast(err.message || t('filterCreateError'))
+      showToast(err.message || t('collectionCreateError'))
     } finally {
-      setCreatingFilter(false)
+      setCreatingCollection(false)
     }
   }
 
@@ -396,7 +396,7 @@ export default function RecipeListPage() {
         </div>
       )}
 
-      {/* Filters (collections) + Create filter */}
+      {/* Filter by collection + Create collection */}
       <div className="mb-4">
         <span className="text-xs font-semibold text-stone-500 mr-2">{t('filterByCollection')}</span>
         <div className="flex flex-wrap gap-2 mt-1.5 items-center">
@@ -422,21 +422,21 @@ export default function RecipeListPage() {
             </button>
           ))}
           {user && (
-            <form onSubmit={handleCreateFilter} className="inline-flex gap-2 items-center">
+            <form onSubmit={handleCreateCollection} className="inline-flex gap-2 items-center">
               <input
                 type="text"
-                value={newFilterName}
-                onChange={e => setNewFilterName(e.target.value)}
-                placeholder={t('newFilterPlaceholder')}
+                value={newCollectionName}
+                onChange={e => setNewCollectionName(e.target.value)}
+                placeholder={t('newCollectionPlaceholder')}
                 className="min-h-[36px] w-36 rounded-xl border border-stone-200 px-3 py-1.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                aria-label={t('createFilter')}
+                aria-label={t('createCollection')}
               />
               <button
                 type="submit"
-                disabled={creatingFilter || !newFilterName.trim()}
+                disabled={creatingCollection || !newCollectionName.trim()}
                 className="min-h-[36px] px-3 py-1.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {creatingFilter ? '…' : t('createFilter')}
+                {creatingCollection ? '…' : t('createCollection')}
               </button>
             </form>
           )}

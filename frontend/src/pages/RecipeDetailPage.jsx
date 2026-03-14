@@ -70,7 +70,7 @@ export default function RecipeDetailPage() {
   const [myIngredientsText, setMyIngredientsText] = useState('')
   const [matchResult, setMatchResult] = useState(null)
   const [matchLoading, setMatchLoading] = useState(false)
-  const [newCollectionInput, setNewCollectionInput] = useState('')
+  const [collectionList, setCollectionList] = useState([])
   const [collectionsSaving, setCollectionsSaving] = useState(false)
 
   function getBaseServings() {
@@ -136,6 +136,11 @@ export default function RecipeDetailPage() {
       .catch(e => setError(e.message || t('recipeNotFound')))
       .finally(() => setLoading(false))
   }, [id, t, location.state])
+
+  useEffect(() => {
+    if (!id || !(user || trialToken)) return
+    api.get('/recipes/collections').then(data => setCollectionList(data.collections || [])).catch(() => setCollectionList([]))
+  }, [id, user, trialToken])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -218,16 +223,12 @@ export default function RecipeDetailPage() {
     }
   }
 
-  function handleAddCollection() {
-    const name = newCollectionInput.trim()
-    if (!name) return
+  function handleAddCollection(name) {
+    const n = (name || '').trim()
+    if (!n) return
     const current = recipe?.collections ?? []
-    if (current.includes(name)) {
-      setNewCollectionInput('')
-      return
-    }
-    handleUpdateCollections([...current, name])
-    setNewCollectionInput('')
+    if (current.some(c => (c || '').trim() === n)) return
+    handleUpdateCollections([...current, n])
   }
 
   function handleRemoveCollection(name) {
@@ -689,14 +690,27 @@ export default function RecipeDetailPage() {
                     </button>
                   </span>
                 ))}
-                <input
-                  type="text"
-                  value={newCollectionInput}
-                  onChange={e => setNewCollectionInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCollection(); } }}
-                  placeholder={t('addCollectionPlaceholder')}
-                  className="text-xs border border-stone-200 rounded-full px-3 py-1.5 w-40 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+                {collectionList.length > 0 ? (
+                  <select
+                    value=""
+                    onChange={e => {
+                      const v = e.target.value
+                      if (v) { handleAddCollection(v); e.target.value = '' }
+                    }}
+                    disabled={collectionsSaving}
+                    className="text-xs border border-stone-200 rounded-full pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-stone-800"
+                    aria-label={t('addToCollection')}
+                  >
+                    <option value="">{t('addToCollection')}</option>
+                    {(collectionList || [])
+                      .filter(c => !(recipe.collections || []).some(r => (r || '').trim() === (c || '').trim()))
+                      .map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                  </select>
+                ) : (
+                  <span className="text-xs text-stone-400">{t('createCollectionFromListHint')}</span>
+                )}
               </div>
             </div>
           )}
