@@ -197,15 +197,6 @@ export default function RecipeDetailPage() {
     }
   }
 
-  async function handleToggleFavorite() {
-    try {
-      const updated = await api.patch(`/recipes/${id}/favorite`, { is_favorite: !recipe.is_favorite })
-      setRecipe(updated)
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
   async function handleSetRating(nextRating) {
     try {
       const updated = await api.patch(`/recipes/${id}/meta`, { rating: nextRating })
@@ -604,13 +595,6 @@ export default function RecipeDetailPage() {
           )}
         </div>
 
-        <button
-          onClick={handleToggleFavorite}
-          className={`text-2xl transition-all hover:scale-110 flex-shrink-0 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
-          title={recipe.is_favorite ? t('removeFromFavorites') : t('addToFavorites')}
-        >
-          ★
-        </button>
       </div>
 
       {/* Hero / Title card */}

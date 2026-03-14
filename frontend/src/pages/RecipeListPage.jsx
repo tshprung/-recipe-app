@@ -26,7 +26,7 @@ const TAG_COLORS = [
   'bg-violet-100 text-violet-700',
 ]
 
-function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveFromList }) {
+function RecipeCard({ recipe, onDelete, onAddToList, onRemoveFromList }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const { isInList, actionLoadingId } = useShoppingList()
@@ -141,15 +141,8 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
             )}
           </button>
 
-          {/* Favorite + Delete */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={e => { e.stopPropagation(); onToggleFavorite(recipe) }}
-              className={`text-xl transition-all hover:scale-110 ${recipe.is_favorite ? 'text-yellow-400' : 'text-stone-200 hover:text-yellow-300'}`}
-              title={recipe.is_favorite ? t('removeFromFavorites') : t('addToFavorites')}
-            >
-              ★
-            </button>
+          {/* Delete */}
+          <div className="flex justify-end items-center">
             <button
               onClick={e => { e.stopPropagation(); onDelete(recipe) }}
               className="text-stone-300 hover:text-red-400 transition-colors text-sm p-1 rounded-lg hover:bg-red-50"
@@ -193,7 +186,6 @@ export default function RecipeListPage() {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
-  const [filter, setFilter] = useState('all')
   const [toast, setToast] = useState(null)
   const [collectionList, setCollectionList] = useState([])
   const [selectedCollection, setSelectedCollection] = useState(null)
@@ -345,17 +337,6 @@ export default function RecipeListPage() {
     setTimeout(() => setToast(null), 2500)
   }
 
-  async function handleToggleFavorite(recipe) {
-    try {
-      const updated = await api.patch(`/recipes/${recipe.id}/favorite`, {
-        is_favorite: !recipe.is_favorite,
-      })
-      setRecipes(rs => rs.map(r => r.id === updated.id ? updated : r))
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
   async function handleDelete(recipe) {
     if (!confirm(`${t('deleteRecipe')} "${recipe.title_pl}"?`)) return
     try {
@@ -384,8 +365,6 @@ export default function RecipeListPage() {
     const coll = selectedCollection.trim().toLowerCase()
     visible = visible.filter(r => (r.collections || []).some(c => String(c).trim().toLowerCase() === coll))
   }
-  if (filter === 'favorites') visible = visible.filter(r => r.is_favorite)
-  const favCount = recipes.filter(r => r.is_favorite).length
 
   return (
     <div>
@@ -478,38 +457,6 @@ export default function RecipeListPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Filter pills: touch-friendly min height */}
-          <div className="flex bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm text-sm">
-            <button
-              onClick={() => setFilter('all')}
-              className={`min-h-[44px] px-4 py-2.5 font-medium transition-colors ${
-                filter === 'all'
-                  ? 'bg-amber-500 text-white'
-                  : 'text-stone-500 hover:bg-stone-50'
-              }`}
-            >
-              {t('all')}
-            </button>
-            <button
-              onClick={() => setFilter('favorites')}
-              className={`min-h-[44px] px-4 py-2.5 font-medium transition-colors flex items-center gap-1.5 ${
-                filter === 'favorites'
-                  ? 'bg-amber-500 text-white'
-                  : 'text-stone-500 hover:bg-stone-50'
-              }`}
-            >
-              <span>★</span>
-              <span>{t('favoritesTab')}</span>
-              {favCount > 0 && (
-                <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${
-                  filter === 'favorites' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {favCount}
-                </span>
-              )}
-            </button>
-          </div>
-
           <button
             onClick={() => setShowAdd(true)}
             className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2.5 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center justify-center gap-1.5"
@@ -525,13 +472,11 @@ export default function RecipeListPage() {
         <div className="flex justify-center py-20">
           <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : visible.length === 0 && filter === 'all' ? (
+      ) : visible.length === 0 && recipes.length === 0 ? (
         <EmptyState onAdd={() => setShowAdd(true)} />
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">⭐</div>
-          <p className="text-stone-500 font-medium mb-1">{t('noFavorites')}</p>
-          <p className="text-sm text-stone-400">{t('noFavoritesHint')}</p>
+          <p className="text-stone-500 font-medium mb-1">{t('noRecipesInCollection')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -539,7 +484,6 @@ export default function RecipeListPage() {
             <RecipeCard
               key={recipe.id}
               recipe={recipe}
-              onToggleFavorite={handleToggleFavorite}
               onDelete={handleDelete}
               onAddToList={handleAddToList}
               onRemoveFromList={handleRemoveFromList}

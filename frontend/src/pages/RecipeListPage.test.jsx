@@ -39,13 +39,6 @@ describe('RecipeListPage', () => {
     expect(screen.getByText('My recipes')).toBeInTheDocument()
   })
 
-  it('renders All and Favorites filter buttons', async () => {
-    renderPage()
-    await screen.findByText('My recipes')
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Favorites/ })).toBeInTheDocument()
-  })
-
   it('renders Add button', async () => {
     renderPage()
     await screen.findByText('My recipes')
