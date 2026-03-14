@@ -268,9 +268,13 @@ def test_create_recipe_from_url_fetches_and_translates(client, auth_headers):
     mock_resp.text = html
     mock_resp.content = html.encode("utf-8")
 
+    def split_mock(page_text):
+        # Return one chunk (full page) so translate_recipe is called once
+        return [(page_text or "").strip()] if (page_text or "").strip() else []
+
     with patch("app.routers.recipes.httpx.get", return_value=mock_resp), patch(
-        "app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED
-    ):
+        "app.routers.recipes.split_page_into_recipes", side_effect=split_mock
+    ), patch("app.routers.recipes.translate_recipe", return_value=MOCK_TRANSLATED):
         r = client.post(
             "/api/recipes/",
             json={"source_url": "https://example.com/recipe"},
