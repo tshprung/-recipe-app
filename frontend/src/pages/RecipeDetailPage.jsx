@@ -608,7 +608,7 @@ export default function RecipeDetailPage() {
                     {t('original')}
                   </span>
                 </div>
-                <h1 className="text-xl font-bold text-stone-800 leading-snug">{recipe.title_pl}</h1>
+                <h1 dir="auto" className="text-xl font-bold text-stone-800 leading-snug">{recipe.title_pl}</h1>
               </div>
               <div className="text-right" dir="rtl">
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2" dir="ltr">עברית</p>
@@ -626,7 +626,7 @@ export default function RecipeDetailPage() {
                   </span>
                 )
               })()}
-              <h1 className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
+              <h1 dir="auto" className="text-2xl font-bold text-stone-800 leading-snug">{displayData?.title_pl}</h1>
               {activeTab !== 'original' && (
                 <button
                   onClick={() => setActiveTab('original')}
@@ -1161,7 +1161,7 @@ export default function RecipeDetailPage() {
                   return (
                     <div key={i} className="grid grid-cols-2 gap-4 py-2 border-b border-stone-50 last:border-0">
                       <div className="flex items-start gap-2 min-w-0">
-                        <span className="text-sm text-stone-700 break-words">{pl}</span>
+                        <span dir="auto" className="text-sm text-stone-700 break-words">{pl}</span>
                         {true && (
                           <button
                             type="button"
@@ -1190,7 +1190,7 @@ export default function RecipeDetailPage() {
                         {i + 1}
                       </span>
                       <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
-                        <span className="text-left break-words">{label}</span>
+                        <span dir="auto" className="break-words">{label}</span>
                         {true && (
                           <button
                             type="button"
@@ -1222,7 +1222,7 @@ export default function RecipeDetailPage() {
                   <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-amber-400 to-orange-400 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
                     {i + 1}
                   </span>
-                  <p className="text-sm text-stone-700 leading-relaxed pt-0.5">{step}</p>
+                  <p dir="auto" className="text-sm text-stone-700 leading-relaxed pt-0.5">{step}</p>
                 </li>
               ))}
             </ol>

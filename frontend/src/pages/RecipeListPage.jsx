@@ -51,7 +51,7 @@ function RecipeCard({ recipe, onToggleFavorite, onDelete, onAddToList, onRemoveF
         <div className="flex gap-4 flex-1 min-h-0">
           <div className="flex-1 min-w-0 flex flex-col">
         {/* Title */}
-        <h3 className="font-bold text-stone-800 text-base leading-snug mb-1 line-clamp-2 group-hover:text-amber-700 transition-colors">
+        <h3 dir="auto" className="font-bold text-stone-800 text-base leading-snug mb-1 line-clamp-2 group-hover:text-amber-700 transition-colors">
           {recipe.title_pl}
         </h3>
 
