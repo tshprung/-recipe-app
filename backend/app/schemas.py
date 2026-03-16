@@ -107,8 +107,10 @@ class TrialRecipeOut(BaseModel):
 
 
 class TrialStartRequest(BaseModel):
-    """Optional device_id to resume an existing trial (same credits)."""
+    """Optional device_id to resume. For new trials: optional country and language (recipe language); no initial recipes."""
     device_id: str | None = None
+    country: str | None = None  # 2-letter code; default from IP geo if not provided
+    language: str | None = None  # recipe/target language; default from country or "en"
 
 
 class TrialStartOut(BaseModel):

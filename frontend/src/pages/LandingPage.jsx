@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { api, getTrialToken } from '../api/client'
-import { TRIAL_DEVICE_ID_KEY, TRIAL_RECIPES_KEY, TRIAL_REMAINING_KEY } from '../constants/storageKeys'
+import { COUNTRIES } from '../constants/countries'
+import { TARGET_LANGUAGES } from '../constants/languages'
+import {
+  LANG_STORAGE_KEY,
+  TRIAL_DEVICE_ID_KEY,
+  TRIAL_RECIPES_KEY,
+  TRIAL_REMAINING_KEY,
+  TRIAL_SETTINGS_KEY,
+} from '../constants/storageKeys'
 
 const COLORS = {
   bg: '#111111',
@@ -12,14 +21,11 @@ const COLORS = {
   secondary: '#C96A4A',
 }
 
-const TRIAL_LOADING_SENTENCES = [
-  'We are loading your personal view…',
-  'This app uses AI to adapt recipes to your needs.',
-  'Starter recipes are chosen for your region.',
-  'You can change recipe and website languages anytime in Settings.',
-  'You can also add allergens and diet preferences in Settings.',
-  'You get 5 free AI actions to try.',
-  'Almost there…',
+/** Website UI language options (app supports en, he, pl). */
+const WEBSITE_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'he', name: 'עברית' },
 ]
 
 const FOOD_IMAGES = [
@@ -36,32 +42,130 @@ function Anchor({ id }) {
   return <span id={id} className="block scroll-mt-24" />
 }
 
-function Spinner({ className = 'w-4 h-4' }) {
+function TrialFormModal({ onClose, onSubmit, error }) {
+  const [form, setForm] = useState({
+    website_language: 'en',
+    recipe_language: 'en',
+    country: 'US',
+  })
+  const [geoLoading, setGeoLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    api.get('/meta/geo')
+      .then((data) => {
+        if (cancelled || !data?.country_code) return
+        const code = (data.country_code || '').toUpperCase()
+        if (code) setForm((f) => ({ ...f, country: code }))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setGeoLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const countryOptions = useMemo(() => {
+    const list = [...COUNTRIES]
+    const hasCode = (code) => list.some((c) => c.code === code)
+    if (form.country && !hasCode(form.country)) {
+      list.push({ code: form.country, name: `${form.country} (detected)` })
+    }
+    return list
+  }, [form.country])
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    setSubmitting(true)
+    onSubmit(form, () => setSubmitting(false))
+  }
+
   return (
-    <span
-      className={cn('inline-block rounded-full border-2 border-current border-t-transparent animate-spin', className)}
-      aria-hidden
-    />
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(17,17,17,0.9)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="trial-form-title"
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-6 shadow-xl border border-white/10"
+        style={{ backgroundColor: COLORS.card }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="trial-form-title" className="text-xl font-bold text-white mb-4">
+          Start your free trial
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-1.5">Website language</label>
+            <select
+              value={form.website_language}
+              onChange={(e) => setForm((f) => ({ ...f, website_language: e.target.value }))}
+              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
+            >
+              {WEBSITE_LANGUAGES.map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-1.5">Recipe language</label>
+            <select
+              value={form.recipe_language}
+              onChange={(e) => setForm((f) => ({ ...f, recipe_language: e.target.value }))}
+              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
+            >
+              {TARGET_LANGUAGES.map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-1.5">
+              Country {geoLoading && <span className="text-white/50">(detecting…)</span>}
+            </label>
+            <select
+              value={form.country}
+              onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
+            >
+              {countryOptions.map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.name}</option>
+              ))}
+            </select>
+          </div>
+          {error && <p className="text-sm text-red-300" role="alert">{error}</p>}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold border border-white/20 text-white/90 hover:bg-white/10 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-black shadow transition hover:opacity-95 disabled:opacity-60"
+              style={{ backgroundColor: COLORS.accent }}
+            >
+              {submitting ? 'Starting…' : 'Start trial'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [trialLoading, setTrialLoading] = useState(false)
+  const [showTrialForm, setShowTrialForm] = useState(false)
   const [trialError, setTrialError] = useState('')
-  const [loadingSentenceIndex, setLoadingSentenceIndex] = useState(0)
   const year = useMemo(() => new Date().getFullYear(), [])
   const navigate = useNavigate()
   const { setTrialToken } = useAuth()
-
-  useEffect(() => {
-    if (!trialLoading) return
-    setLoadingSentenceIndex(0)
-    const interval = setInterval(() => {
-      setLoadingSentenceIndex(i => (i + 1) % TRIAL_LOADING_SENTENCES.length)
-    }, 5500)
-    return () => clearInterval(interval)
-  }, [trialLoading])
+  const { setLang } = useLanguage()
 
   async function handleTryForFree() {
     setTrialError('')
@@ -80,22 +184,37 @@ export default function LandingPage() {
       }
       return
     }
-    setTrialLoading(true)
+    setShowTrialForm(true)
+  }
+
+  async function handleTrialFormSubmit(form, onDone) {
+    setTrialError('')
     try {
       const deviceId = typeof localStorage !== 'undefined' ? localStorage.getItem(TRIAL_DEVICE_ID_KEY) : null
-      const body = deviceId ? { device_id: deviceId } : {}
+      const body = deviceId
+        ? { device_id: deviceId }
+        : { country: form.country, language: form.recipe_language }
       const data = await api.post('/trial/start', body)
       setTrialToken(data.trial_token, data.remaining_actions ?? 5)
       try {
-        localStorage.setItem(TRIAL_RECIPES_KEY, JSON.stringify(data.recipes || []))
+        localStorage.setItem(TRIAL_RECIPES_KEY, JSON.stringify([]))
         localStorage.setItem(TRIAL_REMAINING_KEY, String(data.remaining_actions ?? 5))
         if (data.device_id) localStorage.setItem(TRIAL_DEVICE_ID_KEY, data.device_id)
+        const trialSettings = {
+          ui_language: form.website_language,
+          target_language: form.recipe_language,
+          target_country: form.country,
+        }
+        localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(trialSettings))
+        setLang(form.website_language)
+        localStorage.setItem(LANG_STORAGE_KEY, form.website_language || 'en')
       } catch (_) {}
-      navigate('/', { state: { trialRecipes: data.recipes, remainingActions: data.remaining_actions } })
+      setShowTrialForm(false)
+      navigate('/', { state: { trialRecipes: [], remainingActions: data.remaining_actions }, replace: true })
     } catch (err) {
       setTrialError(err?.message || 'Could not start trial. Is the backend running?')
     } finally {
-      setTrialLoading(false)
+      onDone?.()
     }
   }
 
@@ -105,23 +224,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.bg, color: COLORS.text }}>
-      {/* Trial loading overlay: rotating sentences while /trial/start runs */}
-      {trialLoading && (
-        <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 px-4"
-          style={{ backgroundColor: 'rgba(17,17,17,0.95)' }}
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <Spinner className="w-10 h-10 text-white" />
-          <p
-            key={loadingSentenceIndex}
-            className="text-center text-white/90 text-lg sm:text-xl max-w-md transition-opacity duration-300"
-            style={{ minHeight: '2.5rem' }}
-          >
-            {TRIAL_LOADING_SENTENCES[loadingSentenceIndex]}
-          </p>
-        </div>
+      {showTrialForm && (
+        <TrialFormModal
+          onClose={() => { setShowTrialForm(false); setTrialError('') }}
+          onSubmit={handleTrialFormSubmit}
+          error={trialError}
+        />
       )}
 
       {/* Global background accents (kept subtle, below the hero image) */}
@@ -162,11 +270,9 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => { setMobileOpen(false); handleTryForFree() }}
-                disabled={trialLoading}
-                className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95 disabled:opacity-60"
+                className="hidden sm:inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-black shadow transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                {trialLoading && <Spinner className="w-3.5 h-3.5" />}
                 Try for free
               </button>
               <Link
@@ -245,11 +351,9 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={handleTryForFree}
-                disabled={trialLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold text-black shadow-soft transition hover:opacity-95"
                 style={{ backgroundColor: COLORS.accent }}
               >
-                {trialLoading && <Spinner />}
                 Try for free
               </button>
               <Link

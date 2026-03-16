@@ -21,10 +21,8 @@ def _three_starter_recipes():
 
 
 @patch("app.routers.trial._geo_from_ip")
-@patch("app.routers.trial.get_starter_recipes")
-def test_trial_start_returns_token_and_recipes(mock_starter, mock_geo, client):
+def test_trial_start_returns_token_no_initial_recipes(mock_geo, client):
     mock_geo.return_value = {"country_code": "PL"}
-    mock_starter.return_value = _three_starter_recipes()
 
     r = client.post("/api/trial/start", json={})
     assert r.status_code == 200
@@ -32,18 +30,14 @@ def test_trial_start_returns_token_and_recipes(mock_starter, mock_geo, client):
     assert "trial_token" in data
     assert data["country"] == "PL"
     assert data["language"] == "pl"
-    assert len(data["recipes"]) == 3
+    assert data["recipes"] == []
     assert data["remaining_actions"] == 5
-    assert data["recipes"][0]["title"] == "Recipe 1"
-    assert data["recipes"][0]["author_name"] == "Chef A"
 
 
 @patch("app.routers.trial._geo_from_ip")
-@patch("app.routers.trial.get_starter_recipes")
-def test_trial_start_creates_recipes_with_no_image(mock_starter, mock_geo, client):
-    """Starter recipes are stored with image_url=None (no static/generated images)."""
+def test_trial_start_creates_session_no_recipes(mock_geo, client):
+    """New trial creates a session but no initial recipes."""
     mock_geo.return_value = {"country_code": "PL"}
-    mock_starter.return_value = _three_starter_recipes()
 
     r = client.post("/api/trial/start", json={})
     assert r.status_code == 200
@@ -57,31 +51,22 @@ def test_trial_start_creates_recipes_with_no_image(mock_starter, mock_geo, clien
         session = db.query(models.TrialSession).filter(models.TrialSession.token_id == token_id).first()
         assert session is not None
         recipes = db.query(models.Recipe).filter(models.Recipe.trial_session_id == session.id).all()
-        assert len(recipes) == 3
-        for recipe in recipes:
-            assert recipe.image_url is None
+        assert len(recipes) == 0
     finally:
         db.close()
 
 
 @patch("app.routers.trial._geo_from_ip")
-@patch("app.routers.trial.get_starter_recipes")
-def test_trial_start_recipe_ingredients_have_amounts(mock_starter, mock_geo, client):
-    """Starter recipe ingredients must include quantities/amounts (e.g. 500g flour)."""
-    mock_geo.return_value = {"country_code": "PL"}
-    mock_starter.return_value = _three_starter_recipes()
+def test_trial_start_accepts_country_and_language(mock_geo, client):
+    """Trial start accepts optional country and language in body."""
+    mock_geo.return_value = {"country_code": "XX"}
 
-    r = client.post("/api/trial/start", json={})
+    r = client.post("/api/trial/start", json={"country": "DE", "language": "de"})
     assert r.status_code == 200
-    recipes = r.json()["recipes"]
-    assert len(recipes) >= 3
-    amount_pattern = re.compile(r"\d")
-    for recipe in recipes[:3]:
-        ingredients = recipe.get("ingredients") or recipe.get("ingredients_pl") or []
-        assert ingredients, f"Recipe {recipe.get('title')} has no ingredients"
-        # At least one ingredient should contain a digit (amount)
-        combined = " ".join(str(i) for i in ingredients)
-        assert amount_pattern.search(combined), f"Recipe ingredients should include amounts: {ingredients}"
+    data = r.json()
+    assert data["country"] == "DE"
+    assert data["language"] == "de"
+    assert data["recipes"] == []
 
 
 def test_fallback_starter_recipes_ingredients_have_amounts():
@@ -98,11 +83,9 @@ def test_fallback_starter_recipes_ingredients_have_amounts():
 
 
 @patch("app.routers.trial._geo_from_ip")
-@patch("app.routers.trial.get_starter_recipes")
-def test_trial_start_resume_by_device_id_returns_same_credits(mock_starter, mock_geo, client):
+def test_trial_start_resume_by_device_id_returns_same_credits(mock_geo, client):
     """Sending device_id of an existing trial resumes it and returns actual remaining_actions, not 5."""
     mock_geo.return_value = {"country_code": "PL"}
-    mock_starter.return_value = _three_starter_recipes()
 
     r = client.post("/api/trial/start", json={})
     assert r.status_code == 200
@@ -110,6 +93,7 @@ def test_trial_start_resume_by_device_id_returns_same_credits(mock_starter, mock
     device_id = data.get("device_id")
     assert device_id, "First trial start must return device_id"
     assert data["remaining_actions"] == 5
+    assert data["recipes"] == []
 
     # Use 2 actions (e.g. quota enforcement would increment used_actions)
     db = TestSessionLocal()
@@ -130,14 +114,12 @@ def test_trial_start_resume_by_device_id_returns_same_credits(mock_starter, mock
     data2 = r2.json()
     assert data2["remaining_actions"] == 3
     assert data2["device_id"] == device_id
-    assert len(data2["recipes"]) == 3
+    assert len(data2["recipes"]) == 0
 
 
 @patch("app.routers.trial._geo_from_ip")
-@patch("app.routers.trial.get_starter_recipes")
-def test_trial_start_ip_guard_429(mock_starter, mock_geo, client):
+def test_trial_start_ip_guard_429(mock_geo, client):
     mock_geo.return_value = {"country_code": "US"}
-    mock_starter.return_value = _three_starter_recipes()
 
     # Create 3 trial sessions from same IP in last 24h
     db = TestSessionLocal()

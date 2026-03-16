@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import create_trial_token
 from ..database import get_db
-from ..services.starter_recipes import get_starter_recipes, add_starter_recipes_to_trial_session
 
 router = APIRouter(prefix="/api/trial", tags=["trial"])
 
@@ -110,8 +109,13 @@ def trial_start(
 
     client_ip = _client_ip(request)
     geo = _geo_from_ip(client_ip)
-    country_code = geo.get("country_code") or "PL"
-    language = _language_from_country(country_code)
+    # Prefer body country/language for new trials; no initial recipes
+    country_code = (body.country or "").strip().upper() or geo.get("country_code") or "US"
+    if len(country_code) != 2:
+        country_code = geo.get("country_code") or "US"
+    language = (body.language or "").strip().lower() or _language_from_country(country_code)
+    if language not in ("en", "pl", "he", "es", "fr", "de", "it", "pt", "ru", "ar", "uk", "nl", "tr", "ja", "zh", "cs", "hu", "ro", "el", "sv"):
+        language = "en"
 
     # IP guard: last 24h
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -152,28 +156,12 @@ def trial_start(
     db.refresh(session)
 
     trial_token = create_trial_token(token_id)
-    recipes_data = get_starter_recipes(country_code, language)
-    created_recipes = add_starter_recipes_to_trial_session(session, recipes_data[:3], db)
-    db.refresh(session)
-    recipes_out = [
-        schemas.TrialRecipeOut(
-            id=recipe.id,
-            title=recipe.title_pl or "Recipe",
-            ingredients=recipe.ingredients_pl or [],
-            steps=recipe.steps_pl or [],
-            author_name=recipe.author_name,
-            author_bio=recipe.author_bio,
-            author_image_url=recipe.author_image_url,
-            image_url=recipe.image_url,
-            diet_tags=recipe.diet_tags or [],
-        )
-        for recipe in created_recipes
-    ]
+    # No initial recipes: trial starts with empty list
     return schemas.TrialStartOut(
         trial_token=trial_token,
         country=country_code,
         language=language,
-        recipes=recipes_out,
+        recipes=[],
         remaining_actions=MAX_TRIAL_ACTIONS,
         device_id=new_device_id,
     )

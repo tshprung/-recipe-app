@@ -192,8 +192,24 @@ export default function RecipeListPage() {
   const [selectedCollection, setSelectedCollection] = useState(null)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [creatingCollection, setCreatingCollection] = useState(false)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('trial_welcome_dismissed') === '1'
+    } catch {
+      return false
+    }
+  })
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
+
+  const showWelcomeOverlay = trialToken && !user && !loading && recipes.length === 0 && !welcomeDismissed
+
+  function dismissWelcome() {
+    setWelcomeDismissed(true)
+    try {
+      sessionStorage.setItem('trial_welcome_dismissed', '1')
+    } catch (_) {}
+  }
 
   const TRIAL_COLLECTIONS_KEY = 'trial_collection_names'
 
@@ -510,7 +526,7 @@ export default function RecipeListPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowAdd(true)}
-            className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-5 py-2.5 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+            className="min-h-[44px] bg-white hover:bg-stone-50 text-stone-700 rounded-xl px-5 py-2.5 text-sm font-bold border border-stone-200 hover:border-stone-300 transition-all active:scale-95 flex items-center justify-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
             <span>{t('add')}</span>
@@ -518,7 +534,7 @@ export default function RecipeListPage() {
           <button
             type="button"
             onClick={() => navigate('/discover')}
-            className="min-h-[44px] rounded-xl px-4 py-2.5 text-sm font-semibold border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-amber-300 transition-all active:scale-95"
+            className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-4 py-2.5 text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95"
           >
             {t('findNewRecipes')}
           </button>
@@ -547,6 +563,22 @@ export default function RecipeListPage() {
               onRemoveFromList={handleRemoveFromList}
             />
           ))}
+        </div>
+      )}
+
+      {showWelcomeOverlay && (
+        <div
+          role="dialog"
+          aria-label="Welcome"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          onClick={dismissWelcome}
+        >
+          <div className="max-w-md rounded-2xl bg-white shadow-xl border border-stone-200 p-6 text-center pointer-events-none">
+            <p className="text-stone-800 text-base leading-relaxed">
+              Welcome to the Intelligent Kitchen Helper App. Add recipes or use the Find new recipes button to explore the rich recipe world.
+            </p>
+            <p className="mt-3 text-sm text-stone-500">Tap anywhere to close</p>
+          </div>
         </div>
       )}
 
