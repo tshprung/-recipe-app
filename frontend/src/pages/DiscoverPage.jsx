@@ -8,7 +8,7 @@ import { DISH_TYPES, DIET_OPTIONS, TIME_OPTIONS, ALLERGENS } from '../constants'
 import { getErrorMessage } from '../utils/errors'
 
 export default function DiscoverPage() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const navigate = useNavigate()
   const [dishTypes, setDishTypes] = useState(() => user?.dish_preferences ?? [])
@@ -54,6 +54,7 @@ export default function DiscoverPage() {
         custom_avoid_text: customAvoid || null,
         keywords: keywords || null,
         ingredients_text: ingredientsText || null,
+        target_language: lang || 'en',
       })
       .then(data => {
         setSuggestions(data.suggestions || [])

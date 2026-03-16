@@ -344,7 +344,19 @@ def create_recipe_from_ai_suggestion(
     title = (payload.title or "").strip() or "Untitled"
     ingredients = payload.ingredients or []
     steps = payload.steps or []
-    raw_input = title + "\n\nIngredients:\n" + "\n".join(f"- {s}" for s in ingredients) + "\n\nSteps:\n" + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
+    raw_input = title + "\n\nIngredients:\n" + "\n".join(f"- {s}" for s in ingredients) + "\n\nSteps:\n" + "\n".join(
+        f"{i + 1}. {s}" for i, s in enumerate(steps)
+    )
+
+    if current_user is not None:
+        target_language = (current_user.target_language or "").strip() or "en"
+        target_country = (current_user.target_country or "").strip() or "US"
+        target_city = (current_user.target_city or "").strip() or ""
+    else:
+        # Trial: fall back to trial locale snapshot.
+        target_language = (trial_session.language or "").strip() or "en"
+        target_country = (trial_session.country or "").strip() or "US"
+        target_city = ""
     recipe = models.Recipe(
         user_id=current_user.id if current_user is not None else None,
         trial_session_id=trial_session.id if trial_session is not None else None,
@@ -357,10 +369,10 @@ def create_recipe_from_ai_suggestion(
         substitutions={},
         notes={},
         raw_input=raw_input,
-        detected_language=current_user.target_language,
-        target_language=current_user.target_language,
-        target_country=current_user.target_country,
-        target_city=current_user.target_city,
+        detected_language=target_language,
+        target_language=target_language,
+        target_country=target_country,
+        target_city=target_city,
     )
     db.add(recipe)
     db.commit()
@@ -546,7 +558,10 @@ def discover_recipes(
         if not _has_unlimited_quota(current_user):
             user_for_update.transformations_used += 1
         db.commit()
-    if current_user is not None:
+    requested_lang = (payload.target_language or "").strip() if getattr(payload, "target_language", None) else ""
+    if requested_lang:
+        target_lang = requested_lang
+    elif current_user is not None:
         target_lang = (current_user.target_language or "").strip() or "en"
     else:
         target_lang = (trial_session.language or "").strip() or "en"

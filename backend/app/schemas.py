@@ -460,6 +460,7 @@ class DiscoverRequest(BaseModel):
     custom_avoid_text: str | None = None  # free-text exclusions
     keywords: str | None = None  # e.g. \"Passover charoset\", \"Italian quick dinner\"
     ingredients_text: str | None = None  # free-text ingredients user has/cares about
+    target_language: str | None = None  # optional explicit target language code from client (e.g. "en", "he")
 
 
 class DiscoverOut(BaseModel):
