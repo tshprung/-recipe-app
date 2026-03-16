@@ -68,8 +68,8 @@ def test_list_recipes_returns_only_current_users(client, auth_headers):
     assert len(r.json()) == 1
 
 
-def test_starter_recipes_added_on_first_login(client):
-    """New user gets 3 starter recipes on first login (fallback when no OpenAI key)."""
+def test_no_starter_recipes_added_automatically_on_login(client):
+    """New user does NOT get starter recipes automatically on first login."""
     with patch("app.routers.auth.send_verification_email"), patch(
         "app.routers.auth._verify_turnstile", return_value=True
     ):
@@ -91,12 +91,7 @@ def test_starter_recipes_added_on_first_login(client):
     r = client.get("/api/recipes/", headers=headers)
     assert r.status_code == 200
     recipes = r.json()
-    assert len(recipes) == 3
-    for rec in recipes:
-        assert "title_pl" in rec
-        assert "ingredients_pl" in rec
-        assert "steps_pl" in rec
-        assert rec.get("author_name") or rec.get("author_bio")
+    assert recipes == []
 
 
 def test_get_recipe_not_found(client, auth_headers):

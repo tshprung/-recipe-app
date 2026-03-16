@@ -183,6 +183,7 @@ export default function RecipeListPage() {
   const { t } = useLanguage()
   const { user, trialToken } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -463,6 +464,13 @@ export default function RecipeListPage() {
           >
             <span className="text-base leading-none">+</span>
             <span>{t('add')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/discover')}
+            className="min-h-[44px] rounded-xl px-4 py-2.5 text-sm font-semibold border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-amber-300 transition-all active:scale-95"
+          >
+            {t('findNewRecipes')}
           </button>
         </div>
       </div>

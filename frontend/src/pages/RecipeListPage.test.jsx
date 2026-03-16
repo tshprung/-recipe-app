@@ -7,11 +7,16 @@ import { LanguageProvider } from '../context/LanguageContext'
 import { AuthProvider } from '../context/AuthContext'
 import { ShoppingListProvider } from '../context/ShoppingListContext'
 
-vi.mock('../api/client', () => ({
-  api: {
-    get: vi.fn(),
-  },
-}))
+vi.mock('../api/client', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      get: vi.fn(),
+    },
+  }
+})
 
 function renderPage() {
   return render(
@@ -39,10 +44,11 @@ describe('RecipeListPage', () => {
     expect(screen.getByText('My recipes')).toBeInTheDocument()
   })
 
-  it('renders Add button', async () => {
+  it('renders Add button and Find new recipes button', async () => {
     renderPage()
     await screen.findByText('My recipes')
     expect(screen.getByRole('button', { name: '+Add' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find new recipes' })).toBeInTheDocument()
   })
 
   it('renders empty cookbook state when no recipes', async () => {

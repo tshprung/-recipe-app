@@ -488,7 +488,7 @@ def discover_recipes(
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    """Return 1-2 AI-suggested recipes based on dish type, diet, and optional max time. Consumes quota."""
+    """Return a single AI-suggested recipe based on preferences (dish type, diet, allergens, max time). Consumes quota."""
     trial_session = enforce_trial_or_user_quota(request, db, current_user)
     if current_user is not None and not current_user.is_verified:
         raise HTTPException(
@@ -499,6 +499,13 @@ def discover_recipes(
         user_for_update = (
             db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
         )
+        # Persist discovery preferences on the user so we can prefill next time.
+        user_for_update.dish_preferences = payload.dish_types or []
+        user_for_update.diet_filters = payload.diet_filters or []
+        if payload.allergens is not None:
+          user_for_update.allergens = payload.allergens or []
+        if payload.custom_avoid_text is not None:
+          user_for_update.custom_allergens_text = schemas.sanitize_custom_allergens_text(payload.custom_avoid_text)
         if not _has_unlimited_quota(current_user):
             user_for_update.transformations_used += 1
         db.commit()
@@ -515,6 +522,8 @@ def discover_recipes(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    # Always return at most one best-matching recipe.
+    recipes = recipes[:1] if recipes else []
     out = schemas.DiscoverOut(
         suggestions=[schemas.AISuggestedRecipeOut(
             title=r["title"],

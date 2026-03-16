@@ -140,12 +140,9 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     user.lockout_until = None
     db.commit()
 
-    # First-time starter recipes (one-time gift; does not consume credits)
-    try:
-        ensure_starter_recipes_for_user(user, db)
-    except Exception as e:
-        logger.warning("Starter recipes on login failed: %s", e)
-
+    # Starter recipes are no longer created automatically on login.
+    # Users can still add them explicitly from Settings (/users/me/fetch-starter-recipes)
+    # or via onboarding claim flows.
     return {"access_token": create_access_token(user.id)}
 
 

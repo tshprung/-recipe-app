@@ -4,15 +4,17 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
-import { DISH_TYPES, DIET_OPTIONS, TIME_OPTIONS } from '../constants'
+import { DISH_TYPES, DIET_OPTIONS, TIME_OPTIONS, ALLERGENS } from '../constants'
 import { getErrorMessage } from '../utils/errors'
 
 export default function DiscoverPage() {
   const { t } = useLanguage()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const navigate = useNavigate()
-  const [dishTypes, setDishTypes] = useState([])
-  const [dietFilters, setDietFilters] = useState([])
+  const [dishTypes, setDishTypes] = useState(() => user?.dish_preferences ?? [])
+  const [dietFilters, setDietFilters] = useState(() => user?.diet_filters ?? [])
+  const [allergens, setAllergens] = useState(() => user?.allergens ?? [])
+  const [customAvoid, setCustomAvoid] = useState(() => user?.custom_allergens_text ?? '')
   const [maxTime, setMaxTime] = useState(null)
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState(null)
@@ -30,6 +32,12 @@ export default function DiscoverPage() {
     setDietFilters(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }
 
+  function toggleAllergen(code) {
+    setAllergens(prev =>
+      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+    )
+  }
+
   function handleFind(e) {
     e.preventDefault()
     setError(null)
@@ -40,6 +48,8 @@ export default function DiscoverPage() {
         dish_types: dishTypes.length ? dishTypes : null,
         diet_filters: dietFilters.length ? dietFilters : null,
         max_time_minutes: maxTime || null,
+        allergens: allergens.length ? allergens : null,
+        custom_avoid_text: customAvoid || null,
       })
       .then(data => {
         setSuggestions(data.suggestions || [])
@@ -77,7 +87,7 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('discover')}</h2>
+      <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('findNewRecipes')}</h2>
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
       <form onSubmit={handleFind} className="space-y-4 mb-8">
@@ -116,6 +126,40 @@ export default function DiscoverPage() {
               </label>
             ))}
           </div>
+        </div>
+
+        <div>
+          <span className="block text-sm font-semibold text-stone-600 mb-2">{t('allergensToAvoid')} ({t('optional')})</span>
+          <div className="flex flex-wrap gap-2">
+            {ALLERGENS.map(a => (
+              <button
+                key={a.code}
+                type="button"
+                onClick={() => toggleAllergen(a.code)}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  allergens.includes(a.code)
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            {t('otherAllergens')} ({t('optional')})
+          </label>
+          <input
+            type="text"
+            value={customAvoid}
+            onChange={e => setCustomAvoid(e.target.value)}
+            placeholder={t('otherAllergensPlaceholder')}
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="text-xs text-stone-400 mt-1">{t('otherAllergensHint')}</p>
         </div>
 
         <div>

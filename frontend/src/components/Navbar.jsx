@@ -65,7 +65,7 @@ export default function Navbar() {
               : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
           }`}
         >
-          {t('discover')}
+          {t('findNewRecipes')}
         </Link>
         </div>
 
