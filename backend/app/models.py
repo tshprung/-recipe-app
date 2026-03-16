@@ -33,6 +33,7 @@ class User(Base):
     household_kids: Mapped[int | None] = mapped_column(Integer, nullable=True)
     diet_filters: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # e.g. ["vegetarian", "vegan"]
     default_servings: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
+    measurement_system: Mapped[str] = mapped_column(String(16), default="metric", nullable=False)  # e.g. "metric" or "imperial"
     allergens: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     custom_allergens_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 

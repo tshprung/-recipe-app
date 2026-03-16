@@ -115,15 +115,18 @@ export default function DiscoverPage() {
           <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dietFilters')}</span>
           <div className="flex flex-wrap gap-2">
             {DIET_OPTIONS.map(({ key, labelKey }) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={dietFilters.includes(key)}
-                  onChange={() => toggleDiet(key)}
-                  className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-                />
-                <span className="text-sm text-stone-700">{t(labelKey)}</span>
-              </label>
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleDiet(key)}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  dietFilters.includes(key)
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {t(labelKey)}
+              </button>
             ))}
           </div>
         </div>

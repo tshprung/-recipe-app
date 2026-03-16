@@ -42,7 +42,7 @@ export default function SettingsPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
     ui_language: user?.ui_language ?? 'en',
-    target_language: user?.target_language ?? 'pl',
+    target_language: user?.target_language ?? 'en',
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
     target_zip:      user?.target_zip      ?? '',
@@ -71,7 +71,7 @@ export default function SettingsPage() {
     if (user) {
       setForm({
         ui_language: user.ui_language ?? 'en',
-        target_language: user.target_language ?? 'pl',
+        target_language: user.target_language ?? 'en',
         target_country: user.target_country ?? 'PL',
         target_city: user.target_city ?? 'Wrocław',
         target_zip: user.target_zip ?? '',
@@ -341,40 +341,6 @@ export default function SettingsPage() {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Fetch starter recipes */}
-          <div className="mt-8 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
-            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">{t('fetchStarterRecipes')}</h3>
-            <p className="text-sm text-stone-600 mb-3">
-              {t('fetchStarterRecipesHint')}
-            </p>
-            {fetchStarterMessage && (
-              <p className={`text-sm mb-3 ${fetchStarterMessage.success ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {fetchStarterMessage.text}
-              </p>
-            )}
-            <button
-              type="button"
-              disabled={fetchStarterLoading}
-              onClick={async () => {
-                setFetchStarterLoading(true)
-                setFetchStarterMessage(null)
-                try {
-                  await api.post('/users/me/fetch-starter-recipes')
-                  setFetchStarterMessage({ success: true, text: t('fetchStarterRecipesDone') })
-                  refreshUser?.()
-                  navigate('/', { replace: true })
-                } catch (err) {
-                  setFetchStarterMessage({ success: false, text: err.message || t('somethingWentWrong') })
-                } finally {
-                  setFetchStarterLoading(false)
-                }
-              }}
-              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl px-5 py-2.5 text-sm font-semibold transition"
-            >
-              {fetchStarterLoading ? t('loading') : t('fetchStarterRecipesButton')}
-            </button>
           </div>
 
           {/* Delete account */}

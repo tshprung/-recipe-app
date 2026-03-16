@@ -170,6 +170,7 @@ class UserSettings(BaseModel):
     default_servings: int = Field(default=4, ge=1, le=24)
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
+    measurement_system: str = "metric"
 
     @field_validator("allergens")
     @classmethod
@@ -196,6 +197,7 @@ class UserSettingsUpdate(BaseModel):
     default_servings: int | None = None
     allergens: list[str] | None = None
     custom_allergens_text: str | None = None
+    measurement_system: str | None = None
 
     @field_validator("allergens")
     @classmethod
