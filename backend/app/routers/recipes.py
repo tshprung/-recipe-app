@@ -402,26 +402,45 @@ def list_collections(
 def create_collection(
     payload: schemas.RecipeCollectionCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
-    """Create a new filter/collection name. Logged-in users only; name is added to your filter list."""
+    """
+    Create a new filter/collection name.
+
+    - Logged-in users: name is added to user.filter_names and merged with names from recipes.
+    - Trial sessions: name is returned for immediate use and will persist once assigned to at least one trial recipe.
+    """
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     name = (payload.name or "").strip()
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filter name is required.")
-    user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
-    existing = list(user.filter_names or [])
     name_lower = name.lower()
-    if any((n or "").strip().lower() == name_lower for n in existing):
-        return schemas.RecipeCollectionsListOut(collections=sorted(set((n or "").strip() for n in existing) | {name}))
-    user.filter_names = existing + [name]
-    db.commit()
-    db.refresh(user)
-    names = set((n or "").strip() for n in (user.filter_names or []))
-    recipes = recipes_for_user_or_trial(db, user, None)
+
+    names: set[str] = set()
+
+    if current_user is not None:
+        user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+        existing = list(user.filter_names or [])
+        if any((n or "").strip().lower() == name_lower for n in existing):
+            names.update((n or "").strip() for n in existing if (n or "").strip())
+        else:
+            user.filter_names = existing + [name]
+            db.commit()
+            db.refresh(user)
+            names.update((n or "").strip() for n in (user.filter_names or []) if (n or "").strip())
+        recipes = recipes_for_user_or_trial(db, user, None)
+    else:
+        # Trial: rely on recipe collections + the new name in the response.
+        recipes = recipes_for_user_or_trial(db, None, trial_session)
+
     for r in recipes:
         for c in (r.collections or []):
             if isinstance(c, str) and c.strip():
                 names.add(c.strip())
+    names.add(name)
     return schemas.RecipeCollectionsListOut(collections=sorted(names))
 
 
@@ -429,22 +448,32 @@ def create_collection(
 def remove_collection(
     payload: schemas.RecipeCollectionRemove,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
-    """Delete a collection: remove it from all user recipes and from filter_names."""
+    """Delete a collection: remove it from all recipes and from filter_names (for logged-in users)."""
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     name = (payload.name or "").strip()
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Collection name is required.")
     name_lower = name.lower()
-    user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
-    recipes = db.query(models.Recipe).filter(models.Recipe.user_id == user.id).all()
+
+    # Remove from recipes (user or trial).
+    recipes = recipes_for_user_or_trial(db, current_user, trial_session)
     for r in recipes:
         if r.collections:
             new_list = [c for c in r.collections if (c or "").strip().lower() != name_lower]
             if len(new_list) != len(r.collections):
                 r.collections = new_list
-    if user.filter_names:
-        user.filter_names = [n for n in user.filter_names if (n or "").strip().lower() != name_lower]
+
+    # For logged-in users, also remove from filter_names.
+    if current_user is not None:
+        user = db.execute(select(models.User).where(models.User.id == current_user.id)).scalar_one()
+        if user.filter_names:
+            user.filter_names = [n for n in user.filter_names if (n or "").strip().lower() != name_lower]
+
     db.commit()
     return None
 

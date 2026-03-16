@@ -426,7 +426,7 @@ export default function RecipeListPage() {
               )}
             </span>
           ))}
-          {user && (
+          {(user || trialToken) && (
             <form onSubmit={handleCreateCollection} className="inline-flex gap-2 items-center">
               <input
                 type="text"
