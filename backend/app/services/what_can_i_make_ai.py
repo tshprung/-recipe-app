@@ -126,16 +126,29 @@ def suggest_recipe_from_ingredients(
 
 
 DISCOVER_SYSTEM_PROMPT = """\
-You suggest 1 or 2 recipes that match the user's preferences (dish type, diet, max time).
-Output valid JSON only — no markdown, no prose.
-Return a list of recipes; each recipe has title, ingredients (list of strings), and steps (list of strings).
-Respect diet restrictions. Keep recipes practical and easy to follow.
+You act as an internet-scale recipe search assistant.
+
+Your job:
+- Understand the user's theme/keywords (e.g. Passover charoset, Rosh Hashanah desserts, weekday pasta).
+- Use that plus dish types, diets, max cooking time, and important ingredients to imagine 1–2 excellent recipes
+  the user could realistically cook at home.
+
+Rules:
+- Output valid JSON only — no markdown, no prose outside the JSON.
+- Each recipe must have: title, ingredients (list of strings), steps (list of strings).
+- Respect diet restrictions and \"avoid\" terms as best you can.
+- Keep recipes practical, clear, and easy to follow.
+- If ingredients_text is provided, prefer recipes that meaningfully use those ingredients (but it's not mandatory).
 """
 
 DISCOVER_USER_TEMPLATE = """\
+Theme / keywords for internet search: {keywords}
+
 Dish types they like: {dish_list}
 Diet filters: {diet_list}
 Maximum total time in minutes (optional): {max_time}
+
+Ingredients they have / care about (optional free text): {ingredients_text}
 
 Output language: {output_lang}
 
@@ -154,6 +167,8 @@ def suggest_recipes_from_preferences(
     diet_filters: list[str] | None = None,
     max_time_minutes: int | None = None,
     target_language: str = "en",
+    keywords: str | None = None,
+    ingredients_text: str | None = None,
 ) -> list[dict]:
     """
     Return 1-2 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
@@ -165,11 +180,15 @@ def suggest_recipes_from_preferences(
     dish_list = ", ".join((s or "").strip() for s in (dish_types or []) if (s or "").strip()) or "any"
     diet_list = ", ".join((s or "").strip() for s in (diet_filters or []) if (s or "").strip()) or "none"
     max_time = str(max_time_minutes) if max_time_minutes and max_time_minutes > 0 else "no limit"
+    keywords_text = (keywords or "").strip() or "none specified"
+    ingredients_focus = (ingredients_text or "").strip() or "none specified"
     output_lang = _output_lang_name(target_language)
     prompt = DISCOVER_USER_TEMPLATE.format(
         dish_list=dish_list,
         diet_list=diet_list,
         max_time=max_time,
+        keywords=keywords_text,
+        ingredients_text=ingredients_focus,
         output_lang=output_lang,
     )
     client = OpenAI(api_key=api_key)

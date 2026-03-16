@@ -16,6 +16,8 @@ export default function DiscoverPage() {
   const [allergens, setAllergens] = useState(() => user?.allergens ?? [])
   const [customAvoid, setCustomAvoid] = useState(() => user?.custom_allergens_text ?? '')
   const [maxTime, setMaxTime] = useState(null)
+  const [keywords, setKeywords] = useState('')
+  const [ingredientsText, setIngredientsText] = useState('')
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState(null)
   const [error, setError] = useState(null)
@@ -50,6 +52,8 @@ export default function DiscoverPage() {
         max_time_minutes: maxTime || null,
         allergens: allergens.length ? allergens : null,
         custom_avoid_text: customAvoid || null,
+        keywords: keywords || null,
+        ingredients_text: ingredientsText || null,
       })
       .then(data => {
         setSuggestions(data.suggestions || [])
@@ -91,6 +95,32 @@ export default function DiscoverPage() {
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
       <form onSubmit={handleFind} className="space-y-4 mb-8">
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            {t('discoverKeywordsLabel')}
+          </label>
+          <input
+            type="text"
+            value={keywords}
+            onChange={e => setKeywords(e.target.value)}
+            placeholder="Passover charoset, quick pasta for two, birthday cake without nuts…"
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="text-xs text-stone-400 mt-1">{t('discoverKeywordsHint')}</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            {t('discoverIngredientsLabel')} ({t('optional')})
+          </label>
+          <textarea
+            value={ingredientsText}
+            onChange={e => setIngredientsText(e.target.value)}
+            rows={3}
+            placeholder={t('discoverIngredientsHint')}
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+          />
+        </div>
         <div>
           <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dishTypes')}</span>
           <div className="flex flex-wrap gap-2">

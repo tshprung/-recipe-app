@@ -548,6 +548,8 @@ def discover_recipes(
             diet_filters=payload.diet_filters or None,
             max_time_minutes=payload.max_time_minutes,
             target_language=target_lang,
+            keywords=payload.keywords,
+            ingredients_text=payload.ingredients_text,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))

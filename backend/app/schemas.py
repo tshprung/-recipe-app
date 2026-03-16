@@ -458,6 +458,8 @@ class DiscoverRequest(BaseModel):
     max_time_minutes: int | None = None  # e.g. 30, 60
     allergens: list[str] | None = None  # optional allergen codes to avoid
     custom_avoid_text: str | None = None  # free-text exclusions
+    keywords: str | None = None  # e.g. \"Passover charoset\", \"Italian quick dinner\"
+    ingredients_text: str | None = None  # free-text ingredients user has/cares about
 
 
 class DiscoverOut(BaseModel):
