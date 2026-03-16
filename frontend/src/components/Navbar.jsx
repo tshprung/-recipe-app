@@ -5,13 +5,14 @@ import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
   const { user, logout, trialToken, trialRemainingActions, leaveTrial } = useAuth()
-  const { t } = useLanguage()
+  const { t, setLang } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const { recipeIds, openPanel } = useShoppingList()
 
   function handleLogout() {
     logout()
+    setLang('en')
     navigate('/', { replace: true })
   }
 
