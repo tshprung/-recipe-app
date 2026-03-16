@@ -74,7 +74,80 @@ def recipe_complies_with_diets(recipe: dict, diet_filters: list[str] | None) -> 
         if diet == "dairy_free":
             if _DAIRY_KEYWORDS.search(text):
                 return False
+        if diet == "for_kids_under_1":
+            if re.search(r"\b(honey)\b", text, re.IGNORECASE):
+                return False
+            if re.search(r"\b(whole\s+nut|whole\s+peanut|whole\s+almond|whole\s+walnut)\b", text, re.IGNORECASE):
+                return False
+            adult_dish = re.search(
+                r"\b(taco|tacos|burrito|fajita|burger|pizza|spicy|chili\s+pepper|hot\s+sauce|crispy)\b",
+                text,
+                re.IGNORECASE,
+            )
+            if adult_dish:
+                return False
+        if diet == "for_kids":
+            if re.search(r"\b(alcohol|cocktail|wine|beer|spirits|rum|vodka)\b", text, re.IGNORECASE):
+                return False
     return True
+
+
+# Allergen code -> regex of forbidden ingredient keywords (no optional exception).
+_ALLERGEN_KEYWORDS = {
+    "milk": re.compile(
+        r"\b(milk|cream|butter|cheese|yogurt|yoghurt|whey|parmesan|mozzarella|ricotta|feta|cheddar|gouda)\b",
+        re.IGNORECASE,
+    ),
+    "eggs": re.compile(r"\b(egg|eggs)\b", re.IGNORECASE),
+    "fish": re.compile(r"\b(fish|salmon|tuna|cod|trout|sardine|anchovy)\b", re.IGNORECASE),
+    "crustaceans": re.compile(r"\b(shrimp|prawn|crab|lobster|crayfish)\b", re.IGNORECASE),
+    "molluscs": re.compile(r"\b(mussel|oyster|clam|squid|calamari|scallop)\b", re.IGNORECASE),
+    "peanuts": re.compile(r"\b(peanut|peanuts)\b", re.IGNORECASE),
+    "tree_nuts": re.compile(
+        r"\b(almond|walnut|hazelnut|cashew|pecan|pistachio|macadamia|brazil nut)\b",
+        re.IGNORECASE,
+    ),
+    "soybeans": re.compile(r"\b(soy|soya|tofu|edamame)\b", re.IGNORECASE),
+    "gluten_cereals": re.compile(
+        r"\b(wheat|barley|rye|flour|breadcrumb|pasta|noodle)\b",
+        re.IGNORECASE,
+    ),
+    "celery": re.compile(r"\b(celery)\b", re.IGNORECASE),
+    "mustard": re.compile(r"\b(mustard)\b", re.IGNORECASE),
+    "sesame": re.compile(r"\b(sesame)\b", re.IGNORECASE),
+    "sulphites": re.compile(r"\b(sulphite|sulfite|wine vinegar)\b", re.IGNORECASE),
+    "lupin": re.compile(r"\b(lupin|lupini)\b", re.IGNORECASE),
+}
+
+
+def recipe_complies_with_allergens(
+    recipe: dict,
+    allergen_codes: list[str] | None,
+    avoid_terms: list[str] | None,
+) -> bool:
+    """
+    Return True only if the recipe contains none of the given allergens or avoid terms.
+    Checks full recipe text; no exception for optional ingredients (e.g. "water or milk" fails when milk is an allergen).
+    """
+    if not allergen_codes and not avoid_terms:
+        return True
+    text = _recipe_text(recipe)
+    for code in allergen_codes or []:
+        c = (code or "").strip().lower()
+        if not c:
+            continue
+        pattern = _ALLERGEN_KEYWORDS.get(c)
+        if pattern and pattern.search(text):
+            return False
+    if avoid_terms:
+        for phrase in avoid_terms:
+            p = (phrase or "").strip()
+            if not p:
+                continue
+            if p.lower() in text:
+                return False
+    return True
+
 
 SYSTEM_PROMPT = """\
 You suggest a single recipe that the user can make with the ingredients they have.
@@ -127,6 +200,25 @@ _LANG_NAMES = {
 
 def _output_lang_name(code: str) -> str:
     return _LANG_NAMES.get((code or "").strip().lower(), "English")
+
+
+def _diet_list_for_prompt(diet_filters: list[str] | None) -> str:
+    """Build human-readable diet list for discover prompt (expand for_kids/for_kids_under_1)."""
+    if not diet_filters:
+        return "none"
+    expanded = []
+    for d in diet_filters:
+        s = (d or "").strip()
+        if not s:
+            continue
+        low = s.lower()
+        if low == "for_kids_under_1":
+            expanded.append("for_kids_under_1 (baby-safe: no honey, no whole nuts, soft textures, no added salt/sugar)")
+        elif low == "for_kids":
+            expanded.append("for_kids (family-friendly, no alcohol)")
+        else:
+            expanded.append(s)
+    return ", ".join(expanded) if expanded else "none"
 
 
 def suggest_recipe_from_ingredients(
@@ -213,7 +305,10 @@ Rules:
   - Vegetarian: no meat, no fish, no poultry.
   - Vegan: no animal products (no meat, fish, dairy, eggs, honey).
   - Dairy-free: no milk, cream, butter, cheese.
+  - for_kids_under_1: Recipes must be suitable for babies roughly 6–12 months. No honey, no whole nuts or choking-risk ingredients, no added salt or sugar, soft/mashable/pureed textures only. Examples: simple vegetable or fruit purees, soft mashes, very soft finger foods. NOT adult-style dishes (no tacos, burgers, pizza, stir-fries, spicy or crispy foods).
+  - for_kids: Family-friendly and age-appropriate; avoid heavy spice, alcohol, and obviously adult-only preparations.
   A recipe that only has the diet word in the title but violates it in ingredients/steps is NOT acceptable.
+- CRITICAL — Allergens/avoid: If the user lists allergens or avoid terms, the recipe must NOT contain any of those ingredients in ANY form—not even as an optional alternative (e.g. "water or milk" is forbidden when milk is an allergen).
 - Respect \"avoid\" terms as best you can.
 - Keep recipes practical, clear, and easy to follow.
 - If ingredients_text is provided, prefer recipes that meaningfully use those ingredients (but it's not mandatory).
@@ -225,6 +320,9 @@ Theme / keywords for internet search: {keywords}
 Dish types they like: {dish_list}
 Diet filters: {diet_list}
 Maximum total time in minutes (optional): {max_time}
+
+Allergens to avoid (must NOT appear in recipe in any form, including optional): {allergen_list}
+Other avoid terms (free text): {avoid_terms}
 
 Ingredients they have / care about (optional free text): {ingredients_text}
 
@@ -252,6 +350,8 @@ def suggest_recipes_from_preferences(
     keywords: str | None = None,
     ingredients_text: str | None = None,
     measurement_system: str = "metric",
+    allergens: list[str] | None = None,
+    custom_avoid_text: str | None = None,
 ) -> list[dict]:
     """
     Return up to 3 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
@@ -261,7 +361,9 @@ def suggest_recipes_from_preferences(
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
     dish_list = ", ".join((s or "").strip() for s in (dish_types or []) if (s or "").strip()) or "any"
-    diet_list = ", ".join((s or "").strip() for s in (diet_filters or []) if (s or "").strip()) or "none"
+    diet_list = _diet_list_for_prompt(diet_filters)
+    allergen_list = ", ".join((s or "").strip() for s in (allergens or []) if (s or "").strip()) or "none"
+    avoid_terms = (custom_avoid_text or "").strip() or "none"
     max_time = str(max_time_minutes) if max_time_minutes and max_time_minutes > 0 else "no limit"
     keywords_text = (keywords or "").strip() or "none specified"
     ingredients_focus = (ingredients_text or "").strip() or "none specified"
@@ -271,6 +373,8 @@ def suggest_recipes_from_preferences(
         dish_list=dish_list,
         diet_list=diet_list,
         max_time=max_time,
+        allergen_list=allergen_list,
+        avoid_terms=avoid_terms,
         keywords=keywords_text,
         ingredients_text=ingredients_focus,
         output_lang=output_lang,
@@ -312,7 +416,11 @@ def suggest_recipes_from_preferences(
                 "steps": [str(x).strip() for x in r.get("steps", []) if x],
                 "missing_ingredients": None,
             }
-            # Only include recipes that actually comply with selected diets (full recipe check).
-            if recipe_complies_with_diets(rec, diet_filters):
-                out.append(rec)
+            # Only include recipes that comply with diets and allergens (full recipe check).
+            if not recipe_complies_with_diets(rec, diet_filters):
+                continue
+            avoid_terms_list = [p.strip() for p in (custom_avoid_text or "").split(",") if (p or "").strip()]
+            if not recipe_complies_with_allergens(rec, allergens, avoid_terms_list if avoid_terms_list else None):
+                continue
+            out.append(rec)
     return out
