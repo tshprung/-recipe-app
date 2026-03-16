@@ -326,10 +326,17 @@ def create_recipe(
 def create_recipe_from_ai_suggestion(
     payload: schemas.FromAISuggestionRequest,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    user_and_trial: tuple = Depends(get_optional_user_and_trial),
 ):
-    """Create a recipe from an AI suggestion (e.g. What can I make). No translation, no quota consumed."""
-    if not current_user.is_verified:
+    """Create a recipe from an AI suggestion (e.g. Discover). No translation, no extra quota consumed.
+
+    - Logged-in users: recipe is saved on the user (requires verified email, like other recipe operations).
+    - Trial sessions: recipe is saved on the anonymous trial session.
+    """
+    current_user, trial_session = user_and_trial
+    if current_user is None and trial_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if current_user is not None and not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Verify your email before using the app.",
@@ -339,7 +346,8 @@ def create_recipe_from_ai_suggestion(
     steps = payload.steps or []
     raw_input = title + "\n\nIngredients:\n" + "\n".join(f"- {s}" for s in ingredients) + "\n\nSteps:\n" + "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps))
     recipe = models.Recipe(
-        user_id=current_user.id,
+        user_id=current_user.id if current_user is not None else None,
+        trial_session_id=trial_session.id if trial_session is not None else None,
         title_pl=title,
         title_original=title,
         ingredients_pl=ingredients,
@@ -517,7 +525,7 @@ def discover_recipes(
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    """Return a single AI-suggested recipe based on preferences (dish type, diet, allergens, max time). Consumes quota."""
+    """Return up to 3 AI-suggested recipes based on preferences (dish type, diet, allergens, max time). Consumes quota."""
     trial_session = enforce_trial_or_user_quota(request, db, current_user)
     if current_user is not None and not current_user.is_verified:
         raise HTTPException(
@@ -553,8 +561,8 @@ def discover_recipes(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
-    # Always return at most one best-matching recipe.
-    recipes = recipes[:1] if recipes else []
+    # Always return at most three best-matching recipes.
+    recipes = recipes[:3] if recipes else []
     out = schemas.DiscoverOut(
         suggestions=[schemas.AISuggestedRecipeOut(
             title=r["title"],

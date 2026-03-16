@@ -195,6 +195,28 @@ export default function RecipeListPage() {
 
   const { addRecipe, removeRecipe, isInList, evictFromList } = useShoppingList()
 
+  const TRIAL_COLLECTIONS_KEY = 'trial_collection_names'
+
+  function loadTrialCollections() {
+    try {
+      const raw = localStorage.getItem(TRIAL_COLLECTIONS_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  function saveTrialCollections(names) {
+    try {
+      const unique = Array.from(new Set((names || []).filter(Boolean)))
+      localStorage.setItem(TRIAL_COLLECTIONS_KEY, JSON.stringify(unique))
+    } catch {
+      // ignore storage errors in trial mode
+    }
+  }
+
   const fetchRecipes = useCallback(async (collection = null) => {
     // Call API when logged in or in trial (client sends user token or trial token).
     if (!user && !trialToken) {
@@ -259,7 +281,23 @@ export default function RecipeListPage() {
 
   useEffect(() => {
     if (user || trialToken) {
-      api.get('/recipes/collections').then(data => setCollectionList(data.collections || [])).catch(() => setCollectionList([]))
+      api
+        .get('/recipes/collections')
+        .then(data => {
+          let names = data.collections || []
+          if (!user && trialToken) {
+            const extra = loadTrialCollections()
+            names = Array.from(new Set([...names, ...extra])).sort()
+          }
+          setCollectionList(names)
+        })
+        .catch(() => {
+          if (!user && trialToken) {
+            setCollectionList(loadTrialCollections())
+          } else {
+            setCollectionList([])
+          }
+        })
     } else {
       setCollectionList([])
     }
@@ -322,10 +360,21 @@ export default function RecipeListPage() {
     setCreatingCollection(true)
     try {
       const data = await api.post('/recipes/collections', { name })
-      setCollectionList(data.collections || [])
+      if (user) {
+        const names = data.collections || []
+        setCollectionList(names)
+        setSelectedCollection(name)
+        fetchRecipes(name)
+      } else {
+        // Trial: merge with locally stored names and keep all recipes visible.
+        const apiNames = data.collections || []
+        const merged = Array.from(new Set([...apiNames, name]))
+        saveTrialCollections(merged)
+        setCollectionList(merged)
+        setSelectedCollection(null)
+        fetchRecipes(null)
+      }
       setNewCollectionName('')
-      setSelectedCollection(name)
-      fetchRecipes(name)
       showToast(t('collectionCreated'))
     } catch (err) {
       showToast(err.message || t('collectionCreateError'))
@@ -472,13 +521,6 @@ export default function RecipeListPage() {
             className="min-h-[44px] rounded-xl px-4 py-2.5 text-sm font-semibold border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-amber-300 transition-all active:scale-95"
           >
             {t('findNewRecipes')}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/what-can-i-make')}
-            className="min-h-[44px] rounded-xl px-4 py-2.5 text-sm font-semibold border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-amber-300 transition-all active:scale-95"
-          >
-            {t('whatCanIMake')}
           </button>
         </div>
       </div>

@@ -145,7 +145,36 @@ export default function RecipeDetailPage() {
 
   useEffect(() => {
     if (!id || !(user || trialToken)) return
-    api.get('/recipes/collections').then(data => setCollectionList(data.collections || [])).catch(() => setCollectionList([]))
+
+    const TRIAL_COLLECTIONS_KEY = 'trial_collection_names'
+    function loadTrialCollections() {
+      try {
+        const raw = localStorage.getItem(TRIAL_COLLECTIONS_KEY)
+        if (!raw) return []
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+
+    api
+      .get('/recipes/collections')
+      .then(data => {
+        let names = data.collections || []
+        if (!user && trialToken) {
+          const extra = loadTrialCollections()
+          names = Array.from(new Set([...names, ...extra])).sort()
+        }
+        setCollectionList(names)
+      })
+      .catch(() => {
+        if (!user && trialToken) {
+          setCollectionList(loadTrialCollections())
+        } else {
+          setCollectionList([])
+        }
+      })
   }, [id, user, trialToken])
 
   useEffect(() => {

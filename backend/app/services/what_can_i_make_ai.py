@@ -130,7 +130,7 @@ You act as an internet-scale recipe search assistant.
 
 Your job:
 - Understand the user's theme/keywords (e.g. Passover charoset, Rosh Hashanah desserts, weekday pasta).
-- Use that plus dish types, diets, max cooking time, and important ingredients to imagine 1–2 excellent recipes
+- Use that plus dish types, diets, max cooking time, and important ingredients to imagine up to 3 excellent recipes
   the user could realistically cook at home.
 
 Rules:
@@ -152,7 +152,7 @@ Ingredients they have / care about (optional free text): {ingredients_text}
 
 Output language: {output_lang}
 
-Return exactly this JSON (1 or 2 recipes):
+Return exactly this JSON (up to 3 recipes):
 {{
   "recipes": [
     {{ "title": "<recipe title in {output_lang}>", "ingredients": ["...", "..."], "steps": ["...", "..."] }},
@@ -171,7 +171,7 @@ def suggest_recipes_from_preferences(
     ingredients_text: str | None = None,
 ) -> list[dict]:
     """
-    Return 1-2 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
+    Return up to 3 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
     Raises RuntimeError on missing API key or rate limit.
     """
     api_key = os.getenv("OPENAI_API_KEY")
@@ -219,7 +219,7 @@ def suggest_recipes_from_preferences(
         return []
     recipes = data.get("recipes") or data.get("suggestions") or []
     out = []
-    for r in recipes[:2]:
+    for r in recipes[:3]:
         if isinstance(r, dict) and r.get("title"):
             out.append({
                 "title": str(r.get("title", "")).strip(),

@@ -70,7 +70,6 @@ export default function DiscoverPage() {
   }
 
   async function handleSaveToMyRecipes(sug) {
-    if (!user) return
     setAddingTitle(sug.title)
     setSavedId(null)
     try {
@@ -81,12 +80,84 @@ export default function DiscoverPage() {
       })
       setSavedId(created.id)
       setSavedTitle(sug.title)
-      refreshUser()
+      if (user) {
+        refreshUser()
+      }
     } catch (e) {
       setError(getErrorMessage(e, t))
     } finally {
       setAddingTitle(null)
     }
+  }
+
+  function SuggestionCard({ suggestion: sug, user, trialToken, addingTitle, savedTitle, savedId, onSave }) {
+    const [expanded, setExpanded] = useState(false)
+    const hasAccount = !!user
+    const inTrial = !user && !!trialToken
+
+    return (
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden p-4">
+        <h4 className="font-bold text-stone-800">{sug.title}</h4>
+        <p className="text-xs text-stone-500 mt-1">
+          {sug.ingredients?.length ?? 0} ingredients · {(sug.steps?.length ?? 0)} steps
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setExpanded(e => !e)}
+          className="mt-3 text-xs font-medium text-stone-600 hover:text-stone-800 underline"
+        >
+          {expanded ? 'Hide details' : 'View full recipe'}
+        </button>
+
+        {expanded && (
+          <div className="mt-3 space-y-3 text-sm text-stone-700">
+            <div>
+              <div className="font-semibold mb-1">Ingredients</div>
+              <ul className="list-disc list-inside space-y-0.5">
+                {(sug.ingredients ?? []).map((ing, idx) => (
+                  <li key={idx}>{ing}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="font-semibold mb-1">Steps</div>
+              <ol className="list-decimal list-inside space-y-0.5">
+                {(sug.steps ?? []).map((step, idx) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 flex items-center gap-2">
+          {(hasAccount || inTrial) ? (
+            <>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={addingTitle === sug.title}
+                className="text-sm font-semibold text-amber-600 hover:text-amber-700 disabled:opacity-50"
+              >
+                {addingTitle === sug.title ? '…' : savedTitle === sug.title ? t('saved') : t('addToMyRecipes')}
+              </button>
+              {savedTitle === sug.title && savedId && hasAccount && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/recipes/${savedId}`)}
+                  className="text-sm font-medium text-stone-600 hover:underline"
+                >
+                  {t('viewRecipe')}
+                </button>
+              )}
+            </>
+          ) : (
+            <span className="text-sm text-stone-500">{t('signInToSaveRecipes')}</span>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -236,40 +307,16 @@ export default function DiscoverPage() {
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-stone-800">{t('suggestions')}</h3>
           {suggestions.map((sug, i) => (
-            <div
+            <SuggestionCard
               key={i}
-              className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden p-4"
-            >
-              <h4 className="font-bold text-stone-800">{sug.title}</h4>
-              <p className="text-xs text-stone-500 mt-1">
-                {sug.ingredients?.length ?? 0} ingredients · {(sug.steps?.length ?? 0)} steps
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                {user ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleSaveToMyRecipes(sug)}
-                      disabled={addingTitle === sug.title}
-                      className="text-sm font-semibold text-amber-600 hover:text-amber-700 disabled:opacity-50"
-                    >
-                      {addingTitle === sug.title ? '…' : savedTitle === sug.title ? t('saved') : t('addToMyRecipes')}
-                    </button>
-                    {savedTitle === sug.title && savedId && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/recipes/${savedId}`)}
-                        className="text-sm font-medium text-stone-600 hover:underline"
-                      >
-                        {t('viewRecipe')}
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-sm text-stone-500">{t('signInToSaveRecipes')}</span>
-                )}
-              </div>
-            </div>
+              suggestion={sug}
+              user={user}
+              trialToken={trialToken}
+              addingTitle={addingTitle}
+              savedTitle={savedTitle}
+              savedId={savedId}
+              onSave={() => handleSaveToMyRecipes(sug)}
+            />
           ))}
         </div>
       )}
