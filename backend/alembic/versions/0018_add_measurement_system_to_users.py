@@ -1,6 +1,6 @@
 """add measurement_system to users
 
-Revision ID: 0019_add_measurement_system_to_users
+Revision ID: 0019_measurement_system
 Revises: 0018_user_filter_names
 Create Date: 2026-03-16
 """
@@ -10,7 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "0019_add_measurement_system_to_users"
+revision: str = "0019_measurement_system"
 down_revision: Union[str, None] = "0018_user_filter_names"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
