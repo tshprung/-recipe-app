@@ -1,7 +1,7 @@
 """add measurement_system to users
 
 Revision ID: 0018_add_measurement_system_to_users
-Revises: 0017_trial_session_device_id
+Revises: 0017_trial_device_id
 Create Date: 2026-03-16
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "0018_add_measurement_system_to_users"
-down_revision: Union[str, None] = "0017_trial_session_device_id"
+down_revision: Union[str, None] = "0017_trial_device_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
