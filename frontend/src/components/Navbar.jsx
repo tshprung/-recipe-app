@@ -34,7 +34,7 @@ export default function Navbar() {
     <nav className="bg-black/70 backdrop-blur border-b border-white/10 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)] text-stone-50">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 min-h-[56px] sm:h-16 flex items-center justify-between gap-2">
 
-        {/* Logo + What can I make */}
+        {/* Logo */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink">
         <Link to="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 flex-shrink">
           <div className="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm text-xl">
@@ -47,17 +47,6 @@ export default function Navbar() {
             <div className="text-[10px] sm:text-[11px] text-stone-400 mt-0.5 truncate">{t('appSubtitle')}</div>
           </div>
         </Link>
-        <Link
-          to="/what-can-i-make"
-          className={`hidden sm:flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-            location.pathname === '/what-can-i-make'
-              ? 'bg-amber-500/15 text-amber-300'
-              : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
-          }`}
-        >
-          {t('whatCanIMakeNav')}
-        </Link>
-        {/* Discover / Find new recipes entry point now lives next to + Add on My Recipes, not in the navbar. */}
         </div>
 
         {/* Right side: touch-friendly min sizes, responsive gaps */}
