@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -29,6 +30,18 @@ export default function Navbar() {
       ? t('creditsUnlimited')
       : t('creditsRemaining', { count: remaining })
   const trialQuotaLabel = t('creditsRemaining', { count: trialRemainingActions ?? 0 })
+
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  function handleSignOut() {
+    if (user) {
+      handleLogout()
+    } else if (isTrial) {
+      leaveTrial()
+      setLang('en')
+      navigate('/', { replace: true })
+    }
+  }
 
   return (
     <nav className="bg-black/70 backdrop-blur border-b border-white/10 shadow-sm sticky top-0 z-10 print:hidden pt-[env(safe-area-inset-top)] text-stone-50">
@@ -90,63 +103,45 @@ export default function Navbar() {
               Admin
             </Link>
           )}
-          <Link
-            to="/settings"
-            className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-            isSettings
-              ? 'bg-amber-500/15 text-amber-300'
-              : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
-            }`}
-          >
-            {t('settings')}
-          </Link>
 
-          <div className="w-px h-5 bg-stone-700 mx-0.5 sm:mx-1 hidden sm:block" />
-
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            {user ? (
-              <>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-sm flex-shrink-0">
-                  {initials}
-                </div>
-                <span className="text-sm text-stone-300 hidden md:block max-w-[160px] truncate">
-                  {user.email}
-                </span>
+          {/* User / trial account menu */}
+          <div className="relative ml-1">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(o => !o)}
+              className="min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-200 hover:bg-stone-800/60 hover:text-stone-50 flex items-center justify-center gap-2"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+            >
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-xs font-bold">
+                {user ? initials : '👤'}
+              </span>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-1 w-40 bg-stone-900 border border-stone-700 rounded-xl shadow-lg py-1 text-sm z-20">
                 <button
-                  onClick={handleLogout}
-                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-300 hover:bg-red-500/15 hover:text-red-300 transition-colors"
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    navigate('/settings')
+                  }}
+                  className={`w-full text-left px-3 py-2 hover:bg-stone-800/80 ${
+                    isSettings ? 'text-amber-300' : 'text-stone-100'
+                  }`}
                 >
-                  {t('logOut')}
+                  {t('settings')}
                 </button>
-              </>
-            ) : (
-              <>
-                <span className="text-xs text-stone-500 hidden sm:inline">Trial</span>
-                <Link
-                  to="/signin"
-                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    handleSignOut()
+                  }}
+                  className="w-full text-left px-3 py-2 text-red-300 hover:bg-red-500/10"
                 >
-                  {t('signIn')}
-                </Link>
-                <Link
-                  to="/register"
-                  className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-300 hover:text-stone-50 hover:bg-stone-700/50 transition-colors"
-                >
-                  {t('register')}
-                </Link>
-                {isTrial && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      leaveTrial()
-                      navigate('/', { replace: true })
-                    }}
-                    className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium text-stone-400 hover:text-stone-200 transition-colors"
-                  >
-                    {t('signOut')}
-                  </button>
-                )}
-              </>
+                  {t('signOut')}
+                </button>
+              </div>
             )}
           </div>
         </div>
