@@ -317,7 +317,8 @@ export default function RecipeListPage() {
   async function handleCreateCollection(e) {
     e.preventDefault()
     const name = (newCollectionName || '').trim()
-    if (!name || !user) return
+    // Allow both logged-in users and trial sessions to create collections.
+    if (!name || (!user && !trialToken)) return
     setCreatingCollection(true)
     try {
       const data = await api.post('/recipes/collections', { name })
