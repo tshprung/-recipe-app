@@ -42,6 +42,8 @@ DIET_LABELS = {
     "halal": "halal (Islamic dietary rules)",
     "nut_free": "nut-free (for allergies)",
     "low_sodium": "low-sodium (limited salt)",
+    "for_kids": "suitable for kids (family-friendly, not too spicy, age-appropriate)",
+    "for_kids_under_1": "suitable for babies under 1 year (no honey, no whole nuts, no added salt/sugar, soft and safe textures)",
 }
 
 SYSTEM_PROMPT = (

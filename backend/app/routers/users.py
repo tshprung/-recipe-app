@@ -86,7 +86,7 @@ def claim_starter_recipes(
     _CLAIM_ALLOWED = {
         "ui_language", "target_language", "target_country", "target_city", "target_zip",
         "dish_preferences", "household_adults", "household_kids", "diet_filters",
-        "default_servings", "allergens", "custom_allergens_text",
+        "default_servings", "measurement_system", "allergens", "custom_allergens_text",
     }
     for k, v in payload.model_dump(exclude_unset=True).items():
         if k in _CLAIM_ALLOWED:

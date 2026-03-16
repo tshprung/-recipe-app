@@ -5,7 +5,22 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { TrialExhaustedModal } from '../components/TrialExhaustedModal'
 import { DISH_TYPES, DIET_OPTIONS, TIME_OPTIONS, ALLERGENS } from '../constants'
+import { TRIAL_SETTINGS_KEY } from '../constants/storageKeys'
 import { getErrorMessage } from '../utils/errors'
+
+function getMeasurementSystem(user, trialToken) {
+  if (user?.measurement_system) return user.measurement_system
+  if (trialToken) {
+    try {
+      const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s?.measurement_system) return s.measurement_system
+      }
+    } catch (_) {}
+  }
+  return 'metric'
+}
 
 export default function DiscoverPage() {
   const { t, lang } = useLanguage()
@@ -55,6 +70,7 @@ export default function DiscoverPage() {
         keywords: keywords || null,
         ingredients_text: ingredientsText || null,
         target_language: lang || 'en',
+        measurement_system: getMeasurementSystem(user, trialToken),
       })
       .then(data => {
         setSuggestions(data.suggestions || [])

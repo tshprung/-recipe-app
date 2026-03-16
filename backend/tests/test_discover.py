@@ -1,7 +1,36 @@
 from unittest.mock import patch
 
 from app import models
+from app.services.what_can_i_make_ai import recipe_complies_with_diets
 from .conftest import TestSessionLocal, password_hash, CAPTCHA_DUMMY
+
+
+def test_recipe_complies_with_diets_kosher_rejects_meat_and_dairy():
+    """Kosher filter must reject recipes that mix meat and dairy."""
+    recipe = {
+        "title": "Kosher meatballs",
+        "ingredients": ["ground beef", "parmesan cheese", "egg", "breadcrumbs"],
+        "steps": ["Mix beef with cheese and bake"],
+    }
+    assert recipe_complies_with_diets(recipe, ["kosher"]) is False
+
+
+def test_recipe_complies_with_diets_kosher_accepts_vegetarian():
+    recipe = {
+        "title": "Vegetarian pasta",
+        "ingredients": ["pasta", "tomatoes", "basil", "olive oil"],
+        "steps": ["Cook pasta", "Toss with sauce"],
+    }
+    assert recipe_complies_with_diets(recipe, ["kosher"]) is True
+
+
+def test_recipe_complies_with_diets_kosher_rejects_pork():
+    recipe = {
+        "title": "Pork chops",
+        "ingredients": ["pork chops", "salt", "pepper"],
+        "steps": ["Fry the pork"],
+    }
+    assert recipe_complies_with_diets(recipe, ["kosher"]) is False
 
 
 @patch("app.routers.recipes.suggest_recipes_from_preferences")
@@ -48,7 +77,7 @@ def test_discover_persists_preferences_and_returns_single_recipe(mock_suggest, c
     token = r.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Mock AI suggestions: two recipes, but endpoint should only return the first/best match.
+    # Mock AI suggestions: two vegetarian recipes; both pass diet filter, endpoint returns up to 3.
     mock_suggest.return_value = [
         {"title": "Pasta Primavera", "ingredients": ["pasta"], "steps": ["cook pasta"]},
         {"title": "Tomato Soup", "ingredients": ["tomatoes"], "steps": ["cook soup"]},
@@ -65,7 +94,7 @@ def test_discover_persists_preferences_and_returns_single_recipe(mock_suggest, c
     assert r.status_code == 200
     data = r.json()
     assert "suggestions" in data
-    assert len(data["suggestions"]) == 1
+    assert len(data["suggestions"]) >= 1
     assert data["suggestions"][0]["title"] == "Pasta Primavera"
 
     # Preferences should be saved on the user for next time.

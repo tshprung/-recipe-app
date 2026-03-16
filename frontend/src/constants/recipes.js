@@ -15,6 +15,8 @@ export const DIET_OPTIONS = [
   { key: 'halal', labelKey: 'halal' },
   { key: 'nut_free', labelKey: 'nutFree' },
   { key: 'low_sodium', labelKey: 'lowSodium' },
+  { key: 'for_kids', labelKey: 'forKids' },
+  { key: 'for_kids_under_1', labelKey: 'forKidsUnder1' },
 ]
 
 /** Adaptation variant options (same keys as diet; used in RecipeDetail tabs/badges). */
@@ -31,6 +33,8 @@ export const VARIANT_BADGE = {
   halal: { labelKey: 'halal', cls: 'bg-teal-100 text-teal-700' },
   nut_free: { labelKey: 'nutFree', cls: 'bg-amber-100 text-amber-700' },
   low_sodium: { labelKey: 'lowSodium', cls: 'bg-rose-100 text-rose-700' },
+  for_kids: { labelKey: 'forKids', cls: 'bg-yellow-100 text-yellow-800' },
+  for_kids_under_1: { labelKey: 'forKidsUnder1', cls: 'bg-pink-100 text-pink-700' },
 }
 
 /** Discover page: max time filter options. */
@@ -46,5 +50,7 @@ export function variantLabelKey(key) {
   if (key === 'gluten_free') return 'glutenFree'
   if (key === 'nut_free') return 'nutFree'
   if (key === 'low_sodium') return 'lowSodium'
+  if (key === 'for_kids_under_1') return 'forKidsUnder1'
+  if (key === 'for_kids') return 'forKids'
   return key
 }

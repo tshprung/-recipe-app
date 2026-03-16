@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { api, getTrialToken, setTrialTokenStorage } from '../api/client'
 import { hashPasswordForTransport } from '../auth/passwordHash'
-import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_RECIPES_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
+import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_RECIPES_KEY, TRIAL_SETTINGS_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
 
 const AuthContext = createContext(null)
 // Keep in sync with backend quota.MAX_TRIAL_ACTIONS
@@ -46,6 +46,8 @@ export function AuthProvider({ children }) {
     setTrialRemainingStorage(null)
     try {
       localStorage.removeItem(TRIAL_RECIPES_KEY)
+      localStorage.removeItem(TRIAL_SETTINGS_KEY)
+      localStorage.setItem(LANG_STORAGE_KEY, 'en')
     } catch (_) {}
     setTrialTokenState(null)
     setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
@@ -172,6 +174,9 @@ export function AuthProvider({ children }) {
     setTrialToken(null)
     setTrialRemainingStorage(null)
     setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
+    try {
+      localStorage.setItem(LANG_STORAGE_KEY, 'en')
+    } catch (_) {}
   }
 
   async function setTokenFromOAuth(accessToken) {

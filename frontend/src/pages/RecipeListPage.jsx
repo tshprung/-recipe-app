@@ -26,6 +26,14 @@ const TAG_COLORS = [
   'bg-violet-100 text-violet-700',
 ]
 
+/** Stable color index from collection name for colored collection tags. */
+function collectionColorIndex(name) {
+  if (!name || typeof name !== 'string') return 0
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i) | 0
+  return Math.abs(h) % TAG_COLORS.length
+}
+
 function RecipeCard({ recipe, onDelete, onAddToList, onRemoveFromList }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
@@ -87,6 +95,23 @@ function RecipeCard({ recipe, onDelete, onAddToList, onRemoveFromList }) {
             ))}
             {recipe.tags.length > 3 && (
               <span className="text-xs text-stone-400">+{recipe.tags.length - 3}</span>
+            )}
+          </div>
+        )}
+
+        {/* Collection tags (colored by collection name) */}
+        {recipe.collections?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
+            {recipe.collections.slice(0, 5).map((coll, i) => (
+              <span
+                key={coll}
+                className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${TAG_COLORS[collectionColorIndex(coll)]}`}
+              >
+                {coll}
+              </span>
+            ))}
+            {recipe.collections.length > 5 && (
+              <span className="text-xs text-stone-400">+{recipe.collections.length - 5}</span>
             )}
           </div>
         )}

@@ -565,6 +565,11 @@ def discover_recipes(
         target_lang = (current_user.target_language or "").strip() or "en"
     else:
         target_lang = (trial_session.language or "").strip() or "en"
+    measurement = (payload.measurement_system or "").strip().lower()
+    if not measurement and current_user is not None:
+        measurement = (current_user.measurement_system or "").strip().lower()
+    if not measurement or measurement not in ("metric", "imperial"):
+        measurement = "metric"
     try:
         recipes = suggest_recipes_from_preferences(
             dish_types=payload.dish_types or None,
@@ -573,6 +578,7 @@ def discover_recipes(
             target_language=target_lang,
             keywords=payload.keywords,
             ingredients_text=payload.ingredients_text,
+            measurement_system=measurement,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))

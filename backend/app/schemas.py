@@ -236,6 +236,7 @@ class UserOut(BaseModel):
     household_kids: int | None = None
     diet_filters: list[str] = Field(default_factory=list)
     default_servings: int = 4
+    measurement_system: str = "metric"
     allergens: list[str] = Field(default_factory=list)
     custom_allergens_text: str | None = None
 
@@ -463,6 +464,7 @@ class DiscoverRequest(BaseModel):
     keywords: str | None = None  # e.g. \"Passover charoset\", \"Italian quick dinner\"
     ingredients_text: str | None = None  # free-text ingredients user has/cares about
     target_language: str | None = None  # optional explicit target language code from client (e.g. "en", "he")
+    measurement_system: str | None = None  # "metric" (g, kg, ml) or "imperial" (oz, lb, cups)
 
 
 class DiscoverOut(BaseModel):

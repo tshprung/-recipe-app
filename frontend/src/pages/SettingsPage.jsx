@@ -40,6 +40,7 @@ export default function SettingsPage() {
   const { user, trialToken, setUser, logout, refreshUser } = useAuth()
   const { t, lang, setLang } = useLanguage()
   const navigate = useNavigate()
+  const measurementDefault = (country) => (country === 'US' ? 'imperial' : 'metric')
   const [form, setForm] = useState({
     ui_language: user?.ui_language ?? 'en',
     target_language: user?.target_language ?? 'en',
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     household_kids: user?.household_kids ?? null,
     diet_filters: user?.diet_filters ?? [],
     default_servings: user?.default_servings ?? 1,
+    measurement_system: user?.measurement_system ?? measurementDefault(user?.target_country ?? 'PL'),
     allergens: user?.allergens ?? [],
     custom_allergens_text: user?.custom_allergens_text ?? '',
   })
@@ -80,6 +82,7 @@ export default function SettingsPage() {
         household_kids: user.household_kids ?? null,
         diet_filters: user.diet_filters ?? [],
         default_servings: user.default_servings ?? 1,
+        measurement_system: user.measurement_system ?? measurementDefault(user.target_country),
         allergens: user.allergens ?? [],
         custom_allergens_text: user.custom_allergens_text ?? '',
       })
@@ -90,11 +93,12 @@ export default function SettingsPage() {
         const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
         if (raw) {
           const saved = JSON.parse(raw)
+          const country = saved.target_country ?? prev.target_country
           setForm(prev => ({
             ...prev,
             ui_language: saved.ui_language ?? prev.ui_language,
             target_language: saved.target_language ?? prev.target_language,
-            target_country: saved.target_country ?? prev.target_country,
+            target_country: country,
             target_city: saved.target_city ?? prev.target_city,
             target_zip: saved.target_zip ?? prev.target_zip,
             dish_preferences: Array.isArray(saved.dish_preferences) ? saved.dish_preferences : prev.dish_preferences,
@@ -102,13 +106,14 @@ export default function SettingsPage() {
             household_kids: saved.household_kids ?? prev.household_kids,
             diet_filters: Array.isArray(saved.diet_filters) ? saved.diet_filters : prev.diet_filters,
             default_servings: saved.default_servings ?? prev.default_servings,
+            measurement_system: saved.measurement_system ?? measurementDefault(country),
             allergens: Array.isArray(saved.allergens) ? saved.allergens : prev.allergens,
             custom_allergens_text: saved.custom_allergens_text ?? prev.custom_allergens_text,
           }))
         }
       } catch (_) {}
     }
-  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.allergens, user?.custom_allergens_text, trialToken])
+  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.measurement_system, user?.allergens, user?.custom_allergens_text, trialToken])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -199,13 +204,32 @@ export default function SettingsPage() {
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('country')}</label>
             <select
               value={form.target_country}
-              onChange={e => setForm(f => ({ ...f, target_country: e.target.value }))}
+              onChange={e => {
+                const country = e.target.value
+                setForm(f => ({
+                  ...f,
+                  target_country: country,
+                  measurement_system: f.measurement_system ?? (country === 'US' ? 'imperial' : 'metric'),
+                }))
+              }}
               className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
             >
               {COUNTRIES.map(c => (
                 <option key={c.code} value={c.code}>{c.name}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('measurementSystem')}</label>
+            <select
+              value={form.measurement_system || 'metric'}
+              onChange={e => setForm(f => ({ ...f, measurement_system: e.target.value }))}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
+            >
+              <option value="metric">{t('measurementMetric')}</option>
+              <option value="imperial">{t('measurementImperial')}</option>
+            </select>
+            <p className="text-xs text-stone-400 mt-1.5">{t('measurementSystemHint')}</p>
           </div>
         </SettingsCard>
 
