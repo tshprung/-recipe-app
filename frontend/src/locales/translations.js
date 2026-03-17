@@ -219,7 +219,7 @@ export const translations = {
     addRecipeToShoppingList: 'Add recipe to shopping list',
     discover: 'Discover',
     findNewRecipes: 'Find new recipes',
-    mealPlan: 'Meal plan',
+    mealPlan: 'Weekly Meal Planner',
     mealPlanTitle: 'Weekly meal plan',
     mealPlanHint: 'Generate a 5–7 day plan based on your diet and preferences, then add all meals to your shopping list.',
     generateWeeklyPlan: 'Generate weekly plan',
