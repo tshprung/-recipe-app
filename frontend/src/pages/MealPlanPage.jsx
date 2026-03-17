@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -8,7 +9,7 @@ import { getErrorMessage } from '../utils/errors'
 
 export default function MealPlanPage() {
   const { t } = useLanguage()
-  const { user, refreshUser } = useAuth()
+  const { user, trialToken, refreshUser } = useAuth()
   const { refreshRecipeIds } = useShoppingList()
   const [plan, setPlan] = useState(null)
   const [loadingLatest, setLoadingLatest] = useState(true)
@@ -25,12 +26,18 @@ export default function MealPlanPage() {
   const [budget, setBudget] = useState('')
 
   useEffect(() => {
+    // Meal plans are currently for logged-in users only.
+    if (!user) {
+      setPlan(null)
+      setLoadingLatest(false)
+      return
+    }
     api
       .get('/meal-plan/latest')
       .then(data => setPlan(data))
       .catch(() => setPlan(null))
       .finally(() => setLoadingLatest(false))
-  }, [])
+  }, [user])
 
   useEffect(() => {
     if (user?.diet_filters && dietFilters.length === 0) setDietFilters(user.diet_filters)
@@ -91,6 +98,38 @@ export default function MealPlanPage() {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-10 h-10 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user && trialToken) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold text-stone-50 mb-1">{t('mealPlanTitle')}</h1>
+        <p className="text-stone-400 text-sm mb-6">{t('mealPlanHint')}</p>
+        <div className="bg-stone-900/60 border border-white/10 rounded-2xl p-5">
+          <p className="text-sm text-stone-200 font-semibold mb-1">
+            {t('signInToSeeMergedIngredients')}
+          </p>
+          <p className="text-xs text-stone-400">
+            Meal planning is available for registered accounts (so we can save your plan and build a full shopping list).
+          </p>
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Link
+              to="/register"
+              className="inline-flex justify-center rounded-xl px-4 py-3 text-sm font-semibold text-black bg-amber-400 hover:bg-amber-300 transition"
+            >
+              {t('register')}
+            </Link>
+            <Link
+              to="/signin"
+              className="inline-flex justify-center rounded-xl px-4 py-3 text-sm font-semibold ring-1 ring-white/10 hover:bg-white/10 transition text-stone-50"
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+            >
+              {t('signIn')}
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
