@@ -249,12 +249,24 @@ export default function MealPlanPage() {
     setGoogleCalExported(false)
     setGoogleCalExporting(true)
     try {
-      await api.post(`/calendar/google/export/meal-plan/${plan.id}`)
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      await api.post(`/calendar/google/export/meal-plan/${plan.id}?timezone_name=${encodeURIComponent(tz)}`)
       setGoogleCalExported(true)
     } catch (e) {
       setError(getErrorMessage(e, t))
     } finally {
       setGoogleCalExporting(false)
+    }
+  }
+
+  async function handleDisconnectGoogleCalendar() {
+    setError(null)
+    try {
+      await api.delete('/calendar/google/disconnect')
+      setGoogleCalConnected(false)
+      setGoogleCalExported(false)
+    } catch (e) {
+      setError(getErrorMessage(e, t))
     }
   }
 
@@ -281,14 +293,24 @@ export default function MealPlanPage() {
                 Connect Google Calendar
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={handleExportToGoogleCalendar}
-                disabled={!plan?.id || googleCalExporting}
-                className="min-h-[44px] px-4 py-2 rounded-xl bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition disabled:opacity-50"
-              >
-                {googleCalExporting ? 'Exporting…' : 'Export plan to Calendar'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportToGoogleCalendar}
+                  disabled={!plan?.id || googleCalExporting}
+                  className="min-h-[44px] px-4 py-2 rounded-xl bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition disabled:opacity-50"
+                >
+                  {googleCalExporting ? 'Exporting…' : 'Export plan to Calendar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnectGoogleCalendar}
+                  className="min-h-[44px] px-4 py-2 rounded-xl ring-1 ring-white/10 hover:bg-white/10 transition text-stone-50"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+                >
+                  Disconnect
+                </button>
+              </>
             )}
           </div>
         </div>

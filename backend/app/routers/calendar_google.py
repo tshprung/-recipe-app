@@ -127,6 +127,20 @@ def status_google_calendar(
     return {"connected": bool(row)}
 
 
+@router.delete("/disconnect")
+def disconnect_google_calendar(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    deleted = (
+        db.query(models.GoogleOAuthToken)
+        .filter(models.GoogleOAuthToken.user_id == current_user.id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"disconnected": True, "deleted_tokens": int(deleted or 0)}
+
+
 @router.get("/connect")
 def connect_google_calendar(
     request: Request,
