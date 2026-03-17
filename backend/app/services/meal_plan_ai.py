@@ -58,8 +58,8 @@ Return exactly this JSON (one meal per day):
 
 
 def generate_weekly_meal_plan(
-    num_days: int = 7,
     start_date: str,
+    num_days: int = 7,
     diet_filters: list[str] | None = None,
     allergens: list[str] | None = None,
     custom_avoid_text: str | None = None,
