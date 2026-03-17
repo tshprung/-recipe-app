@@ -472,6 +472,46 @@ class DiscoverOut(BaseModel):
     remaining_actions: int | None = None  # trial only; for frontend sync
 
 
+class MealPlanMealOut(BaseModel):
+    name: str
+    short_description: str
+    estimated_time_minutes: int
+    title: str
+    ingredients: list[str]
+    steps: list[str]
+
+
+class MealPlanDayOut(BaseModel):
+    date: str
+    meal: MealPlanMealOut
+
+
+class MealPlanGenerateRequest(BaseModel):
+    num_days: int = Field(ge=5, le=7, default=7)
+    diet_filters: list[str] | None = None
+    allergens: list[str] | None = None
+    custom_avoid_text: str | None = None
+    max_time_minutes: int | None = None
+    budget: str | None = None
+    start_date: str | None = None  # YYYY-MM-DD; default today
+
+
+class MealPlanOut(BaseModel):
+    id: int
+    start_date: str  # YYYY-MM-DD
+    days: list[MealPlanDayOut]
+
+    model_config = {"from_attributes": True}
+
+
+class MealPlanReplaceRequest(BaseModel):
+    day_index: int = Field(ge=0)
+
+
+class MealPlanAddToShoppingListOut(BaseModel):
+    recipe_ids: list[int]
+
+
 class FromAISuggestionRequest(BaseModel):
     """Create a recipe from an AI suggestion without calling translation (no extra credit)."""
     title: str

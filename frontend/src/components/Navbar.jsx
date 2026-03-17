@@ -135,6 +135,18 @@ export default function Navbar() {
                   type="button"
                   onClick={() => {
                     setMenuOpen(false)
+                    navigate('/meal-plan')
+                  }}
+                  className={`w-full text-left px-3 py-2 hover:bg-stone-800/80 ${
+                    location.pathname === '/meal-plan' ? 'text-amber-300' : 'text-stone-100'
+                  }`}
+                >
+                  {t('mealPlan')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
                     handleSignOut()
                   }}
                   className="w-full text-left px-3 py-2 text-red-300 hover:bg-red-500/10"

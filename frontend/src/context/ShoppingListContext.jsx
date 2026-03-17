@@ -28,7 +28,7 @@ export function ShoppingListProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false)
   const [actionLoadingId, setActionLoadingId] = useState(null)
 
-  useEffect(() => {
+  function fetchRecipeIds() {
     if (user) {
       api.get('/shopping-list/recipes')
         .then(data => setRecipeIds(new Set(data.recipe_ids)))
@@ -40,7 +40,15 @@ export function ShoppingListProvider({ children }) {
       return
     }
     setRecipeIds(new Set())
+  }
+
+  useEffect(() => {
+    fetchRecipeIds()
   }, [user, trialToken])
+
+  function refreshRecipeIds() {
+    fetchRecipeIds()
+  }
 
   async function addRecipe(id) {
     if (!user && trialToken) {
@@ -110,6 +118,7 @@ export function ShoppingListProvider({ children }) {
       isInList: id => recipeIds.has(id),
       actionLoadingId,
       evictFromList,
+      refreshRecipeIds,
     }}>
       {children}
     </ShoppingListContext.Provider>

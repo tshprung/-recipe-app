@@ -9,6 +9,7 @@ import AdminPage from './pages/AdminPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
 import DiscoverPage from './pages/DiscoverPage'
+import MealPlanPage from './pages/MealPlanPage'
 import SettingsPage from './pages/SettingsPage'
 import VerifyPage from './pages/VerifyPage'
 import TermsPage from './pages/TermsPage'
@@ -106,6 +107,7 @@ function AppRoutes() {
               <Route path="/register"   element={<OnboardingPage />} />
               <Route path="/admin"       element={user?.is_admin ? <AdminPage /> : <Navigate to="/" replace />} />
               <Route path="/discover" element={<DiscoverPage />} />
+              <Route path="/meal-plan" element={<MealPlanPage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
               <Route path="/settings"    element={<SettingsPage />} />
               <Route path="/verify"      element={<VerifyPage />} />
