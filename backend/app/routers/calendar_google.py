@@ -270,7 +270,7 @@ def export_meal_plan_to_calendar(
                 description_parts.append("Ingredients:\\n- " + "\\n- ".join(str(x) for x in ings if x))
             steps = meal.get("steps") or []
             if isinstance(steps, list) and steps:
-                description_parts.append("Steps:\\n" + "\\n".join(f\"{i+1}. {s}\" for i, s in enumerate(steps) if s))
+                description_parts.append("Steps:\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps) if s))
             description = "\\n\\n".join([p for p in description_parts if p])
 
             event = {
