@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -11,6 +11,7 @@ export default function MealPlanPage() {
   const { t } = useLanguage()
   const { user, trialToken, refreshUser } = useAuth()
   const { refreshRecipeIds } = useShoppingList()
+  const navigate = useNavigate()
   const [plan, setPlan] = useState(null)
   const [generateLoading, setGenerateLoading] = useState(false)
   const [replaceIndex, setReplaceIndex] = useState(null)
@@ -18,6 +19,8 @@ export default function MealPlanPage() {
   const [error, setError] = useState(null)
   const [addListSuccess, setAddListSuccess] = useState(false)
   const [openPreviewDate, setOpenPreviewDate] = useState(null)
+  const [savingDate, setSavingDate] = useState(null)
+  const [savedRecipeIdsByDate, setSavedRecipeIdsByDate] = useState({})
 
   // Form state for generating
   const [numDays, setNumDays] = useState(7)
@@ -43,6 +46,8 @@ export default function MealPlanPage() {
     setAddListSuccess(false)
     setReplaceIndex(null)
     setOpenPreviewDate(null)
+    setSavingDate(null)
+    setSavedRecipeIdsByDate({})
     setPlan(null)
     setNumDays(7)
     setDietFilters([])
@@ -116,6 +121,27 @@ export default function MealPlanPage() {
       })
       .catch(e => setError(getErrorMessage(e, t)))
       .finally(() => setAddToListLoading(false))
+  }
+
+  async function handleSaveDayToMyRecipes(day) {
+    if (!day?.meal?.title) return
+    setError(null)
+    setSavingDate(day.date)
+    try {
+      const created = await api.post('/recipes/from-ai-suggestion', {
+        title: day.meal.title,
+        ingredients: day.meal.ingredients ?? [],
+        steps: day.meal.steps ?? [],
+      })
+      if (created?.id) {
+        setSavedRecipeIdsByDate((prev) => ({ ...prev, [day.date]: created.id }))
+      }
+      refreshUser?.()
+    } catch (e) {
+      setError(getErrorMessage(e, t))
+    } finally {
+      setSavingDate(null)
+    }
   }
 
   if (!user && trialToken) {
@@ -193,6 +219,25 @@ export default function MealPlanPage() {
                     >
                       {openPreviewDate === day.date ? 'Hide details' : 'Preview recipe'}
                     </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveDayToMyRecipes(day)}
+                        disabled={savingDate === day.date || !!savedRecipeIdsByDate[day.date]}
+                        className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
+                      >
+                        {savingDate === day.date ? t('adding') : savedRecipeIdsByDate[day.date] ? t('addedToRecipes') : t('addToMyRecipes')}
+                      </button>
+                      {!!savedRecipeIdsByDate[day.date] && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/recipes/${savedRecipeIdsByDate[day.date]}`)}
+                          className="text-sm font-medium text-stone-600 hover:underline"
+                        >
+                          {t('viewRecipe')}
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleReplaceDay(idx)}
