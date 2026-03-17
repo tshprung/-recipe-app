@@ -78,6 +78,19 @@ export default function Navbar() {
             )}
           </button>
 
+          {user && (
+            <Link
+              to="/meal-plan"
+              className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                location.pathname === '/meal-plan'
+                  ? 'bg-amber-500/15 text-amber-300'
+                  : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-50'
+              }`}
+            >
+              {t('mealPlan')}
+            </Link>
+          )}
+
           <div className="w-px h-5 bg-stone-700 mx-0.5 sm:mx-1 hidden sm:block" />
 
           {user && (
