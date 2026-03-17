@@ -12,7 +12,6 @@ export default function MealPlanPage() {
   const { user, trialToken, refreshUser } = useAuth()
   const { refreshRecipeIds } = useShoppingList()
   const [plan, setPlan] = useState(null)
-  const [loadingLatest, setLoadingLatest] = useState(true)
   const [generateLoading, setGenerateLoading] = useState(false)
   const [replaceIndex, setReplaceIndex] = useState(null)
   const [addToListLoading, setAddToListLoading] = useState(false)
@@ -26,22 +25,45 @@ export default function MealPlanPage() {
   const [budget, setBudget] = useState('')
 
   useEffect(() => {
-    // Meal plans are currently for logged-in users only.
-    if (!user) {
-      setPlan(null)
-      setLoadingLatest(false)
-      return
-    }
-    api
-      .get('/meal-plan/latest')
-      .then(data => setPlan(data))
-      .catch(() => setPlan(null))
-      .finally(() => setLoadingLatest(false))
-  }, [user])
-
-  useEffect(() => {
     if (user?.diet_filters && dietFilters.length === 0) setDietFilters(user.diet_filters)
   }, [user?.diet_filters])
+
+  function isDirty() {
+    if (plan?.days?.length) return true
+    if (numDays !== 7) return true
+    if ((dietFilters?.length ?? 0) > 0) return true
+    if (maxTime != null) return true
+    if ((budget || '').trim()) return true
+    return false
+  }
+
+  function resetToClean() {
+    setError(null)
+    setAddListSuccess(false)
+    setReplaceIndex(null)
+    setPlan(null)
+    setNumDays(7)
+    setDietFilters([])
+    setMaxTime(null)
+    setBudget('')
+  }
+
+  function confirmAndResetIfDirty() {
+    if (!isDirty()) {
+      resetToClean()
+      return
+    }
+    const ok = window.confirm('Are you sure? This will remove your current Meal Plan and choices.')
+    if (ok) resetToClean()
+  }
+
+  useEffect(() => {
+    function onResetRequest() {
+      confirmAndResetIfDirty()
+    }
+    window.addEventListener('mealplan:reset-request', onResetRequest)
+    return () => window.removeEventListener('mealplan:reset-request', onResetRequest)
+  }, [plan, numDays, dietFilters, maxTime, budget])
 
   function toggleDiet(key) {
     setDietFilters(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
@@ -94,14 +116,6 @@ export default function MealPlanPage() {
       .finally(() => setAddToListLoading(false))
   }
 
-  if (loadingLatest) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-10 h-10 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   if (!user && trialToken) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -141,6 +155,15 @@ export default function MealPlanPage() {
 
       {plan?.days?.length > 0 ? (
         <>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={confirmAndResetIfDirty}
+              className="min-h-[40px] px-3 py-2 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
+            >
+              Back / Cancel
+            </button>
+          </div>
           <div className="space-y-4 mb-8">
             {plan.days.map((day, idx) => (
               <div
@@ -188,6 +211,15 @@ export default function MealPlanPage() {
       ) : (
         <>
           <p className="text-stone-400 text-sm mb-4">{t('noMealPlan')}</p>
+          <div className="flex justify-end mb-3">
+            <button
+              type="button"
+              onClick={confirmAndResetIfDirty}
+              className="min-h-[40px] px-3 py-2 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
+            >
+              Clear / Start over
+            </button>
+          </div>
           <form onSubmit={handleGenerate} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-stone-300 mb-1.5">

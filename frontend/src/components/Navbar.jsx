@@ -81,6 +81,12 @@ export default function Navbar() {
           {(user || isTrial) && (
             <Link
               to="/meal-plan"
+              onClick={(e) => {
+                if (location.pathname === '/meal-plan') {
+                  e.preventDefault()
+                  window.dispatchEvent(new CustomEvent('mealplan:reset-request'))
+                }
+              }}
               className={`min-h-[44px] flex items-center px-2.5 sm:px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 location.pathname === '/meal-plan'
                   ? 'bg-amber-500/15 text-amber-300'
