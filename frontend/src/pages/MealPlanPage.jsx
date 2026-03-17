@@ -24,6 +24,10 @@ export default function MealPlanPage() {
 
   // Form state for generating
   const [numDays, setNumDays] = useState(7)
+  const [mealTypes, setMealTypes] = useState(['dinner'])
+  const [proteinTypes, setProteinTypes] = useState(['chicken'])
+  const [meatMealsPerWeek, setMeatMealsPerWeek] = useState(3)
+  const [fishMealsPerWeek, setFishMealsPerWeek] = useState(1)
   const [dietFilters, setDietFilters] = useState(() => user?.diet_filters ?? [])
   const [maxTime, setMaxTime] = useState(null)
   const [budget, setBudget] = useState('')
@@ -35,6 +39,10 @@ export default function MealPlanPage() {
   function isDirty() {
     if (plan?.days?.length) return true
     if (numDays !== 7) return true
+    if ((mealTypes?.length ?? 0) !== 1 || mealTypes?.[0] !== 'dinner') return true
+    if ((proteinTypes?.length ?? 0) !== 1 || proteinTypes?.[0] !== 'chicken') return true
+    if (meatMealsPerWeek !== 3) return true
+    if (fishMealsPerWeek !== 1) return true
     if ((dietFilters?.length ?? 0) > 0) return true
     if (maxTime != null) return true
     if ((budget || '').trim()) return true
@@ -50,6 +58,10 @@ export default function MealPlanPage() {
     setSavedRecipeIdsByDate({})
     setPlan(null)
     setNumDays(7)
+    setMealTypes(['dinner'])
+    setProteinTypes(['chicken'])
+    setMeatMealsPerWeek(3)
+    setFishMealsPerWeek(1)
     setDietFilters([])
     setMaxTime(null)
     setBudget('')
@@ -76,6 +88,31 @@ export default function MealPlanPage() {
     setDietFilters(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }
 
+  const MEAL_TYPE_OPTIONS = [
+    { key: 'breakfast', label: 'Breakfast' },
+    { key: 'second_breakfast', label: 'Second breakfast' },
+    { key: 'lunch', label: 'Lunch' },
+    { key: 'afternoon_snack', label: 'Afternoon' },
+    { key: 'dinner', label: 'Dinner' },
+  ]
+
+  const PROTEIN_OPTIONS = [
+    { key: 'chicken', label: 'Chicken' },
+    { key: 'turkey', label: 'Turkey' },
+    { key: 'beef', label: 'Beef' },
+    { key: 'fish', label: 'Fish' },
+    { key: 'tofu', label: 'Tofu' },
+    { key: 'eggs', label: 'Eggs' },
+  ]
+
+  function toggleMealType(key) {
+    setMealTypes(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
+
+  function toggleProtein(key) {
+    setProteinTypes(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+  }
+
   function handleGenerate(e) {
     e.preventDefault()
     setError(null)
@@ -83,6 +120,10 @@ export default function MealPlanPage() {
     api
       .post('/meal-plan/generate', {
         num_days: numDays,
+        meal_types: mealTypes.length ? mealTypes : ['dinner'],
+        protein_types: proteinTypes.length ? proteinTypes : null,
+        meat_meals_per_week: meatMealsPerWeek ?? null,
+        fish_meals_per_week: fishMealsPerWeek ?? null,
         diet_filters: dietFilters.length ? dietFilters : null,
         max_time_minutes: maxTime || null,
         budget: budget.trim() || null,
@@ -95,11 +136,11 @@ export default function MealPlanPage() {
       .finally(() => setGenerateLoading(false))
   }
 
-  function handleReplaceDay(dayIndex) {
+  function handleReplaceMeal(dayIndex, mealIndex) {
     setError(null)
-    setReplaceIndex(dayIndex)
+    setReplaceIndex(`${dayIndex}:${mealIndex}`)
     api
-      .post(`/meal-plan/${plan.id}/replace-day`, { day_index: dayIndex })
+      .post(`/meal-plan/${plan.id}/replace-day`, { day_index: dayIndex, meal_index: mealIndex })
       .then(data => {
         setPlan(data)
         refreshUser()
@@ -123,18 +164,18 @@ export default function MealPlanPage() {
       .finally(() => setAddToListLoading(false))
   }
 
-  async function handleSaveDayToMyRecipes(day) {
-    if (!day?.meal?.title) return
+  async function handleSaveMealToMyRecipes(dayDate, meal) {
+    if (!meal?.title) return
     setError(null)
-    setSavingDate(day.date)
+    setSavingDate(dayDate)
     try {
       const created = await api.post('/recipes/from-ai-suggestion', {
-        title: day.meal.title,
-        ingredients: day.meal.ingredients ?? [],
-        steps: day.meal.steps ?? [],
+        title: meal.title,
+        ingredients: meal.ingredients ?? [],
+        steps: meal.steps ?? [],
       })
       if (created?.id) {
-        setSavedRecipeIdsByDate((prev) => ({ ...prev, [day.date]: created.id }))
+        setSavedRecipeIdsByDate((prev) => ({ ...prev, [`${dayDate}::${meal.meal_type || 'meal'}`]: created.id }))
       }
       refreshUser?.()
     } catch (e) {
@@ -198,77 +239,92 @@ export default function MealPlanPage() {
                 key={day.date}
                 className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 text-stone-800"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                      {day.date}
-                    </p>
-                    <h3 className="font-bold text-lg text-stone-800">{day.meal.name}</h3>
-                    {day.meal.short_description && (
-                      <p className="text-sm text-stone-600 mt-1">{day.meal.short_description}</p>
-                    )}
-                    <p className="text-xs text-stone-500 mt-1">
-                      ~{day.meal.estimated_time_minutes} min
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 items-end flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setOpenPreviewDate((prev) => (prev === day.date ? null : day.date))}
-                      className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200"
-                    >
-                      {openPreviewDate === day.date ? 'Hide details' : 'Preview recipe'}
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSaveDayToMyRecipes(day)}
-                        disabled={savingDate === day.date || !!savedRecipeIdsByDate[day.date]}
-                        className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
-                      >
-                        {savingDate === day.date ? t('adding') : savedRecipeIdsByDate[day.date] ? t('addedToRecipes') : t('addToMyRecipes')}
-                      </button>
-                      {!!savedRecipeIdsByDate[day.date] && (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/recipes/${savedRecipeIdsByDate[day.date]}`)}
-                          className="text-sm font-medium text-stone-600 hover:underline"
-                        >
-                          {t('viewRecipe')}
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleReplaceDay(idx)}
-                      disabled={replaceIndex !== null}
-                      className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
-                    >
-                      {replaceIndex === idx ? '…' : t('replaceMeal')}
-                    </button>
-                  </div>
-                </div>
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+                  {day.date}
+                </p>
 
-                {openPreviewDate === day.date && (
-                  <div className="mt-4 border-t border-stone-200 pt-4 space-y-4">
-                    <div>
-                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Ingredients</p>
-                      <ul className="space-y-1 text-sm text-stone-700 list-disc pl-5">
-                        {(day.meal.ingredients || []).map((ing, i) => (
-                          <li key={i}>{ing}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Steps</p>
-                      <ol className="space-y-1 text-sm text-stone-700 list-decimal pl-5">
-                        {(day.meal.steps || []).map((step, i) => (
-                          <li key={i}>{step}</li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-4">
+                  {(day.meals || []).map((meal, mealIdx) => {
+                    const previewKey = `${day.date}::${meal.meal_type || mealIdx}`
+                    const savedKey = `${day.date}::${meal.meal_type || 'meal'}`
+                    const savedId = savedRecipeIdsByDate[savedKey]
+                    return (
+                      <div key={previewKey} className="rounded-xl border border-stone-200 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-1">
+                              {(meal.meal_type || 'meal').replaceAll('_', ' ')}
+                            </p>
+                            <h3 className="font-bold text-lg text-stone-800">{meal.name}</h3>
+                            {meal.short_description && (
+                              <p className="text-sm text-stone-600 mt-1">{meal.short_description}</p>
+                            )}
+                            <p className="text-xs text-stone-500 mt-1">
+                              ~{meal.estimated_time_minutes} min
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2 items-end flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setOpenPreviewDate((prev) => (prev === previewKey ? null : previewKey))}
+                              className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200"
+                            >
+                              {openPreviewDate === previewKey ? 'Hide details' : 'Preview recipe'}
+                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMealToMyRecipes(day.date, meal)}
+                                disabled={savingDate === day.date || !!savedId}
+                                className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
+                              >
+                                {savingDate === day.date ? t('adding') : savedId ? t('addedToRecipes') : t('addToMyRecipes')}
+                              </button>
+                              {!!savedId && (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/recipes/${savedId}`)}
+                                  className="text-sm font-medium text-stone-600 hover:underline"
+                                >
+                                  {t('viewRecipe')}
+                                </button>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleReplaceMeal(idx, mealIdx)}
+                              disabled={replaceIndex !== null}
+                              className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
+                            >
+                              {replaceIndex === `${idx}:${mealIdx}` ? '…' : t('replaceMeal')}
+                            </button>
+                          </div>
+                        </div>
+
+                        {openPreviewDate === previewKey && (
+                          <div className="mt-4 border-t border-stone-200 pt-4 space-y-4">
+                            <div>
+                              <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Ingredients</p>
+                              <ul className="space-y-1 text-sm text-stone-700 list-disc pl-5">
+                                {(meal.ingredients || []).map((ing, i) => (
+                                  <li key={i}>{ing}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Steps</p>
+                              <ol className="space-y-1 text-sm text-stone-700 list-decimal pl-5">
+                                {(meal.steps || []).map((step, i) => (
+                                  <li key={i}>{step}</li>
+                                ))}
+                              </ol>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ))}
           </div>
@@ -311,6 +367,72 @@ export default function MealPlanPage() {
                 <option value={6}>6</option>
                 <option value={7}>7</option>
               </select>
+            </div>
+
+            <div>
+              <span className="block text-sm font-semibold text-stone-300 mb-2">Meal types</span>
+              <div className="flex flex-wrap gap-2">
+                {MEAL_TYPE_OPTIONS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleMealType(key)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      mealTypes.includes(key)
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-stone-500 mt-1">Select 1+; the plan will include all selected meal types for each day.</p>
+            </div>
+
+            <div>
+              <span className="block text-sm font-semibold text-stone-300 mb-2">Protein types (best effort)</span>
+              <div className="flex flex-wrap gap-2">
+                {PROTEIN_OPTIONS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleProtein(key)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      proteinTypes.includes(key)
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-stone-300 mb-1.5">Meat meals per week</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={21}
+                  value={meatMealsPerWeek}
+                  onChange={(e) => setMeatMealsPerWeek(Number(e.target.value))}
+                  className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-stone-300 mb-1.5">Fish meals per week</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={21}
+                  value={fishMealsPerWeek}
+                  onChange={(e) => setFishMealsPerWeek(Number(e.target.value))}
+                  className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
             </div>
             <div>
               <span className="block text-sm font-semibold text-stone-300 mb-2">{t('dietFilters')}</span>

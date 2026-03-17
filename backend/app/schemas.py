@@ -473,6 +473,7 @@ class DiscoverOut(BaseModel):
 
 
 class MealPlanMealOut(BaseModel):
+    meal_type: str | None = None
     name: str
     short_description: str
     estimated_time_minutes: int
@@ -483,11 +484,15 @@ class MealPlanMealOut(BaseModel):
 
 class MealPlanDayOut(BaseModel):
     date: str
-    meal: MealPlanMealOut
+    meals: list[MealPlanMealOut]
 
 
 class MealPlanGenerateRequest(BaseModel):
     num_days: int = Field(ge=5, le=7, default=7)
+    meal_types: list[str] | None = None  # e.g. ["breakfast","lunch","dinner"]
+    protein_types: list[str] | None = None  # e.g. ["chicken","beef","tofu","fish"]
+    meat_meals_per_week: int | None = Field(default=None, ge=0, le=21)
+    fish_meals_per_week: int | None = Field(default=None, ge=0, le=21)
     diet_filters: list[str] | None = None
     allergens: list[str] | None = None
     custom_avoid_text: str | None = None
@@ -506,6 +511,7 @@ class MealPlanOut(BaseModel):
 
 class MealPlanReplaceRequest(BaseModel):
     day_index: int = Field(ge=0)
+    meal_index: int = Field(ge=0)
 
 
 class MealPlanAddToShoppingListOut(BaseModel):

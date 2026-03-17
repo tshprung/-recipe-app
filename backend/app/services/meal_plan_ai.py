@@ -11,13 +11,17 @@ from .what_can_i_make_ai import (
 )
 
 MEAL_PLAN_SYSTEM_PROMPT = """\
-You are a meal-planning assistant. Generate a weekly meal plan: one meal per day for 5–7 days.
+You are a meal-planning assistant. Generate a weekly meal plan for 5–7 days.
 
 Rules:
 - Output valid JSON only — no markdown, no prose outside the JSON.
-- Each day must have: date (YYYY-MM-DD), and one meal with: name, short_description, estimated_time_minutes, title, ingredients (list of strings), steps (list of strings).
+- Each day must have: date (YYYY-MM-DD), and a meals list. Each meal must have: meal_type, name, short_description, estimated_time_minutes, title, ingredients (list of strings), steps (list of strings).
 - CRITICAL — Diet: Every meal must comply with the user's diet filters (e.g. kosher = no meat+dairy mix; vegetarian = no meat/fish; dairy-free = no milk/cheese).
 - CRITICAL — Allergens: Meals must NOT contain any allergen in any form (including optional alternatives like "water or milk" when milk is an allergen).
+- Meal types: Use exactly the requested meal types (e.g. breakfast, lunch, dinner). If multiple are requested, each day must include all of them.
+- Protein preferences:
+  - If the user asks for meat meals per week or fish meals per week, the plan must match those counts across the week.
+  - If protein_types are provided, prefer those (e.g. chicken, turkey, beef, tofu, fish) and avoid other proteins when possible.
 - Variety: Avoid repeating the same dish type on consecutive days.
 - Keep recipes practical and easy to follow.
 - Use the requested output language and measurement system.
@@ -27,6 +31,10 @@ MEAL_PLAN_USER_TEMPLATE = """\
 Generate a {num_days}-day meal plan starting {start_date}.
 
 Constraints:
+- Meal types per day: {meal_types}
+- Protein types to use (best effort): {protein_types}
+- Meat meals per week: {meat_meals_per_week}
+- Fish meals per week: {fish_meals_per_week}
 - Diet: {diet_list}
 - Allergens to avoid: {allergen_list}
 - Other avoid terms: {avoid_terms}
@@ -37,29 +45,48 @@ Constraints:
 Output language: {output_lang}
 Measurement: {measurement_units} (use g, kg, ml, L for metric; oz, lb, cups, tbsp, tsp for imperial).
 
-Return exactly this JSON (one meal per day):
+Return exactly this JSON (meals per day):
 {{
   "days": [
     {{
       "date": "YYYY-MM-DD",
-      "meal": {{
-        "name": "Display name",
-        "short_description": "One sentence.",
-        "estimated_time_minutes": 30,
-        "title": "Recipe title",
-        "ingredients": ["...", "..."],
-        "steps": ["...", "..."]
-      }}
+      "meals": [
+        {{
+          "meal_type": "breakfast",
+          "name": "Display name",
+          "short_description": "One sentence.",
+          "estimated_time_minutes": 30,
+          "title": "Recipe title",
+          "ingredients": ["...", "..."],
+          "steps": ["...", "..."]
+        }}
+      ]
     }},
     ...
   ]
 }}
 """
 
+_MEAT_WORDS = ("chicken", "turkey", "beef", "veal", "lamb", "pork", "duck", "goose", "sausage", "bacon", "ham")
+_FISH_WORDS = ("fish", "salmon", "tuna", "cod", "haddock", "trout", "sardine", "shrimp", "prawn")
+
+
+def _classify_meal_protein(recipe: dict) -> str:
+    text = (recipe.get("title", "") + " " + " ".join(recipe.get("ingredients") or []) + " " + " ".join(recipe.get("steps") or [])).lower()
+    if any(w in text for w in _FISH_WORDS):
+        return "fish"
+    if any(w in text for w in _MEAT_WORDS):
+        return "meat"
+    return "other"
+
 
 def generate_weekly_meal_plan(
     start_date: str,
     num_days: int = 7,
+    meal_types: list[str] | None = None,
+    protein_types: list[str] | None = None,
+    meat_meals_per_week: int | None = None,
+    fish_meals_per_week: int | None = None,
     diet_filters: list[str] | None = None,
     allergens: list[str] | None = None,
     custom_avoid_text: str | None = None,
@@ -79,6 +106,8 @@ def generate_weekly_meal_plan(
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
     num_days = max(5, min(7, num_days))
+    meal_types_norm = [str(x).strip().lower() for x in (meal_types or []) if str(x).strip()] or ["dinner"]
+    protein_types_norm = [str(x).strip().lower() for x in (protein_types or []) if str(x).strip()] or []
     diet_list = _diet_list_for_prompt(diet_filters)
     allergen_list = ", ".join((s or "").strip() for s in (allergens or []) if (s or "").strip()) or "none"
     avoid_terms = (custom_avoid_text or "").strip() or "none"
@@ -99,6 +128,10 @@ def generate_weekly_meal_plan(
     prompt = MEAL_PLAN_USER_TEMPLATE.format(
         num_days=num_days,
         start_date=start_date,
+        meal_types=", ".join(meal_types_norm),
+        protein_types=", ".join(protein_types_norm) if protein_types_norm else "any",
+        meat_meals_per_week=str(meat_meals_per_week) if meat_meals_per_week is not None else "no preference",
+        fish_meals_per_week=str(fish_meals_per_week) if fish_meals_per_week is not None else "no preference",
         diet_list=diet_list,
         allergen_list=allergen_list,
         avoid_terms=avoid_terms,
@@ -145,29 +178,48 @@ def generate_weekly_meal_plan(
         if not isinstance(day, dict):
             continue
         date_val = day.get("date") or ""
-        meal = day.get("meal")
-        if not isinstance(meal, dict) or not meal.get("title"):
+        meals = day.get("meals") or []
+        if not isinstance(meals, list) or not meals:
             continue
-        rec = {
-            "title": str(meal.get("title", "")).strip(),
-            "ingredients": [str(x).strip() for x in meal.get("ingredients", []) if x],
-            "steps": [str(x).strip() for x in meal.get("steps", []) if x],
-        }
-        if not recipe_complies_with_diets(rec, diet_filters):
-            continue
-        if not recipe_complies_with_allergens(rec, allergens, avoid_terms_list):
-            continue
-        out.append({
-            "date": date_val,
-            "meal": {
+        normalized_meals = []
+        for meal in meals:
+            if not isinstance(meal, dict) or not meal.get("title"):
+                continue
+            rec = {
+                "title": str(meal.get("title", "")).strip(),
+                "ingredients": [str(x).strip() for x in meal.get("ingredients", []) if x],
+                "steps": [str(x).strip() for x in meal.get("steps", []) if x],
+            }
+            if not recipe_complies_with_diets(rec, diet_filters):
+                continue
+            if not recipe_complies_with_allergens(rec, allergens, avoid_terms_list):
+                continue
+            normalized_meals.append({
+                "meal_type": str(meal.get("meal_type") or "").strip().lower() or None,
                 "name": str(meal.get("name") or meal.get("title") or "").strip(),
                 "short_description": str(meal.get("short_description") or "").strip(),
                 "estimated_time_minutes": int(meal.get("estimated_time_minutes") or 30),
                 "title": rec["title"],
                 "ingredients": rec["ingredients"],
                 "steps": rec["steps"],
-            },
-        })
+            })
+        if not normalized_meals:
+            continue
+        out.append({"date": date_val, "meals": normalized_meals})
+
+    # Best-effort enforcement of meal_types and meat/fish weekly counts.
+    if out:
+        # Ensure each day contains requested meal types (best effort; keep only requested).
+        req_types = set(meal_types_norm)
+        cleaned = []
+        for d in out:
+            meals = [m for m in (d.get("meals") or []) if (m.get("meal_type") or "").lower() in req_types]
+            if len(req_types) == 1 and not meals:
+                meals = d.get("meals") or []
+            d["meals"] = meals
+            cleaned.append(d)
+        out = cleaned
+    return out
     return out
 
 
@@ -176,6 +228,8 @@ def generate_single_meal(
     allergens: list[str] | None = None,
     custom_avoid_text: str | None = None,
     max_time_minutes: int | None = None,
+    meal_type: str | None = None,
+    protein_types: list[str] | None = None,
     target_language: str = "en",
     measurement_system: str = "metric",
 ) -> dict | None:
@@ -184,12 +238,15 @@ def generate_single_meal(
     """
     from .what_can_i_make_ai import suggest_recipes_from_preferences
 
+    keywords = (meal_type or "").strip().lower() or "dinner"
+    if protein_types:
+        keywords = keywords + " " + " ".join([p for p in protein_types if p])
     recipes = suggest_recipes_from_preferences(
         dish_types=None,
         diet_filters=diet_filters,
         max_time_minutes=max_time_minutes,
         target_language=target_language or "en",
-        keywords="dinner",
+        keywords=keywords,
         ingredients_text=None,
         measurement_system=measurement_system or "metric",
         allergens=allergens,
@@ -199,6 +256,7 @@ def generate_single_meal(
         return None
     r = recipes[0]
     return {
+        "meal_type": (meal_type or "").strip().lower() or None,
         "name": r.get("title") or "Meal",
         "short_description": "",
         "estimated_time_minutes": 30,
