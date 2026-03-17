@@ -232,9 +232,15 @@ export default function MealPlanPage() {
     )
   }
 
-  function handleConnectGoogleCalendar() {
-    // Browser navigation to backend connect endpoint
-    window.location.href = `${(import.meta.env.VITE_API_URL ?? '')}/api/calendar/google/connect`
+  async function handleConnectGoogleCalendar() {
+    setError(null)
+    try {
+      const d = await api.get('/calendar/google/connect-url')
+      if (d?.url) window.location.href = d.url
+      else setError('Failed to start Google Calendar connection.')
+    } catch (e) {
+      setError(getErrorMessage(e, t))
+    }
   }
 
   async function handleExportToGoogleCalendar() {

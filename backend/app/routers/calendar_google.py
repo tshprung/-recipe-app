@@ -150,6 +150,27 @@ def connect_google_calendar(
     return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
 
 
+@router.get("/connect-url")
+def connect_google_calendar_url(
+    current_user: models.User = Depends(get_current_user),
+):
+    """Return the Google OAuth URL (frontend can redirect the browser)."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    redirect_uri = _redirect_uri()
+    if not client_id or not redirect_uri:
+        raise HTTPException(status_code=503, detail="Google Calendar is not configured")
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": CALENDAR_SCOPE,
+        "access_type": "offline",
+        "prompt": "consent",  # ensure refresh_token is returned
+        "state": _state_token(current_user.id),
+    }
+    return {"url": f"{GOOGLE_AUTH_URL}?{urlencode(params)}"}
+
+
 @router.get("/callback")
 def callback_google_calendar(
     code: str | None = None,
