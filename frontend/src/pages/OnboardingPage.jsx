@@ -43,6 +43,7 @@ export default function OnboardingPage() {
   const [authLoading, setAuthLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+  const [agreedToLegal, setAgreedToLegal] = useState(false)
   const turnstileContainerRef = useRef(null)
   const turnstileWidgetIdRef = useRef(null)
   const [locationDetecting, setLocationDetecting] = useState(false)
@@ -129,6 +130,10 @@ export default function OnboardingPage() {
     e.preventDefault()
     setAuthError('')
     if (authTab === 'register') {
+      if (!agreedToLegal) {
+        setAuthError('You must agree to the Terms of Service and Privacy Policy to create an account.')
+        return
+      }
       if (password.length < 8) {
         setAuthError(t('passwordTooShort') || 'Password must be at least 8 characters')
         return
@@ -336,9 +341,27 @@ export default function OnboardingPage() {
                 />
                 <label htmlFor="remember" className="text-sm text-white/70">Keep me signed in</label>
               </div>
+              {authTab === 'register' && (
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id="legal"
+                    checked={agreedToLegal}
+                    onChange={(e) => setAgreedToLegal(e.target.checked)}
+                    className="mt-1 rounded border-white/30"
+                    required
+                  />
+                  <label htmlFor="legal" className="text-sm text-white/70">
+                    I agree to the{' '}
+                    <Link to="/terms" className="underline hover:text-white">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" className="underline hover:text-white">Privacy Policy</Link>
+                  </label>
+                </div>
+              )}
               <button
                 type="submit"
-                disabled={authLoading || (authTab === 'register' && !turnstileToken)}
+                disabled={authLoading || (authTab === 'register' && (!turnstileToken || !agreedToLegal))}
                 className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-stone-900 transition disabled:opacity-50"
                 style={{ backgroundColor: COLORS.accent }}
               >
