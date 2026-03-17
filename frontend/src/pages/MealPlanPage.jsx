@@ -17,6 +17,7 @@ export default function MealPlanPage() {
   const [addToListLoading, setAddToListLoading] = useState(false)
   const [error, setError] = useState(null)
   const [addListSuccess, setAddListSuccess] = useState(false)
+  const [openPreviewDate, setOpenPreviewDate] = useState(null)
 
   // Form state for generating
   const [numDays, setNumDays] = useState(7)
@@ -41,6 +42,7 @@ export default function MealPlanPage() {
     setError(null)
     setAddListSuccess(false)
     setReplaceIndex(null)
+    setOpenPreviewDate(null)
     setPlan(null)
     setNumDays(7)
     setDietFilters([])
@@ -183,15 +185,45 @@ export default function MealPlanPage() {
                       ~{day.meal.estimated_time_minutes} min
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleReplaceDay(idx)}
-                    disabled={replaceIndex !== null}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
-                  >
-                    {replaceIndex === idx ? '…' : t('replaceMeal')}
-                  </button>
+                  <div className="flex flex-col gap-2 items-end flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setOpenPreviewDate((prev) => (prev === day.date ? null : day.date))}
+                      className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    >
+                      {openPreviewDate === day.date ? 'Hide details' : 'Preview recipe'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReplaceDay(idx)}
+                      disabled={replaceIndex !== null}
+                      className="px-3 py-1.5 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-50"
+                    >
+                      {replaceIndex === idx ? '…' : t('replaceMeal')}
+                    </button>
+                  </div>
                 </div>
+
+                {openPreviewDate === day.date && (
+                  <div className="mt-4 border-t border-stone-200 pt-4 space-y-4">
+                    <div>
+                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Ingredients</p>
+                      <ul className="space-y-1 text-sm text-stone-700 list-disc pl-5">
+                        {(day.meal.ingredients || []).map((ing, i) => (
+                          <li key={i}>{ing}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Steps</p>
+                      <ol className="space-y-1 text-sm text-stone-700 list-decimal pl-5">
+                        {(day.meal.steps || []).map((step, i) => (
+                          <li key={i}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
