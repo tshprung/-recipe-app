@@ -21,6 +21,10 @@ export default function MealPlanPage() {
   const [openPreviewDate, setOpenPreviewDate] = useState(null)
   const [savingDate, setSavingDate] = useState(null)
   const [savedRecipeIdsByDate, setSavedRecipeIdsByDate] = useState({})
+  const [googleCalConnected, setGoogleCalConnected] = useState(false)
+  const [googleCalLoading, setGoogleCalLoading] = useState(false)
+  const [googleCalExporting, setGoogleCalExporting] = useState(false)
+  const [googleCalExported, setGoogleCalExported] = useState(false)
 
   // Form state for generating
   const [numDays, setNumDays] = useState(7)
@@ -35,6 +39,15 @@ export default function MealPlanPage() {
   useEffect(() => {
     if (user?.diet_filters && dietFilters.length === 0) setDietFilters(user.diet_filters)
   }, [user?.diet_filters])
+
+  useEffect(() => {
+    if (!user) return
+    setGoogleCalLoading(true)
+    api.get('/calendar/google/status')
+      .then((d) => setGoogleCalConnected(!!d?.connected))
+      .catch(() => setGoogleCalConnected(false))
+      .finally(() => setGoogleCalLoading(false))
+  }, [user])
 
   function isDirty() {
     if (plan?.days?.length) return true
@@ -57,6 +70,7 @@ export default function MealPlanPage() {
     setSavingDate(null)
     setSavedRecipeIdsByDate({})
     setPlan(null)
+    setGoogleCalExported(false)
     setNumDays(7)
     setMealTypes(['dinner'])
     setProteinTypes(['chicken'])
@@ -130,6 +144,7 @@ export default function MealPlanPage() {
       })
       .then(data => {
         setPlan(data)
+        setGoogleCalExported(false)
         refreshUser()
       })
       .catch(e => setError(getErrorMessage(e, t)))
@@ -217,10 +232,61 @@ export default function MealPlanPage() {
     )
   }
 
+  function handleConnectGoogleCalendar() {
+    // Browser navigation to backend connect endpoint
+    window.location.href = `${(import.meta.env.VITE_API_URL ?? '')}/api/calendar/google/connect`
+  }
+
+  async function handleExportToGoogleCalendar() {
+    if (!plan?.id) return
+    setError(null)
+    setGoogleCalExported(false)
+    setGoogleCalExporting(true)
+    try {
+      await api.post(`/calendar/google/export/meal-plan/${plan.id}`)
+      setGoogleCalExported(true)
+    } catch (e) {
+      setError(getErrorMessage(e, t))
+    } finally {
+      setGoogleCalExporting(false)
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-stone-50 mb-1">{t('mealPlanTitle')}</h1>
       <p className="text-stone-400 text-sm mb-6">{t('mealPlanHint')}</p>
+
+      {user && (
+        <div className="mb-6 bg-stone-900/60 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <div className="font-semibold text-stone-100">Google Calendar</div>
+            <div className="text-xs text-stone-400">
+              {googleCalLoading ? 'Checking connection…' : (googleCalConnected ? 'Connected' : 'Not connected')}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {!googleCalConnected ? (
+              <button
+                type="button"
+                onClick={handleConnectGoogleCalendar}
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition"
+              >
+                Connect Google Calendar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleExportToGoogleCalendar}
+                disabled={!plan?.id || googleCalExporting}
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition disabled:opacity-50"
+              >
+                {googleCalExporting ? 'Exporting…' : 'Export plan to Calendar'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {plan?.days?.length > 0 ? (
         <>
