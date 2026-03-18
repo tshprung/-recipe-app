@@ -66,7 +66,7 @@ export default function OnboardingPage() {
             ...d,
             target_country: res.country_code,
             target_language: lang,
-            ui_language: lang,
+            ui_language: 'en',
             target_city: res.city || d.target_city,
             target_zip: res.zip || d.target_zip,
           }))
@@ -208,15 +208,9 @@ export default function OnboardingPage() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-1.5">App / website language</label>
-                <select
-                  value={data.ui_language}
-                  onChange={(e) => set('ui_language')(e.target.value)}
-                  className={inputCls}
-                >
-                  {TARGET_LANGUAGES.slice(0, 8).map((l) => (
-                    <option key={l.code} value={l.code}>{l.name}</option>
-                  ))}
-                </select>
+                <div className={`${inputCls} flex items-center`} aria-label="App language">
+                  English
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-white/80 mb-1.5">Recipe language</label>

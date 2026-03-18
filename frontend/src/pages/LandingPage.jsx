@@ -6,7 +6,6 @@ import { api, getTrialToken } from '../api/client'
 import { COUNTRIES } from '../constants/countries'
 import { TARGET_LANGUAGES } from '../constants/languages'
 import {
-  LANG_STORAGE_KEY,
   TRIAL_DEVICE_ID_KEY,
   TRIAL_RECIPES_KEY,
   TRIAL_REMAINING_KEY,
@@ -20,13 +19,6 @@ const COLORS = {
   accent: '#8FAF8F',
   secondary: '#C96A4A',
 }
-
-/** Website UI language options (app supports en, he, pl). */
-const WEBSITE_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'he', name: 'עברית' },
-]
 
 const FOOD_IMAGES = [
   'https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=900&q=70',
@@ -44,7 +36,6 @@ function Anchor({ id }) {
 
 function TrialFormModal({ onClose, onSubmit, error }) {
   const [form, setForm] = useState({
-    website_language: 'en',
     recipe_language: 'en',
     country: 'US',
   })
@@ -98,15 +89,9 @@ function TrialFormModal({ onClose, onSubmit, error }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-white/80 mb-1.5">Website language</label>
-            <select
-              value={form.website_language}
-              onChange={(e) => setForm((f) => ({ ...f, website_language: e.target.value }))}
-              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
-            >
-              {WEBSITE_LANGUAGES.map((opt) => (
-                <option key={opt.code} value={opt.code}>{opt.name}</option>
-              ))}
-            </select>
+            <div className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white">
+              English
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-white/80 mb-1.5">Recipe language</label>
@@ -201,13 +186,11 @@ export default function LandingPage() {
         localStorage.setItem(TRIAL_REMAINING_KEY, String(data.remaining_actions ?? 5))
         if (data.device_id) localStorage.setItem(TRIAL_DEVICE_ID_KEY, data.device_id)
         const trialSettings = {
-          ui_language: form.website_language,
           target_language: form.recipe_language,
           target_country: form.country,
         }
         localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(trialSettings))
-        setLang(form.website_language)
-        localStorage.setItem(LANG_STORAGE_KEY, form.website_language || 'en')
+        setLang('en')
       } catch (_) {}
       setShowTrialForm(false)
       navigate('/', { state: { trialRecipes: [], remainingActions: data.remaining_actions }, replace: true })

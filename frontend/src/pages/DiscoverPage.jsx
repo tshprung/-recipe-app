@@ -179,6 +179,13 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <button
+        type="button"
+        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+        className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-800"
+      >
+        ← Back
+      </button>
       <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('findNewRecipes')}</h2>
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
