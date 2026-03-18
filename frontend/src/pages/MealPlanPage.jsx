@@ -148,11 +148,15 @@ export default function MealPlanPage() {
   function handleGenerate(e) {
     e.preventDefault()
     setError(null)
+    if (!mealTypes?.length) {
+      setError('Please select at least one meal type.')
+      return
+    }
     setGenerateLoading(true)
     api
       .post('/meal-plan/generate', {
         num_days: numDays,
-        meal_types: mealTypes.length ? mealTypes : ['dinner'],
+        meal_types: mealTypes,
         protein_types: proteinTypes.length ? proteinTypes : null,
         meat_meals_per_week: meatMealsPerWeek ?? null,
         fish_meals_per_week: fishMealsPerWeek ?? null,
@@ -210,6 +214,15 @@ export default function MealPlanPage() {
       if (created?.id) {
         setSavedRecipeIdsByDate((prev) => ({ ...prev, [`${dayDate}::${meal.meal_type || 'meal'}`]: created.id }))
       }
+      // Auto-create and assign a collection based on meal type (best effort).
+      try {
+        const mt = String(meal?.meal_type || '').trim()
+        const name = mt ? mt.replaceAll('_', ' ') : ''
+        if (name) {
+          await api.post('/recipes/collections', { name })
+          await api.patch(`/recipes/${created.id}/collections`, { collections: [name] })
+        }
+      } catch (_) {}
       refreshUser?.()
     } catch (e) {
       setError(getErrorMessage(e, t))
@@ -319,13 +332,6 @@ export default function MealPlanPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button
-        type="button"
-        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
-        className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-stone-300 hover:text-stone-100"
-      >
-        ← Back
-      </button>
       <h1 className="text-2xl font-bold text-stone-50 mb-1">{t('mealPlanTitle')}</h1>
       <p className="text-stone-400 text-sm mb-6">{t('mealPlanHint')}</p>
 
@@ -362,15 +368,6 @@ export default function MealPlanPage() {
 
       {plan?.days?.length > 0 ? (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={confirmAndResetIfDirty}
-              className="min-h-[40px] px-3 py-2 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
-            >
-              Back / Cancel
-            </button>
-          </div>
           <div className="space-y-4 mb-8">
             {plan.days.map((day, idx) => (
               <div
@@ -509,6 +506,14 @@ export default function MealPlanPage() {
           {addListSuccess && (
             <p className="text-sm text-amber-400 mt-2">{t('addedToShoppingList')}</p>
           )}
+
+          <button
+            type="button"
+            onClick={() => navigate('/', { replace: true })}
+            className="mt-6 w-full min-h-[44px] px-4 py-3 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
+          >
+            Back to menu
+          </button>
         </>
       ) : (
         <>
@@ -670,6 +675,14 @@ export default function MealPlanPage() {
               )}
             </button>
           </form>
+
+          <button
+            type="button"
+            onClick={() => navigate('/', { replace: true })}
+            className="mt-6 w-full min-h-[44px] px-4 py-3 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
+          >
+            Back to menu
+          </button>
         </>
       )}
 
