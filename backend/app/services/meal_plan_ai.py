@@ -68,7 +68,7 @@ Return exactly this JSON (meals per day):
 """
 
 _MEAT_WORDS = ("chicken", "turkey", "beef", "veal", "lamb", "pork", "duck", "goose", "sausage", "bacon", "ham")
-_FISH_WORDS = ("fish", "salmon", "tuna", "cod", "haddock", "trout", "sardine", "shrimp", "prawn")
+_FISH_WORDS = ("fish", "seafood", "salmon", "tuna", "cod", "haddock", "trout", "sardine", "shrimp", "prawn")
 
 
 def _classify_meal_protein(recipe: dict) -> str:

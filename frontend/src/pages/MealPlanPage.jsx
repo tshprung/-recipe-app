@@ -114,10 +114,28 @@ export default function MealPlanPage() {
     { key: 'chicken', label: 'Chicken' },
     { key: 'turkey', label: 'Turkey' },
     { key: 'beef', label: 'Beef' },
+    { key: 'pork', label: 'Pork' },
     { key: 'fish', label: 'Fish' },
+    { key: 'seafood', label: 'Seafood' },
     { key: 'tofu', label: 'Tofu' },
     { key: 'eggs', label: 'Eggs' },
   ]
+
+  function isProbablyRTL(text) {
+    if (!text) return false
+    return /[\u0590-\u08FF]/.test(String(text))
+  }
+
+  function mealTimeLabel(mealType) {
+    const map = {
+      breakfast: '08:00',
+      second_breakfast: '10:00',
+      lunch: '12:00',
+      afternoon_snack: '15:00',
+      dinner: '18:00',
+    }
+    return map[String(mealType || '').trim()] || ''
+  }
 
   function toggleMealType(key) {
     setMealTypes(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
@@ -277,6 +295,28 @@ export default function MealPlanPage() {
     }
   }
 
+  function handleSendPlanToEmail() {
+    if (!plan?.days?.length) return
+    const lines = []
+    lines.push('Weekly Meal Plan')
+    lines.push('')
+    for (const day of plan.days) {
+      lines.push(String(day.date || '').trim())
+      const meals = Array.isArray(day.meals) ? day.meals : []
+      for (const m of meals) {
+        const mt = String(m?.meal_type || '').trim()
+        const time = mealTimeLabel(mt)
+        const title = String(m?.name || m?.title || 'Meal').trim()
+        const mtLabel = mt ? mt.replaceAll('_', ' ') : 'meal'
+        lines.push(`- ${mtLabel}${time ? ` (${time})` : ''}: ${title}`)
+      }
+      lines.push('')
+    }
+    const subject = encodeURIComponent('Weekly Meal Plan')
+    const body = encodeURIComponent(lines.join('\n'))
+    window.location.href = `mailto:?subject=${subject}&body=${body}`
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <button
@@ -307,24 +347,14 @@ export default function MealPlanPage() {
                 Connect Google Calendar
               </button>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={handleExportToGoogleCalendar}
-                  disabled={!plan?.id || googleCalExporting}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition disabled:opacity-50"
-                >
-                  {googleCalExporting ? 'Exporting…' : 'Export plan to Calendar'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDisconnectGoogleCalendar}
-                  className="min-h-[44px] px-4 py-2 rounded-xl ring-1 ring-white/10 hover:bg-white/10 transition text-stone-50"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
-                >
-                  Disconnect
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={handleDisconnectGoogleCalendar}
+                className="min-h-[44px] px-4 py-2 rounded-xl ring-1 ring-white/10 hover:bg-white/10 transition text-stone-50"
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+              >
+                Disconnect
+              </button>
             )}
           </div>
         </div>
@@ -356,8 +386,15 @@ export default function MealPlanPage() {
                     const previewKey = `${day.date}::${meal.meal_type || mealIdx}`
                     const savedKey = `${day.date}::${meal.meal_type || 'meal'}`
                     const savedId = savedRecipeIdsByDate[savedKey]
+                    const rtl = isProbablyRTL(
+                      meal?.name || meal?.title || (Array.isArray(meal?.ingredients) ? meal.ingredients.join(' ') : '')
+                    )
                     return (
-                      <div key={previewKey} className="rounded-xl border border-stone-200 p-3">
+                      <div
+                        key={previewKey}
+                        className={`rounded-xl border border-stone-200 p-3 ${rtl ? 'text-right' : ''}`}
+                        dir={rtl ? 'rtl' : 'ltr'}
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-1">
@@ -413,7 +450,7 @@ export default function MealPlanPage() {
                           <div className="mt-4 border-t border-stone-200 pt-4 space-y-4">
                             <div>
                               <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Ingredients</p>
-                              <ul className="space-y-1 text-sm text-stone-700 list-disc pl-5">
+                              <ul className={`space-y-1 text-sm text-stone-700 list-disc ${rtl ? 'pr-5' : 'pl-5'}`}>
                                 {(meal.ingredients || []).map((ing, i) => (
                                   <li key={i}>{ing}</li>
                                 ))}
@@ -421,7 +458,7 @@ export default function MealPlanPage() {
                             </div>
                             <div>
                               <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-2">Steps</p>
-                              <ol className="space-y-1 text-sm text-stone-700 list-decimal pl-5">
+                              <ol className={`space-y-1 text-sm text-stone-700 list-decimal ${rtl ? 'pr-5' : 'pl-5'}`}>
                                 {(meal.steps || []).map((step, i) => (
                                   <li key={i}>{step}</li>
                                 ))}
@@ -437,14 +474,38 @@ export default function MealPlanPage() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={handleAddAllToShoppingList}
-            disabled={addToListLoading}
-            className="w-full min-h-[48px] bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors"
-          >
-            {addToListLoading ? '…' : t('addAllToShoppingList')}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={handleAddAllToShoppingList}
+              disabled={addToListLoading}
+              className="min-h-[48px] px-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-sm transition-colors w-full sm:w-auto"
+            >
+              {addToListLoading ? '…' : t('addAllToShoppingList')}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSendPlanToEmail}
+              disabled={!plan?.days?.length}
+              className="min-h-[48px] px-4 rounded-xl ring-1 ring-white/10 hover:bg-white/10 transition text-stone-50 disabled:opacity-50 w-full sm:w-auto"
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+            >
+              Send to email
+            </button>
+
+            {googleCalConnected && (
+              <button
+                type="button"
+                onClick={handleExportToGoogleCalendar}
+                disabled={!plan?.id || googleCalExporting}
+                className="min-h-[48px] px-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-sm transition-colors w-full sm:w-auto"
+              >
+                {googleCalExporting ? 'Exporting…' : 'Export plan to Calendar'}
+              </button>
+            )}
+          </div>
+
           {addListSuccess && (
             <p className="text-sm text-amber-400 mt-2">{t('addedToShoppingList')}</p>
           )}

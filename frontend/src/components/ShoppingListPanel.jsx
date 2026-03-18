@@ -100,6 +100,11 @@ export default function ShoppingListPanel() {
   const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
   const isEmpty = recipeIds.size === 0
 
+  function isProbablyRTL(text) {
+    if (!text) return false
+    return /[\u0590-\u08FF]/.test(String(text))
+  }
+
   if (!isOpen) return null
 
   return (
@@ -214,7 +219,9 @@ export default function ShoppingListPanel() {
                             <span className={`text-sm transition-colors print:text-stone-800 flex-1 min-w-0 ${
                               isChecked ? 'line-through text-stone-300' : 'text-stone-700'
                             }`}>
-                              {label}
+                              <span dir={isProbablyRTL(label) ? 'rtl' : 'auto'} className={isProbablyRTL(label) ? 'block text-right' : 'block'}>
+                                {label}
+                              </span>
                             </span>
 
                             {/* Report button / form */}
