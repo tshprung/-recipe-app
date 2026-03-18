@@ -206,6 +206,9 @@ export default function DiscoverPage() {
             ))}
           </select>
           <p className="text-xs text-stone-400 mt-1">Default is 3. You can request up to 10.</p>
+          <p className="text-xs text-stone-400 mt-1">
+            Note: “Low fat” and “Fat-free” are best-effort filters and may not be perfect for every recipe.
+          </p>
         </div>
         <div>
           <label className="block text-sm font-semibold text-stone-600 mb-1.5">
