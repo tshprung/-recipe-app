@@ -310,6 +310,11 @@ Your job:
 Rules:
 - Output valid JSON only — no markdown, no prose outside the JSON.
 - Each recipe must have: title, ingredients (list of strings), steps (list of strings), estimated_calories (integer, kcal, rough estimate).
+- Ingredients MUST be raw, buyable items (shopping list friendly). Do NOT include preparation state in ingredient names (no "cooked turkey", "chopped cucumber", "diced onions"). Preparation belongs in steps.
+- Exception: ground/minced meat should stay explicit (e.g. "ground turkey"), because it is commonly bought ground.
+- Do NOT include non-buy items like "season to taste" / "תיבול לפי טעם" as ingredients.
+- Do NOT include plain "water" as an ingredient (unless it's a special water like sparkling/coconut/mineral).
+- If an ingredient requires preparation (e.g. meat must be cooked), include the preparation step(s) in the steps.
 - CRITICAL — Diet compliance: If the user selects a diet (e.g. kosher, vegetarian, vegan), the ENTIRE recipe must comply.
   - Kosher: no pork/bacon/ham, no shellfish; never mix meat and dairy in the same recipe (no cheese with beef/chicken, etc.).
   - Vegetarian: no meat, no fish, no poultry.

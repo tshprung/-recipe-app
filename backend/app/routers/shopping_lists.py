@@ -9,6 +9,7 @@ from ..services.categorization import CATEGORIES, categorize_ingredients
 from ..services.email import send_shopping_list_email
 from ..services.shopping_list_ingredients import (
     aggregate_ingredients,
+    normalize_and_aggregate,
     normalize_ingredient_for_shopping,
     strip_cooking_instructions,
 )
@@ -34,10 +35,12 @@ def _compute_categorized_items(
         if not isinstance(raw, list):
             items[cat] = []
             continue
-        items[cat] = [
+        cleaned_list = [
             cleaned for s in raw
             if isinstance(s, str) and (cleaned := strip_cooking_instructions(s).strip())
         ]
+        # Second-pass: normalize/merge within category (no extra AI calls).
+        items[cat] = normalize_and_aggregate(cleaned_list)
     return items
 
 
@@ -139,7 +142,12 @@ def get_shopping_list(
     )
     cached = next((row for row in cached_rows if row.recipe_ids_snapshot == snapshot), None)
     if cached:
-        return {"recipe_ids": recipe_ids, "items": cached.items}
+        # Postprocess cached items with the latest normalizer (no extra AI calls).
+        post = {cat: normalize_and_aggregate(list(cached.items.get(cat) or [])) for cat in _EMPTY_ITEMS.keys()}
+        if post != cached.items:
+            cached.items = post
+            db.commit()
+        return {"recipe_ids": recipe_ids, "items": post}
 
     items = _compute_categorized_items(recipe_ids, current_user.id, db, user=current_user)
     _invalidate_shopping_list_cache(current_user.id, db)
