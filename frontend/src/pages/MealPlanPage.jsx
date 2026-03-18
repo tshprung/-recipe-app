@@ -660,29 +660,30 @@ export default function MealPlanPage() {
                 {error}
               </div>
             )}
-            <button
-              type="submit"
-              disabled={generateLoading}
-              className="w-full min-h-[48px] bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors"
-            >
-              {generateLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  {t('generating')}
-                </span>
-              ) : (
-                t('generateWeeklyPlan')
-              )}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/', { replace: true })}
+                className="min-h-[40px] px-4 py-2 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={generateLoading}
+                className="min-h-[40px] px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors"
+              >
+                {generateLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {t('generating')}
+                  </span>
+                ) : (
+                  t('generateWeeklyPlan')
+                )}
+              </button>
+            </div>
           </form>
-
-          <button
-            type="button"
-            onClick={() => navigate('/', { replace: true })}
-            className="mt-6 w-full min-h-[44px] px-4 py-3 rounded-xl bg-stone-800 text-stone-200 hover:bg-stone-700 transition-colors text-sm font-semibold"
-          >
-            Back to menu
-          </button>
         </>
       )}
 
