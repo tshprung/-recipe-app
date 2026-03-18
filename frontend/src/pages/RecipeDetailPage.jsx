@@ -36,7 +36,7 @@ export default function RecipeDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const { addRecipe: addRecipeToList, isInList: isRecipeOnList, actionLoadingId: listActionLoadingId } = useShoppingList()
 
   const [recipe, setRecipe] = useState(null)
@@ -182,15 +182,13 @@ export default function RecipeDetailPage() {
     const btn = collectionsTriggerRef.current
     if (!btn) return
     const rect = btn.getBoundingClientRect()
-    const isRtl = lang === 'he'
     const gap = 4
     setCollectionsDropdownPosition({
       top: rect.bottom + gap,
-      ...(isRtl
-        ? { right: window.innerWidth - rect.right, left: undefined }
-        : { left: rect.left, right: undefined }),
+      left: rect.left,
+      right: undefined,
     })
-  }, [collectionsDropdownOpen, lang])
+  }, [collectionsDropdownOpen])
 
   useEffect(() => {
     if (!collectionsDropdownOpen) return
