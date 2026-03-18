@@ -36,6 +36,7 @@ export default function MealPlanPage() {
   const [dietFilters, setDietFilters] = useState(() => user?.diet_filters ?? [])
   const [maxTime, setMaxTime] = useState(null)
   const [budget, setBudget] = useState('')
+  const [openAdvanced, setOpenAdvanced] = useState(false)
 
   useEffect(() => {
     if (user?.diet_filters && dietFilters.length === 0) setDietFilters(user.diet_filters)
@@ -56,6 +57,18 @@ export default function MealPlanPage() {
   const selectedDates = weekDates
     .filter((_, i) => !!selectedDays[i])
     .map(d => d.toISOString().slice(0, 10))
+
+  const activeAdvancedPills = (() => {
+    const pills = []
+    const prot = (proteinTypes || []).map(x => String(x || '').trim()).filter(Boolean)
+    if (!(prot.length === 1 && prot[0] === 'chicken') && prot.length > 0) pills.push({ key: 'protein', label: `Protein: ${prot.length}`, section: 'advanced' })
+    if (meatMealsPerWeek !== 3) pills.push({ key: 'meat', label: `Meat/wk: ${meatMealsPerWeek}`, section: 'advanced' })
+    if (fishMealsPerWeek !== 1) pills.push({ key: 'fish', label: `Fish/wk: ${fishMealsPerWeek}`, section: 'advanced' })
+    if ((dietFilters?.length ?? 0) > 0) pills.push({ key: 'diet', label: `${t('dietFilters')}: ${dietFilters.length}`, section: 'advanced' })
+    if (maxTime != null) pills.push({ key: 'time', label: `≤ ${maxTime} min`, section: 'advanced' })
+    if ((budget || '').trim()) pills.push({ key: 'budget', label: `Budget`, section: 'advanced' })
+    return pills
+  })()
 
   useEffect(() => {
     if (!user) return
@@ -630,8 +643,29 @@ export default function MealPlanPage() {
               </div>
             </div>
 
+            {activeAdvancedPills.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs font-semibold text-stone-400">Active filters:</span>
+                {activeAdvancedPills.map(p => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setOpenAdvanced(true)}
+                    className="px-3 py-1.5 rounded-full bg-white/10 text-stone-100 text-xs font-medium hover:bg-white/15 transition"
+                    title="Click to edit"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Advanced options */}
-            <details className="bg-stone-900/40 rounded-2xl border border-white/10 p-4">
+            <details
+              className="bg-stone-900/40 rounded-2xl border border-white/10 p-4"
+              open={openAdvanced}
+              onToggle={(e) => setOpenAdvanced(e.currentTarget.open)}
+            >
               <summary className="cursor-pointer select-none text-sm font-semibold text-stone-200">
                 More options
                 <span className="text-xs text-stone-400 font-medium ml-2">
