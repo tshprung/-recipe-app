@@ -74,6 +74,16 @@ def recipe_complies_with_diets(recipe: dict, diet_filters: list[str] | None) -> 
         if diet == "dairy_free":
             if _DAIRY_KEYWORDS.search(text):
                 return False
+        if diet == "low_fat":
+            # Best-effort heuristic: avoid common high-fat cooking methods and ingredients.
+            if re.search(r"\b(deep[\s-]?fried|deep[\s-]?fry|fried|bacon|mayonnaise|mayo)\b", text, re.IGNORECASE):
+                return False
+            if re.search(r"\b(heavy cream|double cream|butter|cheese)\b", text, re.IGNORECASE):
+                return False
+        if diet == "fat_free":
+            # Best-effort heuristic: stricter than low_fat; reject obvious fat sources.
+            if re.search(r"\b(oil|olive oil|butter|cheese|cream|mayonnaise|mayo|bacon)\b", text, re.IGNORECASE):
+                return False
         if diet == "for_kids_under_1":
             if re.search(r"\b(honey)\b", text, re.IGNORECASE):
                 return False
@@ -332,7 +342,7 @@ Measurement units: {measurement_units}
 - If metric: use grams (g), kilograms (kg), milliliters (ml), liters (L).
 - If imperial: use ounces (oz), pounds (lb), cups, tablespoons (tbsp), teaspoons (tsp).
 
-Return exactly this JSON (up to 3 recipes):
+Return exactly this JSON (up to {num_recipes} recipes):
 {{
   "recipes": [
     {{ "title": "<recipe title in {output_lang}>", "ingredients": ["...", "..."], "steps": ["...", "..."] }},
@@ -345,6 +355,7 @@ Return exactly this JSON (up to 3 recipes):
 def suggest_recipes_from_preferences(
     dish_types: list[str] | None = None,
     diet_filters: list[str] | None = None,
+    num_recipes: int = 3,
     max_time_minutes: int | None = None,
     target_language: str = "en",
     keywords: str | None = None,
@@ -354,7 +365,7 @@ def suggest_recipes_from_preferences(
     custom_avoid_text: str | None = None,
 ) -> list[dict]:
     """
-    Return up to 3 suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
+    Return up to N suggested recipes matching preferences: [{ title, ingredients, steps }, ...].
     Raises RuntimeError on missing API key or rate limit.
     """
     api_key = os.getenv("OPENAI_API_KEY")
@@ -372,6 +383,7 @@ def suggest_recipes_from_preferences(
     prompt = DISCOVER_USER_TEMPLATE.format(
         dish_list=dish_list,
         diet_list=diet_list,
+        num_recipes=str(max(1, min(10, int(num_recipes or 3)))),
         max_time=max_time,
         allergen_list=allergen_list,
         avoid_terms=avoid_terms,
@@ -408,7 +420,8 @@ def suggest_recipes_from_preferences(
         return []
     recipes = data.get("recipes") or data.get("suggestions") or []
     out = []
-    for r in recipes[:3]:
+    n = max(1, min(10, int(num_recipes or 3)))
+    for r in recipes[:n]:
         if isinstance(r, dict) and r.get("title"):
             rec = {
                 "title": str(r.get("title", "")).strip(),

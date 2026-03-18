@@ -154,6 +154,8 @@ export const translations = {
     halal: 'Halal',
     nutFree: 'Nut free',
     lowSodium: 'Low sodium',
+    lowFat: 'Low fat',
+    fatFree: 'Fat-free',
     forKids: 'For kids',
     forKidsUnder1: 'For kids under 1',
     adapting: 'Adapting…',

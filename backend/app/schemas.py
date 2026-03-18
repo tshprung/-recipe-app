@@ -458,6 +458,7 @@ class WhatCanIMakeAIOut(BaseModel):
 class DiscoverRequest(BaseModel):
     dish_types: list[str] | None = None  # e.g. ["pasta", "salads"]
     diet_filters: list[str] | None = None  # e.g. ["vegetarian", "vegan"]
+    num_recipes: int = Field(default=3, ge=1, le=10)  # how many suggestions to return
     max_time_minutes: int | None = None  # e.g. 30, 60
     allergens: list[str] | None = None  # optional allergen codes to avoid
     custom_avoid_text: str | None = None  # free-text exclusions

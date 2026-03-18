@@ -2,6 +2,7 @@
 
 export const DISH_TYPES = [
   'pasta', 'pizza', 'chicken', 'beef', 'soups', 'fish', 'salads', 'baking', 'breakfast',
+  'pork', 'seafood',
   'vegetarian', 'desserts', 'stews', 'grilling',
 ]
 
@@ -11,6 +12,8 @@ export const DIET_OPTIONS = [
   { key: 'vegan', labelKey: 'vegan' },
   { key: 'gluten_free', labelKey: 'glutenFree' },
   { key: 'dairy_free', labelKey: 'dairyFree' },
+  { key: 'low_fat', labelKey: 'lowFat' },
+  { key: 'fat_free', labelKey: 'fatFree' },
   { key: 'kosher', labelKey: 'kosher' },
   { key: 'halal', labelKey: 'halal' },
   { key: 'nut_free', labelKey: 'nutFree' },
@@ -28,6 +31,8 @@ export const VARIANT_BADGE = {
   vegetarian: { labelKey: 'vegetarian', cls: 'bg-emerald-100 text-emerald-700' },
   vegan: { labelKey: 'vegan', cls: 'bg-emerald-100 text-emerald-700' },
   dairy_free: { labelKey: 'dairyFree', cls: 'bg-sky-100 text-sky-700' },
+  low_fat: { labelKey: 'lowFat', cls: 'bg-lime-100 text-lime-800' },
+  fat_free: { labelKey: 'fatFree', cls: 'bg-lime-100 text-lime-800' },
   gluten_free: { labelKey: 'glutenFree', cls: 'bg-violet-100 text-violet-700' },
   kosher: { labelKey: 'kosher', cls: 'bg-blue-100 text-blue-700' },
   halal: { labelKey: 'halal', cls: 'bg-teal-100 text-teal-700' },
@@ -52,5 +57,7 @@ export function variantLabelKey(key) {
   if (key === 'low_sodium') return 'lowSodium'
   if (key === 'for_kids_under_1') return 'forKidsUnder1'
   if (key === 'for_kids') return 'forKids'
+  if (key === 'low_fat') return 'lowFat'
+  if (key === 'fat_free') return 'fatFree'
   return key
 }
