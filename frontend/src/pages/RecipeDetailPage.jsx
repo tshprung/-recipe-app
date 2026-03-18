@@ -36,7 +36,7 @@ export default function RecipeDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { addRecipe: addRecipeToList, isInList: isRecipeOnList, actionLoadingId: listActionLoadingId } = useShoppingList()
 
   const [recipe, setRecipe] = useState(null)
@@ -404,6 +404,68 @@ export default function RecipeDetailPage() {
     }
   }
 
+  async function handleTransformPreset(kind) {
+    const presets = {
+      faster: {
+        titleKey: 'makeFaster',
+        instruction:
+          'Rewrite the entire recipe to be faster. Reduce total time, simplify steps, use parallelization, and use shortcuts when reasonable. Keep the dish recognizable and tasty.',
+      },
+      cheaper: {
+        titleKey: 'makeCheaper',
+        instruction:
+          'Rewrite the entire recipe to be cheaper. Replace expensive ingredients with widely available cheaper substitutes. Keep the dish identity recognizable and maintain good flavor.',
+      },
+      kid_friendly: {
+        titleKey: 'kidFriendly',
+        instruction:
+          'Rewrite the entire recipe to be kid-friendly and healthy. Reduce spice/heat, avoid overly strong flavors, and aim for simple, safe textures. Keep it tasty and recognizable.',
+      },
+    }
+    const preset = presets[kind]
+    if (!preset) return
+
+    setAdaptError(null)
+    setAdaptLoading(true)
+    setPendingVariantType('transform')
+    try {
+      const body = {
+        variant_type: 'transform',
+        custom_instruction: preset.instruction,
+        custom_title: t(preset.titleKey),
+      }
+      if (!user && trialToken) {
+        // Trial: use saved trial settings when present; otherwise prefer current UI language.
+        try {
+          const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
+          if (raw) {
+            const ts = JSON.parse(raw)
+            if (ts.target_language) body.target_language = ts.target_language
+            if (ts.target_country) body.target_country = ts.target_country
+          }
+        } catch (_) {}
+        if (!body.target_language) body.target_language = lang || 'en'
+      }
+      const result = await api.post(`/recipes/${id}/adapt`, body)
+      if (typeof result?.remaining_actions === 'number') syncTrialRemaining(result.remaining_actions)
+      if (result?.can_adapt && result?.variant) {
+        setVariants(vs => [...vs, result.variant])
+        setActiveTab(result.variant.variant_type)
+        await refreshUser()
+      } else {
+        setAdaptError(t('failedToGenerateVariant'))
+      }
+    } catch (e) {
+      if (e.status === 402 || e.trialExhausted) {
+        syncTrialRemaining(0)
+        setShowTrialExhausted(true)
+      } else setAdaptError(e.message || t('failedToGenerateVariant'))
+    } finally {
+      setAdaptLoading(false)
+      setPendingVariantType(null)
+    }
+  }
+
   function openIngredientAlternatives(ingredientLabel, ingredientIndex) {
     const label = (typeof ingredientLabel === 'string' ? ingredientLabel : '').trim()
     if (!label) return
@@ -622,6 +684,45 @@ export default function RecipeDetailPage() {
           )}
         </div>
 
+      </div>
+
+      {/* Replace entire recipe presets */}
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 mb-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-stone-800">{t('transformRecipe')}</div>
+            <div className="text-xs text-stone-500 mt-0.5">{t('transformRecipeHint')}</div>
+          </div>
+          {(pendingVariantType === 'transform' || adaptLoading) && (
+            <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => handleTransformPreset('faster')}
+            disabled={adaptLoading || pendingVariantType === 'transform'}
+            className="min-h-[40px] px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:border-amber-300 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+          >
+            ⚡ {t('makeFaster')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTransformPreset('cheaper')}
+            disabled={adaptLoading || pendingVariantType === 'transform'}
+            className="min-h-[40px] px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:border-amber-300 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+          >
+            💰 {t('makeCheaper')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTransformPreset('kid_friendly')}
+            disabled={adaptLoading || pendingVariantType === 'transform'}
+            className="min-h-[40px] px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:border-amber-300 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+          >
+            🧒 {t('kidFriendly')}
+          </button>
+        </div>
       </div>
 
       {/* Hero / Title card */}

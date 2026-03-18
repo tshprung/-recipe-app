@@ -88,6 +88,16 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture
+def db_session():
+    """Direct DB access for tests that need to tweak user quota, etc."""
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 # --- Convenience fixtures ---
 
 SAMPLE_EMAIL = "tester@example.com"

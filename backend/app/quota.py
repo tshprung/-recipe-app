@@ -31,6 +31,7 @@ def enforce_trial_or_user_quota(
     request: Request,
     db: Session,
     current_user: models.User | None,
+    allow_overdraft: bool = False,
 ) -> models.TrialSession | None:
     """
     Enforce quota: if user is present, check user quota (do not increment here).
@@ -45,7 +46,7 @@ def enforce_trial_or_user_quota(
             db.execute(select(models.User).where(models.User.id == current_user.id))
             .scalar_one()
         )
-        if not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
+        if (not allow_overdraft) and not _has_unlimited_quota(current_user) and user_for_update.transformations_limit != -1 and (
             user_for_update.transformations_used >= user_for_update.transformations_limit
         ):
             raise HTTPException(

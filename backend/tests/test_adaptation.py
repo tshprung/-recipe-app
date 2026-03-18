@@ -147,6 +147,34 @@ def test_adapt_recipe_multiple_custom_variants_get_unique_slugs(client, auth_hea
     assert r1.json()["variant"]["variant_type"] != r2.json()["variant"]["variant_type"]
 
 
+def test_transform_overdraft_allowed_and_clamped_to_zero(client, auth_headers, registered_user, recipe, db_session):
+    """
+    The new transform flow (variant_type='transform' + custom_instruction) should run even when the user
+    is out of credits. After the run, remaining credits should be 0 (i.e. used is clamped to limit).
+    """
+    from app import models
+
+    user = db_session.query(models.User).filter(models.User.id == registered_user["id"]).first()
+    user.transformations_limit = 0
+    user.transformations_used = 0
+    db_session.commit()
+
+    with patch("app.routers.recipes.adapt_recipe", return_value=MOCK_VARIANT):
+        r = client.post(
+            f"/api/recipes/{recipe['id']}/adapt",
+            json={"variant_type": "transform", "custom_instruction": "Rewrite the entire recipe to be faster."},
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["can_adapt"] is True
+    assert data["variant"]["variant_type"].startswith("transform_alt")
+
+    user = db_session.query(models.User).filter(models.User.id == registered_user["id"]).first()
+    assert user.transformations_used == 0
+    assert user.transformations_limit == 0
+
+
 def test_adapt_recipe_not_found(client, auth_headers):
     r = client.post(
         "/api/recipes/99999/adapt",

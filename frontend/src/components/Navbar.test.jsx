@@ -53,14 +53,16 @@ describe('Navbar', () => {
     expect(screen.getByTitle('Shopping list')).toBeInTheDocument()
   })
 
-  it('renders Settings link', () => {
+  it('shows Settings in the account menu', async () => {
     renderNavbar()
-    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    await (await import('@testing-library/user-event')).default.click(screen.getByRole('button', { name: 'T' }))
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
   })
 
-  it('renders Log out button', () => {
+  it('shows Sign out in the account menu', async () => {
     renderNavbar()
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    await (await import('@testing-library/user-event')).default.click(screen.getByRole('button', { name: 'T' }))
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
   it('renders recipes quota when user is present', () => {

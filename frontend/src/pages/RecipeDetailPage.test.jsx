@@ -175,6 +175,23 @@ describe('RecipeDetailPage — adaptation', () => {
       ).toBeInTheDocument()
     })
   })
+
+  it('clicking Make faster triggers POST /recipes/1/adapt with transform preset', async () => {
+    api.post.mockResolvedValue({
+      can_adapt: true,
+      variant: { ...MOCK_VEGAN_VARIANT, variant_type: 'transform_alt0', title_pl: 'Make faster' },
+      alternatives: [],
+    })
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+
+    await userEvent.click(screen.getByRole('button', { name: /Make faster/ }))
+
+    expect(api.post).toHaveBeenCalledWith('/recipes/1/adapt', expect.objectContaining({
+      variant_type: 'transform',
+      custom_title: 'Make faster',
+    }))
+  })
 })
 
 describe('RecipeDetailPage — re-localize', () => {

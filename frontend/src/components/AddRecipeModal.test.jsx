@@ -48,9 +48,9 @@ describe('AddRecipeModal', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
-  it('renders Translate submit button', () => {
+  it('renders Adapt submit button', () => {
     renderModal()
-    expect(screen.getByRole('button', { name: /Translate/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Adapt/ })).toBeInTheDocument()
   })
 
   it('renders recipe placeholder in paste text mode', () => {
