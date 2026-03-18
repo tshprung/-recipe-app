@@ -1208,17 +1208,15 @@ export default function RecipeDetailPage() {
                     <div key={i} className="grid grid-cols-2 gap-4 py-2 border-b border-stone-50 last:border-0">
                       <div className="flex items-start gap-2 min-w-0">
                         <span dir="auto" className="text-sm text-stone-700 break-words">{pl}</span>
-                        {true && (
-                          <button
-                            type="button"
-                            onClick={() => openIngredientAlternatives(plRaw, i)}
-                            className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
-                            title={t('ingredientAlternatives')}
-                            aria-label={t('ingredientAlternatives')}
-                          >
-                            ⇄
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => openIngredientAlternatives(plRaw, i)}
+                          className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                          title={t('ingredientAlternatives')}
+                          aria-label={t('ingredientAlternatives')}
+                        >
+                          ⇄
+                        </button>
                       </div>
                       <span dir="rtl" className="text-sm text-stone-400 text-right">{he}</span>
                     </div>
@@ -1237,17 +1235,15 @@ export default function RecipeDetailPage() {
                       </span>
                       <div className="flex items-start justify-between gap-2 flex-1 min-w-0">
                         <span dir="auto" className="break-words">{label}</span>
-                        {true && (
-                          <button
-                            type="button"
-                            onClick={() => openIngredientAlternatives(labelRaw, i)}
-                            className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
-                            title={t('ingredientAlternatives')}
-                            aria-label={t('ingredientAlternatives')}
-                          >
-                            ⇄
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => openIngredientAlternatives(labelRaw, i)}
+                          className="flex-shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                          title={t('ingredientAlternatives')}
+                          aria-label={t('ingredientAlternatives')}
+                        >
+                          ⇄
+                        </button>
                       </div>
                     </li>
                   )
