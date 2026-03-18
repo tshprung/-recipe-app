@@ -13,40 +13,6 @@ const COLORS = {
   secondary: '#8FAF8F',
 }
 
-const COUNTRIES = [
-  { code: 'PL', name: 'Poland' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-]
-
-const TARGET_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'he', name: 'עברית' },
-  { code: 'es', name: 'Español' },
-  { code: 'fr', name: 'Français' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'pt', name: 'Português' },
-  { code: 'ru', name: 'Русский' },
-  { code: 'ar', name: 'العربية' },
-  { code: 'uk', name: 'Українська' },
-  { code: 'nl', name: 'Nederlands' },
-  { code: 'tr', name: 'Türkçe' },
-  { code: 'ja', name: '日本語' },
-  { code: 'zh', name: '中文' },
-  { code: 'cs', name: 'Čeština' },
-  { code: 'hu', name: 'Magyar' },
-  { code: 'ro', name: 'Română' },
-  { code: 'el', name: 'Ελληνικά' },
-  { code: 'sv', name: 'Svenska' },
-]
-
 export default function LoginPage() {
   const { t } = useLanguage()
   const location = useLocation()
