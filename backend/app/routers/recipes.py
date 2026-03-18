@@ -588,18 +588,43 @@ def discover_recipes(
             allergens=allergens,
             custom_avoid_text=custom_avoid,
             num_recipes=payload.num_recipes,
+            servings=payload.servings or (current_user.default_servings if current_user else None),
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     # Always return at most requested best-matching recipes.
     recipes = recipes[: payload.num_recipes] if recipes else []
+    no_reason = None
+    if not recipes:
+        parts = []
+        if payload.dish_types:
+            parts.append(f"dish types ({', '.join(payload.dish_types)})")
+        if payload.diet_filters:
+            parts.append(f"diet ({', '.join(payload.diet_filters)})")
+        if payload.max_time_minutes:
+            parts.append(f"max time ({payload.max_time_minutes} min)")
+        if allergens:
+            parts.append(f"allergens ({', '.join(allergens)})")
+        if (custom_avoid or "").strip():
+            parts.append("avoid terms")
+        if (payload.keywords or "").strip():
+            parts.append("keywords")
+        if (payload.ingredients_text or "").strip():
+            parts.append("ingredients focus")
+        if parts:
+            no_reason = "No recipes matched all selected filters together. Try relaxing: " + ", ".join(parts) + "."
+        else:
+            no_reason = "No recipes matched your request. Try changing keywords or filters."
+
     out = schemas.DiscoverOut(
         suggestions=[schemas.AISuggestedRecipeOut(
             title=r["title"],
+            estimated_calories=r.get("estimated_calories"),
             ingredients=r["ingredients"],
             steps=r["steps"],
             missing_ingredients=r.get("missing_ingredients"),
         ) for r in recipes],
+        no_results_reason=no_reason,
     )
     if trial_session is not None:
         out.remaining_actions = MAX_TRIAL_ACTIONS - trial_session.used_actions

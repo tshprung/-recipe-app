@@ -34,8 +34,10 @@ export default function DiscoverPage() {
   const [keywords, setKeywords] = useState('')
   const [ingredientsText, setIngredientsText] = useState('')
   const [numRecipes, setNumRecipes] = useState(3)
+  const [servings, setServings] = useState(() => user?.default_servings ?? 1)
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState(null)
+  const [noReason, setNoReason] = useState(null)
   const [error, setError] = useState(null)
   const [addingTitle, setAddingTitle] = useState(null)
   const [savedId, setSavedId] = useState(null)
@@ -60,12 +62,14 @@ export default function DiscoverPage() {
     e.preventDefault()
     setError(null)
     setSuggestions(null)
+    setNoReason(null)
     setLoading(true)
     api
       .post('/recipes/discover', {
         dish_types: dishTypes.length ? dishTypes : null,
         diet_filters: dietFilters.length ? dietFilters : null,
         num_recipes: numRecipes,
+        servings: servings ? Number(servings) : null,
         max_time_minutes: maxTime || null,
         allergens: allergens.length ? allergens : null,
         custom_avoid_text: customAvoid || null,
@@ -76,6 +80,7 @@ export default function DiscoverPage() {
       })
       .then(data => {
         setSuggestions(data.suggestions || [])
+        setNoReason(data.no_results_reason || null)
         if (typeof data.remaining_actions === 'number') syncTrialRemaining(data.remaining_actions)
         refreshUser()
       })
@@ -119,6 +124,7 @@ export default function DiscoverPage() {
         <h4 className="font-bold text-stone-800">{sug.title}</h4>
         <p className="text-xs text-stone-500 mt-1">
           {sug.ingredients?.length ?? 0} ingredients · {(sug.steps?.length ?? 0)} steps
+          {typeof sug.estimated_calories === 'number' ? ` · ~${sug.estimated_calories} kcal` : ''}
         </p>
 
         <button
@@ -181,13 +187,6 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button
-        type="button"
-        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
-        className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-800"
-      >
-        ← Back
-      </button>
       <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('findNewRecipes')}</h2>
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
@@ -218,10 +217,27 @@ export default function DiscoverPage() {
             type="text"
             value={keywords}
             onChange={e => setKeywords(e.target.value)}
-            placeholder="Passover charoset, quick pasta for two, birthday cake without nuts…"
+            placeholder="e.g. quick dinner, family-friendly, traditional soup, high-protein lunch…"
             className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
           <p className="text-xs text-stone-400 mt-1">{t('discoverKeywordsHint')}</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            Servings
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={24}
+            value={servings}
+            onChange={(e) => setServings(e.target.value === '' ? '' : Number(e.target.value))}
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="text-xs text-stone-400 mt-1">
+            Default comes from Settings (“I usually cook for…”). Changing it here won’t affect your Settings.
+          </p>
         </div>
 
         <div>
@@ -368,13 +384,21 @@ export default function DiscoverPage() {
       {suggestions && suggestions.length === 0 && !loading && (
         <div className="text-center py-12 bg-white rounded-2xl border border-stone-100">
           <p className="text-stone-500 font-medium">{t('noSuggestions')}</p>
-          <p className="text-sm text-stone-400 mt-1">{t('tryDifferentFilters')}</p>
+          <p className="text-sm text-stone-400 mt-1">{noReason || t('tryDifferentFilters')}</p>
         </div>
       )}
 
       {showTrialExhausted && (
         <TrialExhaustedModal onClose={() => setShowTrialExhausted(false)} />
       )}
+
+      <button
+        type="button"
+        onClick={() => navigate('/', { replace: true })}
+        className="mt-8 w-full min-h-[44px] px-4 py-3 rounded-xl bg-stone-800 text-stone-100 hover:bg-stone-700 transition-colors text-sm font-semibold"
+      >
+        Back to menu
+      </button>
     </div>
   )
 }
