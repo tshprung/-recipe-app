@@ -191,162 +191,6 @@ export default function DiscoverPage() {
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
       <form onSubmit={handleFind} className="space-y-4 mb-8">
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-            Number of variations
-          </label>
-          <select
-            value={numRecipes}
-            onChange={(e) => setNumRecipes(parseInt(e.target.value, 10))}
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-          <p className="text-xs text-stone-400 mt-1">Default is 3. You can request up to 10.</p>
-          <p className="text-xs text-stone-400 mt-1">
-            Note: “Low fat” and “Fat-free” are best-effort filters and may not be perfect for every recipe.
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-            {t('discoverKeywordsLabel')}
-          </label>
-          <input
-            type="text"
-            value={keywords}
-            onChange={e => setKeywords(e.target.value)}
-            placeholder="e.g. quick dinner, family-friendly, traditional soup, high-protein lunch…"
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-          <p className="text-xs text-stone-400 mt-1">{t('discoverKeywordsHint')}</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-            Servings
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={24}
-            value={servings}
-            onChange={(e) => setServings(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-          <p className="text-xs text-stone-400 mt-1">
-            Default comes from Settings (“I usually cook for…”). Changing it here won’t affect your Settings.
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-            {t('discoverIngredientsLabel')} ({t('optional')})
-          </label>
-          <textarea
-            value={ingredientsText}
-            onChange={e => setIngredientsText(e.target.value)}
-            rows={3}
-            placeholder={t('discoverIngredientsHint')}
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-          />
-        </div>
-        <div>
-          <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dishTypes')}</span>
-          <div className="flex flex-wrap gap-2">
-            {DISH_TYPES.map(type => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => toggleDish(type)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  dishTypes.includes(type)
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dietFilters')}</span>
-          <div className="flex flex-wrap gap-2">
-            {DIET_OPTIONS.map(({ key, labelKey }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleDiet(key)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  dietFilters.includes(key)
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                {t(labelKey)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <span className="block text-sm font-semibold text-stone-600 mb-2">{t('allergensToAvoid')} ({t('optional')})</span>
-          <div className="flex flex-wrap gap-2">
-            {ALLERGENS.map(a => (
-              <button
-                key={a.code}
-                type="button"
-                onClick={() => toggleAllergen(a.code)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  allergens.includes(a.code)
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
-            {t('otherAllergens')} ({t('optional')})
-          </label>
-          <input
-            type="text"
-            value={customAvoid}
-            onChange={e => setCustomAvoid(e.target.value)}
-            placeholder={t('otherAllergensPlaceholder')}
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-          <p className="text-xs text-stone-400 mt-1">{t('otherAllergensHint')}</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('maxTime')}</label>
-          <select
-            value={maxTime ?? ''}
-            onChange={e => setMaxTime(e.target.value === '' ? null : parseInt(e.target.value, 10))}
-            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-          >
-            {TIME_OPTIONS.map(opt => (
-              <option key={String(opt.value)} value={opt.value ?? ''}>
-                {t(opt.labelKey)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-            {error}
-          </div>
-        )}
-
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -370,6 +214,189 @@ export default function DiscoverPage() {
             )}
           </button>
         </div>
+
+        {/* Simple / primary inputs */}
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            {t('discoverKeywordsLabel')}
+          </label>
+          <input
+            type="text"
+            value={keywords}
+            onChange={e => setKeywords(e.target.value)}
+            placeholder="e.g. quick dinner, family-friendly, traditional soup, high-protein lunch…"
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="text-xs text-stone-400 mt-1">{t('discoverKeywordsHint')}</p>
+        </div>
+
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            {error}
+          </div>
+        )}
+
+        {/* Advanced options */}
+        <details className="bg-white rounded-2xl border border-stone-100 p-4">
+          <summary className="cursor-pointer select-none text-sm font-semibold text-stone-700">
+            More options
+            <span className="text-xs text-stone-400 font-medium ml-2">
+              (dish type, servings, time, variations, ingredients)
+            </span>
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div>
+              <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dishTypes')}</span>
+              <div className="flex flex-wrap gap-2">
+                {DISH_TYPES.map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => toggleDish(type)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      dishTypes.includes(type)
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+                  Servings
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={servings}
+                  onChange={(e) => setServings(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <p className="text-xs text-stone-400 mt-1">
+                  Default comes from Settings (“I usually cook for…”). Changing it here won’t affect your Settings.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+                  Number of variations
+                </label>
+                <select
+                  value={numRecipes}
+                  onChange={(e) => setNumRecipes(parseInt(e.target.value, 10))}
+                  className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-stone-400 mt-1">Default is 3. You can request up to 10.</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('maxTime')}</label>
+              <select
+                value={maxTime ?? ''}
+                onChange={e => setMaxTime(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                {TIME_OPTIONS.map(opt => (
+                  <option key={String(opt.value)} value={opt.value ?? ''}>
+                    {t(opt.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+                {t('discoverIngredientsLabel')} ({t('optional')})
+              </label>
+              <textarea
+                value={ingredientsText}
+                onChange={e => setIngredientsText(e.target.value)}
+                rows={3}
+                placeholder={t('discoverIngredientsHint')}
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+              />
+            </div>
+          </div>
+        </details>
+
+        <details className="bg-white rounded-2xl border border-stone-100 p-4">
+          <summary className="cursor-pointer select-none text-sm font-semibold text-stone-700">
+            Diet & allergens
+            <span className="text-xs text-stone-400 font-medium ml-2">
+              (diet filters, allergens, avoid terms)
+            </span>
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div>
+              <span className="block text-sm font-semibold text-stone-600 mb-2">{t('dietFilters')}</span>
+              <div className="flex flex-wrap gap-2">
+                {DIET_OPTIONS.map(({ key, labelKey }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleDiet(key)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      dietFilters.includes(key)
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    {t(labelKey)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-stone-400 mt-1">
+                Note: “Low fat” and “Fat-free” are best-effort filters and may not be perfect for every recipe.
+              </p>
+            </div>
+
+            <div>
+              <span className="block text-sm font-semibold text-stone-600 mb-2">{t('allergensToAvoid')} ({t('optional')})</span>
+              <div className="flex flex-wrap gap-2">
+                {ALLERGENS.map(a => (
+                  <button
+                    key={a.code}
+                    type="button"
+                    onClick={() => toggleAllergen(a.code)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      allergens.includes(a.code)
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+                {t('otherAllergens')} ({t('optional')})
+              </label>
+              <input
+                type="text"
+                value={customAvoid}
+                onChange={e => setCustomAvoid(e.target.value)}
+                placeholder={t('otherAllergensPlaceholder')}
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <p className="text-xs text-stone-400 mt-1">{t('otherAllergensHint')}</p>
+            </div>
+          </div>
+        </details>
+
       </form>
 
       {suggestions && suggestions.length > 0 && (
