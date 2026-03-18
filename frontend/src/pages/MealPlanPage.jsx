@@ -562,161 +562,180 @@ export default function MealPlanPage() {
             </button>
           </div>
           <form onSubmit={handleGenerate} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-stone-300 mb-1.5">
-                Dates
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (v) setStartDate(v)
-                }}
-                className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {weekDates.map((d, idx) => {
-                  const isOn = !!selectedDays[idx]
-                  const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-                  return (
+            {error && (
+              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            {/* Simple / primary controls */}
+            <div className="bg-stone-900/40 rounded-2xl border border-white/10 p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-stone-300 mb-1.5">
+                  Dates
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v) setStartDate(v)
+                  }}
+                  className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {weekDates.map((d, idx) => {
+                    const isOn = !!selectedDays[idx]
+                    const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                    return (
+                      <button
+                        key={String(idx)}
+                        type="button"
+                        onClick={() => toggleSelectedDay(idx)}
+                        className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          isOn
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-stone-500 mt-1">
+                  Selected: {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'}
+                </p>
+              </div>
+
+              <div>
+                <span className="block text-sm font-semibold text-stone-300 mb-2">Meal types</span>
+                <div className="flex flex-wrap gap-2">
+                  {MEAL_TYPE_OPTIONS.map(({ key, label }) => (
                     <button
-                      key={String(idx)}
+                      key={key}
                       type="button"
-                      onClick={() => toggleSelectedDay(idx)}
+                      onClick={() => toggleMealType(key)}
                       className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        isOn
+                        mealTypes.includes(key)
                           ? 'bg-amber-500 text-white'
                           : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
                       }`}
                     >
                       {label}
                     </button>
-                  )
-                })}
-              </div>
-              <p className="text-xs text-stone-500 mt-1">
-                Selected: {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'}
-              </p>
-            </div>
-
-            <div>
-              <span className="block text-sm font-semibold text-stone-300 mb-2">Meal types</span>
-              <div className="flex flex-wrap gap-2">
-                {MEAL_TYPE_OPTIONS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleMealType(key)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      mealTypes.includes(key)
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-stone-500 mt-1">Select 1+; the plan will include all selected meal types for each day.</p>
-            </div>
-
-            <div>
-              <span className="block text-sm font-semibold text-stone-300 mb-2">Protein types (best effort)</span>
-              <div className="flex flex-wrap gap-2">
-                {PROTEIN_OPTIONS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleProtein(key)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      proteinTypes.includes(key)
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                  ))}
+                </div>
+                <p className="text-xs text-stone-500 mt-1">Select 1+; the plan will include all selected meal types for each day.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-semibold text-stone-300 mb-1.5">Meat meals per week</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={21}
-                  value={meatMealsPerWeek}
-                  onChange={(e) => setMeatMealsPerWeek(Number(e.target.value))}
-                  className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-stone-300 mb-1.5">Fish meals per week</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={21}
-                  value={fishMealsPerWeek}
-                  onChange={(e) => setFishMealsPerWeek(Number(e.target.value))}
-                  className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-            </div>
-            <div>
-              <span className="block text-sm font-semibold text-stone-300 mb-2">{t('dietFilters')}</span>
-              <div className="flex flex-wrap gap-2">
-                {DIET_OPTIONS.map(({ key, labelKey }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleDiet(key)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      dietFilters.includes(key)
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
-                    }`}
+            {/* Advanced options */}
+            <details className="bg-stone-900/40 rounded-2xl border border-white/10 p-4">
+              <summary className="cursor-pointer select-none text-sm font-semibold text-stone-200">
+                More options
+                <span className="text-xs text-stone-400 font-medium ml-2">
+                  (protein, diet, time, budget)
+                </span>
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <span className="block text-sm font-semibold text-stone-300 mb-2">Protein types (best effort)</span>
+                  <div className="flex flex-wrap gap-2">
+                    {PROTEIN_OPTIONS.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleProtein(key)}
+                        className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          proteinTypes.includes(key)
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-stone-300 mb-1.5">Meat meals per week</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={21}
+                      value={meatMealsPerWeek}
+                      onChange={(e) => setMeatMealsPerWeek(Number(e.target.value))}
+                      className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-stone-300 mb-1.5">Fish meals per week</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={21}
+                      value={fishMealsPerWeek}
+                      onChange={(e) => setFishMealsPerWeek(Number(e.target.value))}
+                      className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <span className="block text-sm font-semibold text-stone-300 mb-2">{t('dietFilters')}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {DIET_OPTIONS.map(({ key, labelKey }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleDiet(key)}
+                        className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          dietFilters.includes(key)
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                        }`}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-stone-300 mb-1.5">
+                    {t('maxTime')}
+                  </label>
+                  <select
+                    value={maxTime ?? ''}
+                    onChange={e => setMaxTime(e.target.value === '' ? null : Number(e.target.value))}
+                    className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
                   >
-                    {t(labelKey)}
-                  </button>
-                ))}
+                    {TIME_OPTIONS.map(opt => (
+                      <option key={String(opt.value)} value={opt.value ?? ''}>
+                        {t(opt.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-stone-300 mb-1.5">
+                    {t('budget')}
+                  </label>
+                  <input
+                    type="text"
+                    value={budget}
+                    onChange={e => setBudget(e.target.value)}
+                    placeholder="e.g. low, medium"
+                    className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-stone-300 mb-1.5">
-                {t('maxTime')}
-              </label>
-              <select
-                value={maxTime ?? ''}
-                onChange={e => setMaxTime(e.target.value === '' ? null : Number(e.target.value))}
-                className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              >
-                {TIME_OPTIONS.map(opt => (
-                  <option key={String(opt.value)} value={opt.value ?? ''}>
-                    {t(opt.labelKey)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-stone-300 mb-1.5">
-                {t('budget')}
-              </label>
-              <input
-                type="text"
-                value={budget}
-                onChange={e => setBudget(e.target.value)}
-                placeholder="e.g. low, medium"
-                className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-            </div>
-            {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
+            </details>
+
             <div className="flex items-center gap-3">
               <button
                 type="button"
