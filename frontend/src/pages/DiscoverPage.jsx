@@ -26,6 +26,7 @@ export default function DiscoverPage() {
   const { t, lang } = useLanguage()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const navigate = useNavigate()
+  const defaultServings = user?.default_servings ?? 1
   const [dishTypes, setDishTypes] = useState(() => user?.dish_preferences ?? [])
   const [dietFilters, setDietFilters] = useState(() => user?.diet_filters ?? [])
   const [allergens, setAllergens] = useState(() => user?.allergens ?? [])
@@ -34,7 +35,7 @@ export default function DiscoverPage() {
   const [keywords, setKeywords] = useState('')
   const [ingredientsText, setIngredientsText] = useState('')
   const [numRecipes, setNumRecipes] = useState(3)
-  const [servings, setServings] = useState(() => user?.default_servings ?? 1)
+  const [servings, setServings] = useState(() => defaultServings)
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState(null)
   const [noReason, setNoReason] = useState(null)
@@ -43,6 +44,8 @@ export default function DiscoverPage() {
   const [savedId, setSavedId] = useState(null)
   const [savedTitle, setSavedTitle] = useState(null)
   const [showTrialExhausted, setShowTrialExhausted] = useState(false)
+  const [openMoreOptions, setOpenMoreOptions] = useState(false)
+  const [openDietAllergens, setOpenDietAllergens] = useState(false)
 
   function toggleDish(type) {
     setDishTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -185,6 +188,24 @@ export default function DiscoverPage() {
     )
   }
 
+  const activeFilterPills = (() => {
+    const pills = []
+    if ((dishTypes?.length ?? 0) > 0) pills.push({ key: 'dishTypes', label: `${t('dishTypes')}: ${dishTypes.length}`, section: 'more' })
+    if (Number.isFinite(Number(servings)) && Number(servings) !== Number(defaultServings)) pills.push({ key: 'servings', label: `Servings: ${servings}`, section: 'more' })
+    if (Number.isFinite(Number(maxTime)) && Number(maxTime) > 0) pills.push({ key: 'maxTime', label: `≤ ${maxTime} min`, section: 'more' })
+    if (Number.isFinite(Number(numRecipes)) && Number(numRecipes) !== 3) pills.push({ key: 'numRecipes', label: `Variations: ${numRecipes}`, section: 'more' })
+    if ((ingredientsText || '').trim()) pills.push({ key: 'ingredients', label: 'Ingredients focus', section: 'more' })
+    if ((dietFilters?.length ?? 0) > 0) pills.push({ key: 'diets', label: `${t('dietFilters')}: ${dietFilters.length}`, section: 'diet' })
+    if ((allergens?.length ?? 0) > 0) pills.push({ key: 'allergens', label: `${t('allergensToAvoid')}: ${allergens.length}`, section: 'diet' })
+    if ((customAvoid || '').trim()) pills.push({ key: 'avoid', label: 'Avoid terms', section: 'diet' })
+    return pills
+  })()
+
+  function openSection(section) {
+    if (section === 'more') setOpenMoreOptions(true)
+    if (section === 'diet') setOpenDietAllergens(true)
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('findNewRecipes')}</h2>
@@ -236,8 +257,31 @@ export default function DiscoverPage() {
           </div>
         )}
 
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs font-semibold text-stone-500">Active filters:</span>
+          {activeFilterPills.length === 0 ? (
+            <span className="text-xs text-stone-400">none</span>
+          ) : (
+            activeFilterPills.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => openSection(p.section)}
+                className="px-3 py-1.5 rounded-full bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition"
+                title="Click to edit"
+              >
+                {p.label}
+              </button>
+            ))
+          )}
+        </div>
+
         {/* Advanced options */}
-        <details className="bg-white rounded-2xl border border-stone-100 p-4">
+        <details
+          className="bg-white rounded-2xl border border-stone-100 p-4"
+          open={openMoreOptions}
+          onToggle={(e) => setOpenMoreOptions(e.currentTarget.open)}
+        >
           <summary className="cursor-pointer select-none text-sm font-semibold text-stone-700">
             More options
             <span className="text-xs text-stone-400 font-medium ml-2">
@@ -330,7 +374,11 @@ export default function DiscoverPage() {
           </div>
         </details>
 
-        <details className="bg-white rounded-2xl border border-stone-100 p-4">
+        <details
+          className="bg-white rounded-2xl border border-stone-100 p-4"
+          open={openDietAllergens}
+          onToggle={(e) => setOpenDietAllergens(e.currentTarget.open)}
+        >
           <summary className="cursor-pointer select-none text-sm font-semibold text-stone-700">
             Diet & allergens
             <span className="text-xs text-stone-400 font-medium ml-2">
