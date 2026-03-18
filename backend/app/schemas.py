@@ -492,7 +492,7 @@ class MealPlanDayOut(BaseModel):
 
 
 class MealPlanGenerateRequest(BaseModel):
-    num_days: int = Field(ge=5, le=7, default=7)
+    num_days: int = Field(ge=1, le=7, default=7)
     meal_types: list[str] | None = None  # e.g. ["breakfast","lunch","dinner"]
     protein_types: list[str] | None = None  # e.g. ["chicken","beef","tofu","fish"]
     meat_meals_per_week: int | None = Field(default=None, ge=0, le=21)
@@ -503,6 +503,7 @@ class MealPlanGenerateRequest(BaseModel):
     max_time_minutes: int | None = None
     budget: str | None = None
     start_date: str | None = None  # YYYY-MM-DD; default today
+    selected_dates: list[str] | None = None  # optional explicit dates; overrides num_days for length (1–7)
 
 
 class MealPlanOut(BaseModel):

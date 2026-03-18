@@ -110,7 +110,7 @@ def generate_weekly_meal_plan(
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
 
-    num_days = max(5, min(7, num_days))
+    num_days = max(1, min(7, num_days))
     meal_types_norm = [str(x).strip().lower() for x in (meal_types or []) if str(x).strip()] or ["dinner"]
     protein_types_norm = [str(x).strip().lower() for x in (protein_types or []) if str(x).strip()] or []
     diet_list = _diet_list_for_prompt(diet_filters)
