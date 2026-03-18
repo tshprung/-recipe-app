@@ -277,10 +277,16 @@ def export_meal_plan_to_calendar(
 
     cal_id = (calendar_id or "").strip() or "primary"
     tz = (timezone_name or "").strip() or "UTC"
-    tm = (default_time or "").strip() or "19:00"
-    # MVP: create 1-hour events; user can adjust in calendar
-    start_suffix = f"T{tm}:00"
-    end_suffix = f"T{tm}:00"
+    default_tm = (default_time or "").strip() or ""
+
+    # Default schedule by meal type (local time). Users can adjust in Calendar after export.
+    meal_type_times = {
+        "breakfast": "08:00",
+        "second_breakfast": "10:00",
+        "lunch": "12:00",
+        "afternoon_snack": "15:00",
+        "dinner": "18:00",
+    }
 
     access_token = _refresh_access_token(token_row.refresh_token)
 
@@ -297,6 +303,12 @@ def export_meal_plan_to_calendar(
             title = (meal.get("title") or meal.get("name") or "").strip() or "Meal"
             meal_type = (meal.get("meal_type") or "").strip()
             summary = f"{meal_type.title().replace('_', ' ')}: {title}" if meal_type else title
+
+            tm = meal_type_times.get(meal_type, default_tm or "19:00")
+            # Create 1-hour events; user can adjust in calendar
+            start_suffix = f"T{tm}:00"
+            end_suffix = f"T{tm}:00"
+
             description_parts = []
             if meal.get("short_description"):
                 description_parts.append(str(meal.get("short_description")).strip())
