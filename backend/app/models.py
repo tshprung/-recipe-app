@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text
+    Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -59,6 +59,58 @@ class User(Base):
     )
 
     recipes: Mapped[list["Recipe"]] = relationship("Recipe", back_populates="user")
+    meal_plans: Mapped[list["MealPlan"]] = relationship(
+        "MealPlan", back_populates="user", cascade="all, delete-orphan"
+    )
+    google_oauth_tokens: Mapped[list["GoogleOAuthToken"]] = relationship(
+        "GoogleOAuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class MealPlan(Base):
+    """Weekly meal plan: 5–7 days, each with one meal (name, description, full recipe for shopping list)."""
+
+    __tablename__ = "meal_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="meal_plans")
+
+
+class GoogleOAuthToken(Base):
+    """Stored Google OAuth tokens for Calendar integration (per user)."""
+
+    __tablename__ = "google_oauth_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="google")
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="google_oauth_tokens")
 
 
 class Recipe(Base):

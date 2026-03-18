@@ -537,7 +537,7 @@ def discover_recipes(
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    """Return up to 3 AI-suggested recipes based on preferences (dish type, diet, allergens, max time). Consumes quota."""
+    """Return up to N AI-suggested recipes based on preferences (dish type, diet, allergens, max time). Consumes quota."""
     trial_session = enforce_trial_or_user_quota(request, db, current_user)
     if current_user is not None and not current_user.is_verified:
         raise HTTPException(
@@ -587,11 +587,12 @@ def discover_recipes(
             measurement_system=measurement,
             allergens=allergens,
             custom_avoid_text=custom_avoid,
+            num_recipes=payload.num_recipes,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
-    # Always return at most three best-matching recipes.
-    recipes = recipes[:3] if recipes else []
+    # Always return at most requested best-matching recipes.
+    recipes = recipes[: payload.num_recipes] if recipes else []
     out = schemas.DiscoverOut(
         suggestions=[schemas.AISuggestedRecipeOut(
             title=r["title"],

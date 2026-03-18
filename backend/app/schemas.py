@@ -458,6 +458,7 @@ class WhatCanIMakeAIOut(BaseModel):
 class DiscoverRequest(BaseModel):
     dish_types: list[str] | None = None  # e.g. ["pasta", "salads"]
     diet_filters: list[str] | None = None  # e.g. ["vegetarian", "vegan"]
+    num_recipes: int = Field(default=3, ge=1, le=10)  # how many suggestions to return
     max_time_minutes: int | None = None  # e.g. 30, 60
     allergens: list[str] | None = None  # optional allergen codes to avoid
     custom_avoid_text: str | None = None  # free-text exclusions
@@ -470,6 +471,52 @@ class DiscoverRequest(BaseModel):
 class DiscoverOut(BaseModel):
     suggestions: list[AISuggestedRecipeOut]
     remaining_actions: int | None = None  # trial only; for frontend sync
+
+
+class MealPlanMealOut(BaseModel):
+    meal_type: str | None = None
+    name: str
+    short_description: str
+    estimated_time_minutes: int
+    title: str
+    ingredients: list[str]
+    steps: list[str]
+
+
+class MealPlanDayOut(BaseModel):
+    date: str
+    meals: list[MealPlanMealOut]
+
+
+class MealPlanGenerateRequest(BaseModel):
+    num_days: int = Field(ge=5, le=7, default=7)
+    meal_types: list[str] | None = None  # e.g. ["breakfast","lunch","dinner"]
+    protein_types: list[str] | None = None  # e.g. ["chicken","beef","tofu","fish"]
+    meat_meals_per_week: int | None = Field(default=None, ge=0, le=21)
+    fish_meals_per_week: int | None = Field(default=None, ge=0, le=21)
+    diet_filters: list[str] | None = None
+    allergens: list[str] | None = None
+    custom_avoid_text: str | None = None
+    max_time_minutes: int | None = None
+    budget: str | None = None
+    start_date: str | None = None  # YYYY-MM-DD; default today
+
+
+class MealPlanOut(BaseModel):
+    id: int
+    start_date: str  # YYYY-MM-DD
+    days: list[MealPlanDayOut]
+
+    model_config = {"from_attributes": True}
+
+
+class MealPlanReplaceRequest(BaseModel):
+    day_index: int = Field(ge=0)
+    meal_index: int = Field(ge=0)
+
+
+class MealPlanAddToShoppingListOut(BaseModel):
+    recipe_ids: list[int]
 
 
 class FromAISuggestionRequest(BaseModel):

@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from .database import engine
-from .routers import auth, users, recipes, shopping_lists, substitutions, admin, meta, onboarding, trial
+from .routers import auth, users, recipes, shopping_lists, substitutions, admin, meta, onboarding, trial, meal_plan, calendar_google
 
 # DB schema is managed via Alembic migrations (production) or test fixtures (tests).
 
@@ -52,12 +52,39 @@ def _cors_headers_for_request(request: Request) -> dict:
     }
 
 
-@app.middleware("http")
-async def cors_preflight_first(request: Request, call_next):
-    """Handle OPTIONS (CORS preflight) first so it always returns 200; avoids 400 from proxy/downstream."""
-    if request.method == "OPTIONS":
-        return Response(status_code=200, headers=_cors_headers_for_request(request))
-    return await call_next(request)
+class CORSPreflightMiddleware:
+    """Handle OPTIONS (CORS preflight) as the outermost middleware so it always returns 200."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("method") == "OPTIONS":
+            headers = _cors_headers_for_request_from_scope(scope)
+            await send({
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [(k.encode(), v.encode()) for k, v in headers.items()],
+            })
+            await send({"type": "http.response.body", "body": b""})
+            return
+        await self.app(scope, receive, send)
+
+
+def _cors_headers_for_request_from_scope(scope: dict) -> dict:
+    origin = (next((v.decode() for k, v in scope.get("headers", []) if k == b"origin"), None) or "")
+    if allow_origins == ["*"]:
+        allow_origin = "*"
+    elif origin in allow_origins:
+        allow_origin = origin
+    else:
+        allow_origin = allow_origins[0] if allow_origins else "*"
+    return {
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+        "Access-Control-Max-Age": "86400",
+    }
 
 
 app.add_middleware(
@@ -69,6 +96,9 @@ app.add_middleware(
 )
 
 app.add_middleware(SlowAPIMiddleware)
+
+# OPTIONS handler must run first (added last) so preflight never hits rate limiter or routes
+app.add_middleware(CORSPreflightMiddleware)
 
 
 @app.middleware("http")
@@ -83,6 +113,8 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(recipes.router)
 app.include_router(shopping_lists.router)
+app.include_router(meal_plan.router)
+app.include_router(calendar_google.router)
 app.include_router(substitutions.router)
 app.include_router(admin.router)
 app.include_router(meta.router)

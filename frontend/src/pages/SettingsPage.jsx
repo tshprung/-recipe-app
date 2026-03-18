@@ -163,15 +163,6 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <SettingsCard icon="🗣️" title={t('language')}>
-          <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('appLanguage')}</label>
-            <div className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800">
-              English
-            </div>
-          </div>
-        </SettingsCard>
-
         <SettingsCard icon="🌐" title={t('translateTo')}>
           <p className="text-sm text-stone-500 mb-3">Choose the language and country you want recipes adapted for.</p>
           <div>

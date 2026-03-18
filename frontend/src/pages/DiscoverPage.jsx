@@ -33,6 +33,7 @@ export default function DiscoverPage() {
   const [maxTime, setMaxTime] = useState(null)
   const [keywords, setKeywords] = useState('')
   const [ingredientsText, setIngredientsText] = useState('')
+  const [numRecipes, setNumRecipes] = useState(3)
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState(null)
   const [error, setError] = useState(null)
@@ -64,6 +65,7 @@ export default function DiscoverPage() {
       .post('/recipes/discover', {
         dish_types: dishTypes.length ? dishTypes : null,
         diet_filters: dietFilters.length ? dietFilters : null,
+        num_recipes: numRecipes,
         max_time_minutes: maxTime || null,
         allergens: allergens.length ? allergens : null,
         custom_avoid_text: customAvoid || null,
@@ -190,6 +192,21 @@ export default function DiscoverPage() {
       <p className="text-stone-500 text-sm mb-6">{t('discoverHint')}</p>
 
       <form onSubmit={handleFind} className="space-y-4 mb-8">
+        <div>
+          <label className="block text-sm font-semibold text-stone-600 mb-1.5">
+            Number of variations
+          </label>
+          <select
+            value={numRecipes}
+            onChange={(e) => setNumRecipes(parseInt(e.target.value, 10))}
+            className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          >
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <p className="text-xs text-stone-400 mt-1">Default is 3. You can request up to 10.</p>
+        </div>
         <div>
           <label className="block text-sm font-semibold text-stone-600 mb-1.5">
             {t('discoverKeywordsLabel')}
