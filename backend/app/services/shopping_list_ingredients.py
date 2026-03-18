@@ -29,6 +29,12 @@ COOKING_PHRASES = [
     r",\s*melted\s*$",
     r"\s+melted\s*$",
     r"^\s*melted\s+",
+    r",\s*cooked\s*$",
+    r"\s+cooked\s*$",
+    r"^\s*cooked\s+",
+    r",\s*cut\s*$",
+    r"\s+cut\s*$",
+    r"^\s*cut\s+",
     r"\s+for\s+coating\s*$",
     r",\s*for\s+coating\s*$",
     # "for sauce", "for shallow frying", etc. — usage, not buying info
@@ -55,6 +61,61 @@ COOKING_PHRASES_FULL = [
 COOKING_PATTERNS = [re.compile(p, re.IGNORECASE) for p in COOKING_PHRASES]
 COOKING_PATTERNS_FULL = [re.compile(p, re.IGNORECASE) for p in COOKING_PHRASES_FULL]
 
+# Phrases that are not real shopping items (multilingual)
+_EXCLUDE_ITEM_PATTERNS = [
+    # English
+    r"^\s*season(?:ing)?\s+to\s+taste\s*$",
+    r"^\s*season\s+to\s+taste\s*$",
+    # Hebrew
+    r"^\s*תיבול\s+לפי\s+טעם\s*$",
+    r"^\s*תיבול\s+לפי\s+הטעם\s*$",
+    r"^\s*תבלון\s+לפי\s+טעם\s*$",
+]
+EXCLUDE_ITEM_PATTERNS = [re.compile(p) for p in _EXCLUDE_ITEM_PATTERNS]
+
+# Hebrew prep words to strip from ingredient names (keep "ground"/טחון)
+_HE_PREP_SUFFIXES = {
+    "קצוץ", "קצוצה", "קצוצים", "קצוצות",
+    "חתוך", "חתוכה", "חתוכים", "חתוכות",
+    "פרוס", "פרוסה", "פרוסים", "פרוסות",
+    "קלוף", "קלופה", "קלופים", "קלופות",
+    "מבושל", "מבושלת", "מבושלים", "מבושלות",
+    "צלוי", "צלויה", "צלויים", "צלויות",
+    "מטוגן", "מטוגנת", "מטוגנים", "מטוגנות",
+    "אפוי", "אפויה", "אפויים", "אפויות",
+}
+_HE_GROUND_WORDS = {"טחון", "טחונה", "טחונים", "טחונות"}
+
+
+def _strip_hebrew_prep(name: str) -> str:
+    s = (name or "").strip()
+    if not s:
+        return s
+    words = s.split()
+    # Strip trailing prep words, but never strip "ground" (טחון)
+    while words:
+        w = words[-1].strip("()[]{}.,;:!?'\"׳״")
+        if not w:
+            words.pop()
+            continue
+        if w in _HE_GROUND_WORDS:
+            break
+        if w in _HE_PREP_SUFFIXES:
+            words.pop()
+            continue
+        break
+    return " ".join(words).strip()
+
+
+def _should_exclude_item(label: str) -> bool:
+    s = (label or "").strip()
+    if not s:
+        return True
+    for pat in EXCLUDE_ITEM_PATTERNS:
+        if pat.match(s):
+            return True
+    return False
+
 # Units we recognize for quantity aggregation (same unit + same name → sum)
 VOLUME_UNITS = {
     "tablespoon", "tablespoons", "tbsp", "tb",
@@ -74,6 +135,13 @@ COUNTABLE_UNITS = {
     "pinch", "pinches",
 }
 KNOWN_UNITS = VOLUME_WEIGHT_UNITS | COUNTABLE_UNITS
+
+# A small set of common countable nouns that should pluralize when unit is empty.
+# This avoids "8 carrot" while not trying to pluralize everything (e.g. "rice", "salt").
+_COUNTABLE_NOUNS = {
+    "onion", "tomato", "potato", "pepper", "cucumber", "carrot",
+    "apple", "banana", "lemon", "lime", "avocado",
+}
 
 # Convert tbsp/tsp to tablespoons for aggregation (1 tbsp = 3 tsp). Cups stay separate.
 TABLESPOON_TSP_TO_TABLESPOONS = {
@@ -103,7 +171,9 @@ def strip_cooking_instructions(name: str) -> str:
             return ""
     for pat in COOKING_PATTERNS:
         result = pat.sub("", result)
-    return result.strip().rstrip(",").strip()
+    result = result.strip().rstrip(",").strip()
+    result = _strip_hebrew_prep(result)
+    return result.strip()
 
 
 def _normalize_amount_range(amount: str) -> str:
@@ -314,6 +384,9 @@ def _format_quantity(value: float, unit: str, name_rest: str) -> str:
     if value != 1 and name in COUNTABLE_UNITS:
         plural = name + "s" if not name.endswith("s") else name
         return f"{num_str} {plural}"
+    # Heuristic pluralization when unit is empty (English only, common produce nouns)
+    if not unit and value != 1 and name in _COUNTABLE_NOUNS and not name.endswith("s"):
+        return f"{num_str} {name}s"
     return f"{num_str} {name}"
 
 
@@ -371,7 +444,7 @@ def aggregate_ingredients(ingredient_labels: list[str]) -> list[str]:
 
     out.extend(unparseable)
     # Exclude plain water (tap water); keep special waters e.g. sparkling, coconut, mineral
-    out = [x for x in out if x and not _is_plain_water(x)]
+    out = [x for x in out if x and not _is_plain_water(x) and not _should_exclude_item(x)]
     return out
 
 
