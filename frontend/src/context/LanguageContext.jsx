@@ -1,30 +1,22 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { LANG_STORAGE_KEY } from '../constants/storageKeys'
 import { translations } from '../locales/translations'
 
 
 const LanguageContext = createContext(null)
 
 export function LanguageProvider({ children }) {
-  const [lang, setLangState] = useState(() => {
-    try {
-      const stored = localStorage.getItem(LANG_STORAGE_KEY)
-      if (stored === 'en' || stored === 'he' || stored === 'pl') return stored
-    } catch (_) {}
-    return 'en'
-  })
+  // UI language is fixed to English for now.
+  const [lang, setLangState] = useState('en')
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LANG_STORAGE_KEY, lang)
-    } catch (_) {}
     const html = document.documentElement
-    html.setAttribute('lang', lang === 'he' ? 'he' : lang === 'pl' ? 'pl' : 'en')
-    html.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr')
+    html.setAttribute('lang', 'en')
+    html.setAttribute('dir', 'ltr')
   }, [lang])
 
   function setLang(l) {
-    if (l === 'en' || l === 'he' || l === 'pl') setLangState(l)
+    // kept for backwards-compat with existing callers; UI language is fixed to English.
+    if (l === 'en') setLangState('en')
   }
 
   function t(key, vars = {}) {

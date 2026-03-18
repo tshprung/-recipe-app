@@ -1,4 +1,4 @@
-import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
+import { REMEMBER_ME_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
 
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
@@ -45,32 +45,15 @@ export function setTrialTokenStorage(token) {
   } catch (_) {}
 }
 
-function getLang() {
-  try {
-    const l = localStorage.getItem(LANG_STORAGE_KEY)
-    if (l === 'en' || l === 'he' || l === 'pl') return l
-  } catch (_) {}
-  return 'en'
-}
-
 /** Minimal t() for pre-React network errors only; app i18n lives in LanguageContext. */
 function t(key, vars = {}) {
-  const lang = getLang()
   const dict = {
     en: {
       cantReachServer:
         "Can't reach the server at {{apiBase}}. Check your connection, that VITE_API_URL is set correctly when building, and that CORS allows your origin.",
     },
-    he: {
-      cantReachServer:
-        "לא ניתן להגיע לשרת בכתובת {{apiBase}}. בדוק את החיבור, ש־VITE_API_URL מוגדר נכון בבנייה, וש־CORS מאפשר את המקור שלך.",
-    },
-    pl: {
-      cantReachServer:
-        "Nie można połączyć się z serwerem pod adresem {{apiBase}}. Sprawdź połączenie, czy VITE_API_URL jest poprawnie ustawione podczas budowania oraz czy CORS zezwala na Twoje źródło.",
-    },
   }
-  const raw = dict[lang]?.[key] ?? dict.en[key] ?? key
+  const raw = dict.en[key] ?? key
   return Object.entries(vars).reduce(
     (s, [k, v]) => s.replace(new RegExp(`{{${k}}}`, 'g'), String(v)),
     raw

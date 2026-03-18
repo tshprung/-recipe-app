@@ -11,7 +11,6 @@ export {
   variantLabelKey,
 } from './recipes'
 export {
-  LANG_STORAGE_KEY,
   REMEMBER_ME_KEY,
   TRIAL_TOKEN_KEY,
   TRIAL_SETTINGS_KEY,

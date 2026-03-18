@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { api, getTrialToken, setTrialTokenStorage } from '../api/client'
 import { hashPasswordForTransport } from '../auth/passwordHash'
-import { LANG_STORAGE_KEY, REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_RECIPES_KEY, TRIAL_SETTINGS_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
+import { REMEMBER_ME_KEY, TRIAL_REMAINING_KEY, TRIAL_RECIPES_KEY, TRIAL_SETTINGS_KEY, TRIAL_TOKEN_KEY } from '../constants/storageKeys'
 
 const AuthContext = createContext(null)
 // Keep in sync with backend quota.MAX_TRIAL_ACTIONS
@@ -47,7 +47,6 @@ export function AuthProvider({ children }) {
     try {
       localStorage.removeItem(TRIAL_RECIPES_KEY)
       localStorage.removeItem(TRIAL_SETTINGS_KEY)
-      localStorage.setItem(LANG_STORAGE_KEY, 'en')
     } catch (_) {}
     setTrialTokenState(null)
     setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
@@ -68,22 +67,12 @@ export function AuthProvider({ children }) {
     setTrialRemainingStorage(n)
   }
 
-  function syncUiLanguageToStorage(u) {
-    const l = u?.ui_language
-    if (l === 'en' || l === 'he' || l === 'pl') {
-      try {
-        localStorage.setItem(LANG_STORAGE_KEY, l)
-      } catch (_) {}
-    }
-  }
-
   async function refreshUser() {
     if (!getToken()) return
     try {
       const me = await api.get('/users/me')
       const user = storeRenewedToken(me)
       setUser(user)
-      syncUiLanguageToStorage(user)
     } catch (_) {
       /* ignore */
     }
@@ -101,7 +90,6 @@ export function AuthProvider({ children }) {
         .then(me => {
           const user = storeRenewedToken(me)
           setUser(user)
-          syncUiLanguageToStorage(user)
         })
         .catch(err => {
           // Only clear token on 401 (invalid/expired); keep it on network errors so session persists
@@ -153,7 +141,6 @@ export function AuthProvider({ children }) {
     const me = await api.get('/users/me')
     const user = storeRenewedToken(me)
     setUser(user)
-    syncUiLanguageToStorage(user)
   }
 
   async function register(email, password, captchaToken = null, settings, rememberMe = true) {
@@ -174,9 +161,6 @@ export function AuthProvider({ children }) {
     setTrialToken(null)
     setTrialRemainingStorage(null)
     setTrialRemainingActionsState(MAX_TRIAL_ACTIONS)
-    try {
-      localStorage.setItem(LANG_STORAGE_KEY, 'en')
-    } catch (_) {}
   }
 
   async function setTokenFromOAuth(accessToken) {
@@ -188,7 +172,6 @@ export function AuthProvider({ children }) {
       const me = await api.get('/users/me')
       const user = storeRenewedToken(me)
       setUser(user)
-      syncUiLanguageToStorage(user)
     } catch (err) {
       // Only clear on 401 (invalid token); keep stored token on network/5xx so user can retry
       if (err && err.status === 401) clearToken()
