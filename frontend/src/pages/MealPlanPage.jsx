@@ -203,6 +203,13 @@ export default function MealPlanPage() {
   if (!user && trialToken) {
     return (
       <div className="max-w-2xl mx-auto">
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+          className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-stone-300 hover:text-stone-100"
+        >
+          ← Back
+        </button>
         <h1 className="text-2xl font-bold text-stone-50 mb-1">{t('mealPlanTitle')}</h1>
         <p className="text-stone-400 text-sm mb-6">{t('mealPlanHint')}</p>
         <div className="bg-stone-900/60 border border-white/10 rounded-2xl p-5">
@@ -272,6 +279,13 @@ export default function MealPlanPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <button
+        type="button"
+        onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+        className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-stone-300 hover:text-stone-100"
+      >
+        ← Back
+      </button>
       <h1 className="text-2xl font-bold text-stone-50 mb-1">{t('mealPlanTitle')}</h1>
       <p className="text-stone-400 text-sm mb-6">{t('mealPlanHint')}</p>
 
