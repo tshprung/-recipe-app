@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
-import { TARGET_LANGUAGES, COUNTRIES, ALLERGENS, TRIAL_SETTINGS_KEY, LANG_STORAGE_KEY } from '../constants'
+import { TARGET_LANGUAGES, COUNTRIES, ALLERGENS, TRIAL_SETTINGS_KEY } from '../constants'
 
 function Field({ label, hint, value, onChange }) {
   return (
@@ -38,11 +38,10 @@ function SettingsCard({ icon, title, children }) {
 
 export default function SettingsPage() {
   const { user, trialToken, setUser, logout, refreshUser } = useAuth()
-  const { t, lang, setLang } = useLanguage()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const measurementDefault = (country) => (country === 'US' ? 'imperial' : 'metric')
   const [form, setForm] = useState({
-    ui_language: user?.ui_language ?? 'en',
     target_language: user?.target_language ?? 'en',
     target_country:  user?.target_country  ?? 'PL',
     target_city:     user?.target_city     ?? 'Wrocław',
@@ -72,7 +71,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setForm({
-        ui_language: user.ui_language ?? 'en',
         target_language: user.target_language ?? 'en',
         target_country: user.target_country ?? 'PL',
         target_city: user.target_city ?? 'Wrocław',
@@ -96,7 +94,6 @@ export default function SettingsPage() {
           const country = saved.target_country ?? prev.target_country
           setForm(prev => ({
             ...prev,
-            ui_language: saved.ui_language ?? prev.ui_language,
             target_language: saved.target_language ?? prev.target_language,
             target_country: country,
             target_city: saved.target_city ?? prev.target_city,
@@ -113,7 +110,7 @@ export default function SettingsPage() {
         }
       } catch (_) {}
     }
-  }, [user?.id, user?.ui_language, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.measurement_system, user?.allergens, user?.custom_allergens_text, trialToken])
+  }, [user?.id, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.measurement_system, user?.allergens, user?.custom_allergens_text, trialToken])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -123,8 +120,6 @@ export default function SettingsPage() {
       if (!user && trialToken) {
         try {
           localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(form))
-          if (form.ui_language && form.ui_language !== lang) setLang(form.ui_language)
-          localStorage.setItem(LANG_STORAGE_KEY, form.ui_language || 'en')
         } catch (_) {}
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
@@ -134,9 +129,6 @@ export default function SettingsPage() {
       }
       const updated = await api.patch('/users/me/settings', form)
       setUser(updated)
-      if (updated?.ui_language && updated.ui_language !== lang) {
-        setLang(updated.ui_language)
-      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
       navigate('/', { replace: true })
@@ -174,15 +166,9 @@ export default function SettingsPage() {
         <SettingsCard icon="🗣️" title={t('language')}>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-1.5">{t('appLanguage')}</label>
-            <select
-              value={form.ui_language}
-              onChange={e => setForm(f => ({ ...f, ui_language: e.target.value }))}
-              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
-            >
-              <option value="en">English</option>
-              <option value="he">עברית</option>
-              <option value="pl">Polski</option>
-            </select>
+            <div className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800">
+              English
+            </div>
           </div>
         </SettingsCard>
 

@@ -7,7 +7,6 @@ import { api } from '../api/client'
 import { LanguageProvider } from '../context/LanguageContext'
 import { AuthProvider } from '../context/AuthContext'
 import { ShoppingListProvider } from '../context/ShoppingListContext'
-import { LANG_STORAGE_KEY } from '../constants/storageKeys'
 
 vi.mock('../api/client', async importOriginal => {
   const actual = await importOriginal()
@@ -305,35 +304,4 @@ describe('RecipeDetailPage — return to original', () => {
   })
 })
 
-describe('RecipeDetailPage — collections dropdown (RTL)', () => {
-  const hebrewCollectionName = 'אוספים'
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    localStorage.setItem(LANG_STORAGE_KEY, 'he')
-    api.get.mockImplementation(path => {
-      if (path === '/users/me') return Promise.resolve(DEFAULT_USER)
-      if (path === '/recipes/collections') return Promise.resolve({ collections: [hebrewCollectionName] })
-      if (path.endsWith('/variants')) return Promise.resolve([])
-      return Promise.resolve(MOCK_RECIPE)
-    })
-  })
-
-  it('collections dropdown is visible and shows Hebrew collection names when UI is in Hebrew', async () => {
-    renderPage()
-    await screen.findByText('Zupa Pomidorowa')
-
-    const addButton = await screen.findByRole('button', { name: /הוסף לאוסף/ })
-    await userEvent.click(addButton)
-
-    await waitFor(() => {
-      const listbox = screen.getByRole('listbox')
-      expect(listbox).toBeInTheDocument()
-      expect(within(listbox).getByText(hebrewCollectionName)).toBeInTheDocument()
-    })
-
-    const listbox = screen.getByRole('listbox')
-    const dropdownWrapper = listbox.closest('[dir="auto"]')
-    expect(dropdownWrapper).toBeInTheDocument()
-  })
-})
+// UI language is fixed to English; RTL-specific tests removed.

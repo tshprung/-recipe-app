@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -6,14 +6,13 @@ import { useShoppingList } from '../context/ShoppingListContext'
 
 export default function Navbar() {
   const { user, logout, trialToken, trialRemainingActions, leaveTrial } = useAuth()
-  const { t, setLang } = useLanguage()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const { recipeIds, openPanel } = useShoppingList()
 
   function handleLogout() {
     logout()
-    setLang('en')
     navigate('/', { replace: true })
   }
 
@@ -32,13 +31,28 @@ export default function Navbar() {
   const trialQuotaLabel = t('creditsRemaining', { count: trialRemainingActions ?? 0 })
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuWrapRef = useRef(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDown(e) {
+      if (!menuWrapRef.current) return
+      if (menuWrapRef.current.contains(e.target)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
+  }, [menuOpen])
 
   function handleSignOut() {
     if (user) {
       handleLogout()
     } else if (isTrial) {
       leaveTrial()
-      setLang('en')
       navigate('/', { replace: true })
     }
   }
@@ -105,7 +119,7 @@ export default function Navbar() {
           )}
 
           {/* User / trial account menu */}
-          <div className="relative ml-1">
+          <div ref={menuWrapRef} className="relative ml-1">
             <button
               type="button"
               onClick={() => setMenuOpen(o => !o)}
