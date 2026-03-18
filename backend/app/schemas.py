@@ -447,6 +447,7 @@ class AISuggestedRecipeOut(BaseModel):
     title: str
     ingredients: list[str]
     steps: list[str]
+    estimated_calories: int | None = None
     missing_ingredients: list[str] | None = None
 
 
@@ -459,6 +460,7 @@ class DiscoverRequest(BaseModel):
     dish_types: list[str] | None = None  # e.g. ["pasta", "salads"]
     diet_filters: list[str] | None = None  # e.g. ["vegetarian", "vegan"]
     num_recipes: int = Field(default=3, ge=1, le=10)  # how many suggestions to return
+    servings: int | None = Field(default=None, ge=1, le=24)  # optional desired portions (does not change user settings)
     max_time_minutes: int | None = None  # e.g. 30, 60
     allergens: list[str] | None = None  # optional allergen codes to avoid
     custom_avoid_text: str | None = None  # free-text exclusions
@@ -471,6 +473,7 @@ class DiscoverRequest(BaseModel):
 class DiscoverOut(BaseModel):
     suggestions: list[AISuggestedRecipeOut]
     remaining_actions: int | None = None  # trial only; for frontend sync
+    no_results_reason: str | None = None  # optional explanation when suggestions is empty
 
 
 class MealPlanMealOut(BaseModel):

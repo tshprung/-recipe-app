@@ -309,7 +309,7 @@ Your job:
 
 Rules:
 - Output valid JSON only — no markdown, no prose outside the JSON.
-- Each recipe must have: title, ingredients (list of strings), steps (list of strings).
+- Each recipe must have: title, ingredients (list of strings), steps (list of strings), estimated_calories (integer, kcal, rough estimate).
 - CRITICAL — Diet compliance: If the user selects a diet (e.g. kosher, vegetarian, vegan), the ENTIRE recipe must comply.
   - Kosher: no pork/bacon/ham, no shellfish; never mix meat and dairy in the same recipe (no cheese with beef/chicken, etc.).
   - Vegetarian: no meat, no fish, no poultry.
@@ -329,6 +329,7 @@ Theme / keywords for internet search: {keywords}
 
 Dish types they like: {dish_list}
 Diet filters: {diet_list}
+Servings / people to cook for: {servings}
 Maximum total time in minutes (optional): {max_time}
 
 Allergens to avoid (must NOT appear in recipe in any form, including optional): {allergen_list}
@@ -345,7 +346,7 @@ Measurement units: {measurement_units}
 Return exactly this JSON (up to {num_recipes} recipes):
 {{
   "recipes": [
-    {{ "title": "<recipe title in {output_lang}>", "ingredients": ["...", "..."], "steps": ["...", "..."] }},
+    {{ "title": "<recipe title in {output_lang}>", "estimated_calories": 650, "ingredients": ["...", "..."], "steps": ["...", "..."] }},
     ...
   ]
 }}
@@ -356,6 +357,7 @@ def suggest_recipes_from_preferences(
     dish_types: list[str] | None = None,
     diet_filters: list[str] | None = None,
     num_recipes: int = 3,
+    servings: int | None = None,
     max_time_minutes: int | None = None,
     target_language: str = "en",
     keywords: str | None = None,
@@ -380,10 +382,12 @@ def suggest_recipes_from_preferences(
     ingredients_focus = (ingredients_text or "").strip() or "none specified"
     output_lang = _output_lang_name(target_language)
     measurement_units = "imperial" if (measurement_system or "").strip().lower() == "imperial" else "metric"
+    servings_str = str(int(servings)) if servings is not None and int(servings) > 0 else "default"
     prompt = DISCOVER_USER_TEMPLATE.format(
         dish_list=dish_list,
         diet_list=diet_list,
         num_recipes=str(max(1, min(10, int(num_recipes or 3)))),
+        servings=servings_str,
         max_time=max_time,
         allergen_list=allergen_list,
         avoid_terms=avoid_terms,
@@ -423,8 +427,16 @@ def suggest_recipes_from_preferences(
     n = max(1, min(10, int(num_recipes or 3)))
     for r in recipes[:n]:
         if isinstance(r, dict) and r.get("title"):
+            calories_raw = r.get("estimated_calories", r.get("calories"))
+            try:
+                calories = int(calories_raw) if calories_raw is not None else None
+                if calories is not None and (calories < 50 or calories > 4000):
+                    calories = None
+            except Exception:
+                calories = None
             rec = {
                 "title": str(r.get("title", "")).strip(),
+                "estimated_calories": calories,
                 "ingredients": [str(x).strip() for x in r.get("ingredients", []) if x],
                 "steps": [str(x).strip() for x in r.get("steps", []) if x],
                 "missing_ingredients": None,
