@@ -1,5 +1,6 @@
 """Weekly meal plan: generate, replace day, add all to shopping list."""
 from datetime import date
+from datetime import date as _date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -62,16 +63,28 @@ def generate_plan(
         )
     _check_and_consume_quota(current_user, db)
 
-    start = payload.start_date or date.today().isoformat()
+    selected_dates: list[_date] | None = None
+    if payload.selected_dates:
+        parsed: list[_date] = []
+        for s in payload.selected_dates[:7]:
+            try:
+                parsed.append(_date.fromisoformat(str(s)))
+            except Exception:
+                continue
+        # de-dup + sort
+        selected_dates = sorted(set(parsed)) if parsed else None
+
+    start = (selected_dates[0].isoformat() if selected_dates else (payload.start_date or date.today().isoformat()))
     try:
         start_date = date.fromisoformat(start)
     except ValueError:
         start_date = date.today()
 
     try:
+        num_days = len(selected_dates) if selected_dates else payload.num_days
         days = generate_weekly_meal_plan(
             start_date=start_date.isoformat(),
-            num_days=payload.num_days,
+            num_days=num_days,
             meal_types=payload.meal_types,
             protein_types=payload.protein_types,
             meat_meals_per_week=payload.meat_meals_per_week,
@@ -98,6 +111,12 @@ def generate_plan(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not generate a meal plan. Try relaxing filters or try again.",
         )
+
+    # If user selected explicit dates (e.g. skip a weekday), override the generated dates.
+    if selected_dates:
+        for i, d in enumerate(days[: len(selected_dates)]):
+            d["date"] = selected_dates[i].isoformat()
+        days = days[: len(selected_dates)]
 
     plan = models.MealPlan(
         user_id=current_user.id,

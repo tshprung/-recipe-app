@@ -27,7 +27,8 @@ export default function MealPlanPage() {
   const [googleCalExported, setGoogleCalExported] = useState(false)
 
   // Form state for generating
-  const [numDays, setNumDays] = useState(7)
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [selectedDays, setSelectedDays] = useState(() => Array.from({ length: 7 }, () => true))
   const [mealTypes, setMealTypes] = useState(['dinner'])
   const [proteinTypes, setProteinTypes] = useState(['chicken'])
   const [meatMealsPerWeek, setMeatMealsPerWeek] = useState(3)
@@ -40,6 +41,22 @@ export default function MealPlanPage() {
     if (user?.diet_filters && dietFilters.length === 0) setDietFilters(user.diet_filters)
   }, [user?.diet_filters])
 
+  function buildWeekDates(isoStart) {
+    const d0 = new Date(`${isoStart}T00:00:00`)
+    const out = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(d0)
+      d.setDate(d0.getDate() + i)
+      out.push(d)
+    }
+    return out
+  }
+
+  const weekDates = buildWeekDates(startDate)
+  const selectedDates = weekDates
+    .filter((_, i) => !!selectedDays[i])
+    .map(d => d.toISOString().slice(0, 10))
+
   useEffect(() => {
     if (!user) return
     setGoogleCalLoading(true)
@@ -51,7 +68,8 @@ export default function MealPlanPage() {
 
   function isDirty() {
     if (plan?.days?.length) return true
-    if (numDays !== 7) return true
+    if ((startDate || '') !== new Date().toISOString().slice(0, 10)) return true
+    if (selectedDays.some(v => v === false)) return true
     if ((mealTypes?.length ?? 0) !== 1 || mealTypes?.[0] !== 'dinner') return true
     if ((proteinTypes?.length ?? 0) !== 1 || proteinTypes?.[0] !== 'chicken') return true
     if (meatMealsPerWeek !== 3) return true
@@ -71,7 +89,8 @@ export default function MealPlanPage() {
     setSavedRecipeIdsByDate({})
     setPlan(null)
     setGoogleCalExported(false)
-    setNumDays(7)
+    setStartDate(new Date().toISOString().slice(0, 10))
+    setSelectedDays(Array.from({ length: 7 }, () => true))
     setMealTypes(['dinner'])
     setProteinTypes(['chicken'])
     setMeatMealsPerWeek(3)
@@ -96,7 +115,7 @@ export default function MealPlanPage() {
     }
     window.addEventListener('mealplan:reset-request', onResetRequest)
     return () => window.removeEventListener('mealplan:reset-request', onResetRequest)
-  }, [plan, numDays, dietFilters, maxTime, budget])
+  }, [plan, startDate, selectedDays, dietFilters, maxTime, budget])
 
   function toggleDiet(key) {
     setDietFilters(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
@@ -152,10 +171,16 @@ export default function MealPlanPage() {
       setError('Please select at least one meal type.')
       return
     }
+    if (!selectedDates.length) {
+      setError('Please select at least one day.')
+      return
+    }
     setGenerateLoading(true)
     api
       .post('/meal-plan/generate', {
-        num_days: numDays,
+        start_date: startDate,
+        selected_dates: selectedDates,
+        num_days: selectedDates.length || 7,
         meal_types: mealTypes,
         protein_types: proteinTypes.length ? proteinTypes : null,
         meat_meals_per_week: meatMealsPerWeek ?? null,
@@ -171,6 +196,15 @@ export default function MealPlanPage() {
       })
       .catch(e => setError(getErrorMessage(e, t)))
       .finally(() => setGenerateLoading(false))
+  }
+
+  function toggleSelectedDay(idx) {
+    setSelectedDays(prev => {
+      const next = [...prev]
+      next[idx] = !next[idx]
+      if (next.every(v => !v)) return prev
+      return next
+    })
   }
 
   function handleReplaceMeal(dayIndex, mealIndex) {
@@ -530,17 +564,40 @@ export default function MealPlanPage() {
           <form onSubmit={handleGenerate} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-stone-300 mb-1.5">
-                {t('numDays')}
+                Dates
               </label>
-              <select
-                value={numDays}
-                onChange={e => setNumDays(Number(e.target.value))}
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v) setStartDate(v)
+                }}
                 className="w-full bg-stone-800 border border-stone-600 rounded-xl px-4 py-2.5 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              >
-                <option value={5}>5</option>
-                <option value={6}>6</option>
-                <option value={7}>7</option>
-              </select>
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {weekDates.map((d, idx) => {
+                  const isOn = !!selectedDays[idx]
+                  const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                  return (
+                    <button
+                      key={String(idx)}
+                      type="button"
+                      onClick={() => toggleSelectedDay(idx)}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        isOn
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-stone-500 mt-1">
+                Selected: {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'}
+              </p>
             </div>
 
             <div>
