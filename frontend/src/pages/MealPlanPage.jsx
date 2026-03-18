@@ -643,10 +643,12 @@ export default function MealPlanPage() {
               </div>
             </div>
 
-            {activeAdvancedPills.length > 0 && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-semibold text-stone-400">Active filters:</span>
-                {activeAdvancedPills.map(p => (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-stone-400">Active filters:</span>
+              {activeAdvancedPills.length === 0 ? (
+                <span className="text-xs text-stone-500">none</span>
+              ) : (
+                activeAdvancedPills.map(p => (
                   <button
                     key={p.key}
                     type="button"
@@ -656,9 +658,9 @@ export default function MealPlanPage() {
                   >
                     {p.label}
                   </button>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
 
             {/* Advanced options */}
             <details

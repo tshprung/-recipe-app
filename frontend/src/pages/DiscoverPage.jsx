@@ -257,10 +257,12 @@ export default function DiscoverPage() {
           </div>
         )}
 
-        {activeFilterPills.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs font-semibold text-stone-500">Active filters:</span>
-            {activeFilterPills.map(p => (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs font-semibold text-stone-500">Active filters:</span>
+          {activeFilterPills.length === 0 ? (
+            <span className="text-xs text-stone-400">none</span>
+          ) : (
+            activeFilterPills.map(p => (
               <button
                 key={p.key}
                 type="button"
@@ -270,9 +272,9 @@ export default function DiscoverPage() {
               >
                 {p.label}
               </button>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
         {/* Advanced options */}
         <details
