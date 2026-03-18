@@ -220,8 +220,20 @@ export default function SettingsPage() {
               type="number"
               min={1}
               max={24}
-              value={form.default_servings}
-              onChange={e => setForm(f => ({ ...f, default_servings: parseInt(e.target.value || '1', 10) }))}
+              value={form.default_servings === '' ? '' : (form.default_servings ?? '')}
+              onChange={e => {
+                const v = e.target.value
+                if (v === '') {
+                  setForm(f => ({ ...f, default_servings: '' }))
+                  return
+                }
+                const n = parseInt(v, 10)
+                if (Number.isFinite(n)) setForm(f => ({ ...f, default_servings: n }))
+              }}
+              onBlur={() => {
+                // Mobile UX: allow empty while editing, but never persist empty.
+                if (form.default_servings === '') setForm(f => ({ ...f, default_servings: 1 }))
+              }}
               className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm bg-stone-50 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:bg-white transition-colors"
             />
             <p className="text-xs text-stone-400 mt-1.5">
