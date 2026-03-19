@@ -22,8 +22,22 @@ function getMeasurementSystem(user, trialToken) {
   return 'metric'
 }
 
+function getTargetLanguage(user, trialToken) {
+  if (user?.target_language) return user.target_language
+  if (trialToken) {
+    try {
+      const raw = localStorage.getItem(TRIAL_SETTINGS_KEY)
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s?.target_language) return s.target_language
+      }
+    } catch (_) {}
+  }
+  return 'en'
+}
+
 export default function DiscoverPage() {
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const { user, trialToken, refreshUser, syncTrialRemaining } = useAuth()
   const navigate = useNavigate()
   const defaultServings = user?.default_servings ?? 1
@@ -78,7 +92,7 @@ export default function DiscoverPage() {
         custom_avoid_text: customAvoid || null,
         keywords: keywords || null,
         ingredients_text: ingredientsText || null,
-        target_language: lang || 'en',
+        target_language: getTargetLanguage(user, trialToken),
         measurement_system: getMeasurementSystem(user, trialToken),
       })
       .then(data => {

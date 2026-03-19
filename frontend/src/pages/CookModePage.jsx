@@ -460,10 +460,10 @@ export default function CookModePage() {
               type="button"
               onClick={handleToggleReadAloud}
               disabled={!speechAvailable}
-              className={`inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-2 rounded-xl border transition-colors shadow-sm ${
+              className={`inline-flex items-center justify-center gap-2 text-base font-bold px-5 py-2.5 min-h-[44px] rounded-xl border transition-colors shadow-sm focus:outline-none focus:ring-4 ${
                 readAloudEnabled
-                  ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white'
-                  : 'bg-amber-500 hover:bg-amber-600 border-amber-400 text-white'
+                  ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white focus:ring-emerald-200/70'
+                  : 'bg-amber-500 hover:bg-amber-600 border-amber-400 text-white focus:ring-amber-200/70'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <span>{readAloudEnabled ? '🔊' : '🔇'}</span>
