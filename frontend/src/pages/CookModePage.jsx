@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useLanguage } from '../context/LanguageContext'
+
+const IS_TEST = typeof import.meta !== 'undefined'
+  && import.meta.env
+  && import.meta.env.MODE === 'test'
 
 function formatRemaining(totalSec) {
   const sec = Math.max(0, Math.floor(totalSec))
@@ -13,7 +17,7 @@ function formatRemaining(totalSec) {
 export default function CookModePage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -23,6 +27,20 @@ export default function CookModePage() {
   const [timerMinutes, setTimerMinutes] = useState('5')
   const [activeTimers, setActiveTimers] = useState({})
   const [nowMs, setNowMs] = useState(Date.now())
+
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const [voiceListening, setVoiceListening] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [voiceStatus, setVoiceStatus] = useState('off') // off | listening | unavailable | error
+
+  const recognitionRef = useRef(null)
+  const keepListeningRef = useRef(false)
+  const stepIndexRef = useRef(0)
+  const stepsRef = useRef([])
+  const currentTimerRef = useRef(null)
+
+  const voiceEnabledRef = useRef(true)
+  const voiceStatusRef = useRef('off')
 
   useEffect(() => {
     let cancelled = false
@@ -46,6 +64,14 @@ export default function CookModePage() {
 
     return () => { cancelled = true }
   }, [id, t])
+
+  useEffect(() => {
+    stepIndexRef.current = stepIndex
+  }, [stepIndex])
+
+  useEffect(() => {
+    stepsRef.current = recipe?.steps_pl ?? []
+  }, [recipe])
 
   useEffect(() => {
     const hasRunning = Object.values(activeTimers).some(timer => timer.status === 'running')
@@ -99,7 +125,200 @@ export default function CookModePage() {
     }
   }, [timersList])
 
+  function speakText(text) {
+    try {
+      const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+      const Utterance = typeof window !== 'undefined' ? window.SpeechSynthesisUtterance : null
+      if (!synth || !Utterance) return false
+
+      synth.cancel()
+      const u = new Utterance(text)
+      if (lang) u.lang = lang
+      u.rate = 1
+      u.pitch = 1
+      synth.speak(u)
+      return true
+    } catch (_) {
+      return false
+    }
+  }
+
+  function speakCurrentStep() {
+    const stepsNow = stepsRef.current
+    const idx = stepIndexRef.current
+    const step = stepsNow?.[idx]
+    if (!step) return
+    speakText(step)
+  }
+
+  function normalizeTranscript(s) {
+    return String(s || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[.,!?;:]/g, '')
+      .replace(/\s+/g, ' ')
+  }
+
+  function parseHelperCommand(transcript) {
+    const txt = normalizeTranscript(transcript)
+    if (!txt) return null
+    if (!txt.startsWith('helper ')) return null
+    const rest = txt.slice('helper '.length).trim()
+    if (!rest) return null
+    const first = rest.split(' ')[0]
+    if (first === 'next') return { type: 'next' }
+    if (first === 'back' || first === 'previous' || first === 'prev') return { type: 'back' }
+    if (first === 'pause') return { type: 'pause' }
+    if (first === 'repeat' || first === 'again') return { type: 'repeat' }
+    return null
+  }
+
+  function applyVoiceCommand(cmd) {
+    if (!cmd) return
+    const stepsNow = stepsRef.current
+    const idx = stepIndexRef.current
+
+    if (cmd.type === 'next') {
+      if (idx >= stepsNow.length - 1) return
+      setStepIndex(i => Math.min(stepsNow.length - 1, i + 1))
+      return
+    }
+    if (cmd.type === 'back') {
+      if (idx <= 0) return
+      setStepIndex(i => Math.max(0, i - 1))
+      return
+    }
+    if (cmd.type === 'pause') {
+      const timer = currentTimerRef.current
+      if (!timer || timer.status !== 'running') return
+      handlePauseTimer(idx)
+      return
+    }
+    if (cmd.type === 'repeat') {
+      speakCurrentStep()
+    }
+  }
+
+  function stopRecognition() {
+    keepListeningRef.current = false
+    try {
+      recognitionRef.current?.stop?.()
+    } catch (_) {}
+    setVoiceListening(false)
+    setVoiceStatus(voiceSupported ? 'off' : 'unavailable')
+  }
+
+  function startRecognition() {
+    if (!voiceSupported) {
+      setVoiceStatus('unavailable')
+      return
+    }
+    keepListeningRef.current = true
+    try {
+      recognitionRef.current?.start?.()
+      setVoiceListening(true)
+      setVoiceStatus('listening')
+    } catch (_) {
+      // start() can throw if called too quickly or without permission; keep UI safe.
+      setVoiceListening(false)
+      setVoiceStatus('error')
+    }
+  }
+
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled
+    voiceStatusRef.current = voiceStatus
+  }, [voiceEnabled, voiceStatus])
+
+  useEffect(() => {
+    const SR = typeof window !== 'undefined'
+      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+      : null
+    const supported = Boolean(SR)
+    setVoiceSupported(supported)
+
+    if (!supported) {
+      setVoiceStatus('unavailable')
+      return
+    }
+
+    const rec = new SR()
+    rec.continuous = true
+    rec.interimResults = false
+    if (lang) rec.lang = lang
+
+    rec.onresult = (event) => {
+      try {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i]
+          if (!res.isFinal) continue
+          const transcript = res[0]?.transcript ?? ''
+          const cmd = parseHelperCommand(transcript)
+          if (cmd) applyVoiceCommand(cmd)
+        }
+      } catch (_) {}
+    }
+
+    rec.onerror = () => {
+      if (!keepListeningRef.current) return
+      setVoiceStatus('error')
+      setVoiceListening(false)
+    }
+
+    rec.onend = () => {
+      if (!keepListeningRef.current) return
+      if (IS_TEST) return
+      // Try to keep hands-free mode alive.
+      try {
+        rec.start()
+        setVoiceListening(true)
+        setVoiceStatus('listening')
+      } catch (_) {
+        setVoiceListening(false)
+        setVoiceStatus('error')
+      }
+    }
+
+    recognitionRef.current = rec
+
+    // Auto-start if enabled (hands-free).
+    if (!IS_TEST && voiceEnabledRef.current) startRecognition()
+    else setVoiceStatus('off')
+
+    return () => {
+      keepListeningRef.current = false
+      try { rec.stop() } catch (_) {}
+      recognitionRef.current = null
+    }
+  }, [lang])
+
+  useEffect(() => {
+    if (IS_TEST) return
+    if (!voiceSupported) {
+      setVoiceStatus('unavailable')
+      return
+    }
+    if (voiceEnabled) startRecognition()
+    else stopRecognition()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceEnabled])
+
+  useEffect(() => {
+    // Auto-read on step changes.
+    if (loading || finished) return
+    speakCurrentStep()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIndex, loading, finished])
+
+  useEffect(() => {
+    // Cleanup TTS when leaving Cook Mode.
+    return () => {
+      try { window.speechSynthesis?.cancel?.() } catch (_) {}
+    }
+  }, [])
+
   function handleExit() {
+    stopRecognition()
     navigate(`/recipes/${id}`)
   }
 
@@ -112,6 +331,7 @@ export default function CookModePage() {
   }
 
   function handleFinishCooking() {
+    stopRecognition()
     setFinished(true)
   }
 
@@ -231,6 +451,7 @@ export default function CookModePage() {
   }
 
   const currentTimer = activeTimers[stepIndex]
+  currentTimerRef.current = currentTimer
   const currentTimerRemainingSec = currentTimer?.status === 'running'
     ? Math.max(0, Math.ceil((currentTimer.endAt - nowMs) / 1000))
     : currentTimer?.remainingSec ?? null
@@ -243,6 +464,26 @@ export default function CookModePage() {
           <p className="text-sm text-stone-300 mt-1">
             {t('step')} {stepIndex + 1} {t('of')} {steps.length}
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10 text-stone-200">
+              {voiceStatus === 'listening'
+                ? t('voiceListening')
+                : voiceStatus === 'unavailable'
+                  ? t('voiceUnavailable')
+                  : voiceStatus === 'error'
+                    ? t('voiceError')
+                    : t('voiceOff')}
+            </span>
+            {voiceSupported && (
+              <button
+                type="button"
+                onClick={() => setVoiceEnabled(v => !v)}
+                className="text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200"
+              >
+                {voiceEnabled ? t('voiceOn') : t('voiceOff')}
+              </button>
+            )}
+          </div>
         </div>
         <button
           type="button"
@@ -257,6 +498,18 @@ export default function CookModePage() {
         <section className="max-w-3xl mx-auto">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8">
             <p className="text-lg sm:text-2xl leading-relaxed">{currentStep}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={speakCurrentStep}
+                className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-semibold"
+              >
+                {t('readStep')}
+              </button>
+              <p className="text-xs text-stone-300">
+                {t('voiceCommandsHint')}
+              </p>
+            </div>
           </div>
 
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
