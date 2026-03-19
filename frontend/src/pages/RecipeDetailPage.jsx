@@ -628,60 +628,70 @@ export default function RecipeDetailPage() {
           ← {t('back')}
         </button>
 
-        {/* Adapt dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setAdaptDropdownOpen(v => !v)}
-            disabled={adaptLoading}
-            className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
+            type="button"
+            onClick={() => navigate(`/recipes/${id}/cook`)}
+            disabled={!hasSteps}
+            className="flex items-center gap-1.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 border border-amber-500 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {adaptLoading ? (
-              <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
-            ) : (
-              '✨'
-            )}
-            {t('adaptRecipe')} ▾
+            {t('startCooking')}
           </button>
-          {adaptDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-2 min-w-[200px]">
-              <p className="px-4 py-1 text-xs font-semibold text-stone-400 uppercase tracking-wide">
-                {t('adaptRecipe')}
-              </p>
-              {VARIANT_OPTIONS.map(opt => {
-                const alreadyHasSingle = variants.some(v => v.variant_type === opt.key)
-                const isChecked = selectedAdaptTypes.includes(opt.key)
-                return (
-                  <label
-                    key={opt.key}
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 cursor-pointer"
+          {/* Adapt dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setAdaptDropdownOpen(v => !v)}
+              disabled={adaptLoading}
+              className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-amber-700 bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-60"
+            >
+              {adaptLoading ? (
+                <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin inline-block" />
+              ) : (
+                '✨'
+              )}
+              {t('adaptRecipe')} ▾
+            </button>
+            {adaptDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-lg z-20 py-2 min-w-[200px]">
+                <p className="px-4 py-1 text-xs font-semibold text-stone-400 uppercase tracking-wide">
+                  {t('adaptRecipe')}
+                </p>
+                {VARIANT_OPTIONS.map(opt => {
+                  const alreadyHasSingle = variants.some(v => v.variant_type === opt.key)
+                  const isChecked = selectedAdaptTypes.includes(opt.key)
+                  return (
+                    <label
+                      key={opt.key}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-stone-700 hover:bg-amber-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setSelectedAdaptTypes(prev =>
+                            prev.includes(opt.key) ? prev.filter(k => k !== opt.key) : [...prev, opt.key]
+                          )
+                        }}
+                        className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+                      />
+                      <span className="flex-1">{t(variantLabelKey(opt.key))}</span>
+                      {alreadyHasSingle && <span className="text-xs text-emerald-500">✓</span>}
+                    </label>
+                  )
+                })}
+                <div className="border-t border-stone-100 mt-2 pt-2 px-2">
+                  <button
+                    type="button"
+                    onClick={() => selectedAdaptTypes.length > 0 && handleAdapt(selectedAdaptTypes)}
+                    disabled={selectedAdaptTypes.length === 0 || adaptLoading}
+                    className="w-full py-2 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                   >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => {
-                        setSelectedAdaptTypes(prev =>
-                          prev.includes(opt.key) ? prev.filter(k => k !== opt.key) : [...prev, opt.key]
-                        )
-                      }}
-                      className="rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-                    />
-                    <span className="flex-1">{t(variantLabelKey(opt.key))}</span>
-                    {alreadyHasSingle && <span className="text-xs text-emerald-500">✓</span>}
-                  </label>
-                )
-              })}
-              <div className="border-t border-stone-100 mt-2 pt-2 px-2">
-                <button
-                  type="button"
-                  onClick={() => selectedAdaptTypes.length > 0 && handleAdapt(selectedAdaptTypes)}
-                  disabled={selectedAdaptTypes.length === 0 || adaptLoading}
-                  className="w-full py-2 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:pointer-events-none transition-colors"
-                >
-                  {t('applyAdaptations')}
-                </button>
+                    {t('applyAdaptations')}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
       </div>
