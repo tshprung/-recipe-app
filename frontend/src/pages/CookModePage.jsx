@@ -2,10 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useLanguage } from '../context/LanguageContext'
-
-const IS_TEST = typeof import.meta !== 'undefined'
-  && import.meta.env
-  && import.meta.env.MODE === 'test'
+import { COOK_MODE_READ_ALOUD_KEY } from '../constants/storageKeys'
 
 function formatRemaining(totalSec) {
   const sec = Math.max(0, Math.floor(totalSec))
@@ -28,19 +25,10 @@ export default function CookModePage() {
   const [activeTimers, setActiveTimers] = useState({})
   const [nowMs, setNowMs] = useState(Date.now())
 
-  const [voiceSupported, setVoiceSupported] = useState(false)
-  const [voiceListening, setVoiceListening] = useState(false)
-  const [voiceEnabled, setVoiceEnabled] = useState(true)
-  const [voiceStatus, setVoiceStatus] = useState('off') // off | listening | unavailable | error
-
-  const recognitionRef = useRef(null)
-  const keepListeningRef = useRef(false)
+  const [readAloudEnabled, setReadAloudEnabled] = useState(true)
   const stepIndexRef = useRef(0)
   const stepsRef = useRef([])
   const currentTimerRef = useRef(null)
-
-  const voiceEnabledRef = useRef(true)
-  const voiceStatusRef = useRef('off')
 
   useEffect(() => {
     let cancelled = false
@@ -72,6 +60,16 @@ export default function CookModePage() {
   useEffect(() => {
     stepsRef.current = recipe?.steps_pl ?? []
   }, [recipe])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COOK_MODE_READ_ALOUD_KEY)
+      if (raw == null) setReadAloudEnabled(true)
+      else setReadAloudEnabled(raw === '1')
+    } catch (_) {
+      setReadAloudEnabled(true)
+    }
+  }, [])
 
   useEffect(() => {
     const hasRunning = Object.values(activeTimers).some(timer => timer.status === 'running')
@@ -151,164 +149,12 @@ export default function CookModePage() {
     speakText(step)
   }
 
-  function normalizeTranscript(s) {
-    return String(s || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[.,!?;:]/g, '')
-      .replace(/\s+/g, ' ')
-  }
-
-  function parseHelperCommand(transcript) {
-    const txt = normalizeTranscript(transcript)
-    if (!txt) return null
-    if (!txt.startsWith('helper ')) return null
-    const rest = txt.slice('helper '.length).trim()
-    if (!rest) return null
-    const first = rest.split(' ')[0]
-    if (first === 'next') return { type: 'next' }
-    if (first === 'back' || first === 'previous' || first === 'prev') return { type: 'back' }
-    if (first === 'pause') return { type: 'pause' }
-    if (first === 'repeat' || first === 'again') return { type: 'repeat' }
-    return null
-  }
-
-  function applyVoiceCommand(cmd) {
-    if (!cmd) return
-    const stepsNow = stepsRef.current
-    const idx = stepIndexRef.current
-
-    if (cmd.type === 'next') {
-      if (idx >= stepsNow.length - 1) return
-      setStepIndex(i => Math.min(stepsNow.length - 1, i + 1))
-      return
-    }
-    if (cmd.type === 'back') {
-      if (idx <= 0) return
-      setStepIndex(i => Math.max(0, i - 1))
-      return
-    }
-    if (cmd.type === 'pause') {
-      const timer = currentTimerRef.current
-      if (!timer || timer.status !== 'running') return
-      handlePauseTimer(idx)
-      return
-    }
-    if (cmd.type === 'repeat') {
-      speakCurrentStep()
-    }
-  }
-
-  function stopRecognition() {
-    keepListeningRef.current = false
-    try {
-      recognitionRef.current?.stop?.()
-    } catch (_) {}
-    setVoiceListening(false)
-    setVoiceStatus(voiceSupported ? 'off' : 'unavailable')
-  }
-
-  function startRecognition() {
-    if (!voiceSupported) {
-      setVoiceStatus('unavailable')
-      return
-    }
-    keepListeningRef.current = true
-    try {
-      recognitionRef.current?.start?.()
-      setVoiceListening(true)
-      setVoiceStatus('listening')
-    } catch (_) {
-      // start() can throw if called too quickly or without permission; keep UI safe.
-      setVoiceListening(false)
-      setVoiceStatus('error')
-    }
-  }
-
-  useEffect(() => {
-    voiceEnabledRef.current = voiceEnabled
-    voiceStatusRef.current = voiceStatus
-  }, [voiceEnabled, voiceStatus])
-
-  useEffect(() => {
-    const SR = typeof window !== 'undefined'
-      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
-      : null
-    const supported = Boolean(SR)
-    setVoiceSupported(supported)
-
-    if (!supported) {
-      setVoiceStatus('unavailable')
-      return
-    }
-
-    const rec = new SR()
-    rec.continuous = true
-    rec.interimResults = false
-    if (lang) rec.lang = lang
-
-    rec.onresult = (event) => {
-      try {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i]
-          if (!res.isFinal) continue
-          const transcript = res[0]?.transcript ?? ''
-          const cmd = parseHelperCommand(transcript)
-          if (cmd) applyVoiceCommand(cmd)
-        }
-      } catch (_) {}
-    }
-
-    rec.onerror = () => {
-      if (!keepListeningRef.current) return
-      setVoiceStatus('error')
-      setVoiceListening(false)
-    }
-
-    rec.onend = () => {
-      if (!keepListeningRef.current) return
-      if (IS_TEST) return
-      // Try to keep hands-free mode alive.
-      try {
-        rec.start()
-        setVoiceListening(true)
-        setVoiceStatus('listening')
-      } catch (_) {
-        setVoiceListening(false)
-        setVoiceStatus('error')
-      }
-    }
-
-    recognitionRef.current = rec
-
-    // Auto-start if enabled (hands-free).
-    if (!IS_TEST && voiceEnabledRef.current) startRecognition()
-    else setVoiceStatus('off')
-
-    return () => {
-      keepListeningRef.current = false
-      try { rec.stop() } catch (_) {}
-      recognitionRef.current = null
-    }
-  }, [lang])
-
-  useEffect(() => {
-    if (IS_TEST) return
-    if (!voiceSupported) {
-      setVoiceStatus('unavailable')
-      return
-    }
-    if (voiceEnabled) startRecognition()
-    else stopRecognition()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceEnabled])
-
   useEffect(() => {
     // Auto-read on step changes.
-    if (loading || finished) return
+    if (loading || finished || !readAloudEnabled) return
     speakCurrentStep()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIndex, loading, finished])
+  }, [stepIndex, loading, finished, readAloudEnabled])
 
   useEffect(() => {
     // Cleanup TTS when leaving Cook Mode.
@@ -318,7 +164,6 @@ export default function CookModePage() {
   }, [])
 
   function handleExit() {
-    stopRecognition()
     navigate(-1)
   }
 
@@ -331,8 +176,22 @@ export default function CookModePage() {
   }
 
   function handleFinishCooking() {
-    stopRecognition()
     setFinished(true)
+  }
+
+  function handleToggleReadAloud() {
+    setReadAloudEnabled(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, next ? '1' : '0')
+      } catch (_) {}
+      if (!next) {
+        try { window.speechSynthesis?.cancel?.() } catch (_) {}
+      } else {
+        speakCurrentStep()
+      }
+      return next
+    })
   }
 
   function handleStartTimer() {
@@ -466,23 +325,15 @@ export default function CookModePage() {
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10 text-stone-200">
-              {voiceStatus === 'listening'
-                ? t('voiceListening')
-                : voiceStatus === 'unavailable'
-                  ? t('voiceUnavailable')
-                  : voiceStatus === 'error'
-                    ? t('voiceError')
-                    : t('voiceOff')}
+              {readAloudEnabled ? t('readAloudOn') : t('readAloudOff')}
             </span>
-            {voiceSupported && (
-              <button
-                type="button"
-                onClick={() => setVoiceEnabled(v => !v)}
-                className="text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200"
-              >
-                {voiceEnabled ? t('voiceOn') : t('voiceOff')}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleToggleReadAloud}
+              className="text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200"
+            >
+              {readAloudEnabled ? t('turnReadAloudOff') : t('turnReadAloudOn')}
+            </button>
           </div>
         </div>
         <button
@@ -503,12 +354,10 @@ export default function CookModePage() {
                 type="button"
                 onClick={speakCurrentStep}
                 className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-semibold"
+                disabled={!readAloudEnabled}
               >
                 {t('readStep')}
               </button>
-              <p className="text-xs text-stone-300">
-                {t('voiceCommandsHint')}
-              </p>
             </div>
           </div>
 

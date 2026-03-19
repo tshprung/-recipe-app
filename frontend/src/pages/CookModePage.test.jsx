@@ -1,44 +1,11 @@
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import CookModePage from './CookModePage'
 import { LanguageProvider } from '../context/LanguageContext'
 import { api } from '../api/client'
-
-class MockSpeechRecognition {
-  constructor() {
-    this.continuous = false
-    this.interimResults = false
-    this.lang = 'en'
-    this.onresult = null
-    this.onend = null
-    this.onerror = null
-    this._started = false
-    globalThis.__lastSpeechRecognition = this
-  }
-
-  start() {
-    this._started = true
-  }
-
-  stop() {
-    this._started = false
-  }
-
-  emitFinal(transcript) {
-    const event = {
-      resultIndex: 0,
-      results: [
-        {
-          isFinal: true,
-          0: { transcript },
-        },
-      ],
-    }
-    this.onresult?.(event)
-  }
-}
+import { COOK_MODE_READ_ALOUD_KEY } from '../constants/storageKeys'
 
 vi.mock('../api/client', async importOriginal => {
   const actual = await importOriginal()
@@ -99,9 +66,7 @@ describe('CookModePage', () => {
       this.pitch = 1
     }
 
-    // Speech recognition mocks
-    window.SpeechRecognition = MockSpeechRecognition
-    window.webkitSpeechRecognition = undefined
+    localStorage.removeItem(COOK_MODE_READ_ALOUD_KEY)
   })
 
   afterEach(() => {
@@ -170,52 +135,25 @@ describe('CookModePage', () => {
     expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(3)
   })
 
-  it('executes only helper-prefixed voice commands', async () => {
+  it('read aloud toggle disables auto-read and read button', async () => {
     renderPage()
     await screen.findByText('Tomato Soup')
+    expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(1)
 
-    const rec = globalThis.__lastSpeechRecognition
-    expect(rec).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
+    expect(screen.getByRole('button', { name: 'Read step' })).toBeDisabled()
 
-    // Non-prefixed should do nothing
-    await act(async () => { rec.emitFinal('next') })
-    expect(screen.getByText(/step 1 of 3/i)).toBeInTheDocument()
-
-    // Prefixed next should advance
-    await act(async () => { rec.emitFinal('helper next') })
-    await screen.findByText(/step 2 of 3/i)
-
-    // Prefixed back should go back
-    await act(async () => { rec.emitFinal('helper back') })
-    await screen.findByText(/step 1 of 3/i)
-
-    // Repeat should trigger TTS again
-    const callsBefore = window.speechSynthesis.speak.mock.calls.length
-    await act(async () => { rec.emitFinal('helper repeat') })
-    expect(window.speechSynthesis.speak.mock.calls.length).toBeGreaterThan(callsBefore)
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(1)
   })
 
-  it('helper pause pauses current step timer only when running', async () => {
+  it('uses global read aloud setting from local storage', async () => {
+    localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, '0')
     renderPage()
     await screen.findByText('Tomato Soup')
-
-    const rec = globalThis.__lastSpeechRecognition
-    expect(rec).toBeTruthy()
-
-    // If no timer running, pause should do nothing (no Resume button)
-    await act(async () => { rec.emitFinal('helper pause') })
-    expect(screen.queryByRole('button', { name: 'Resume timer' })).not.toBeInTheDocument()
-
-    // Start a timer, then pause via voice
-    const minutesInput = screen.getByLabelText('minutes')
-    await userEvent.clear(minutesInput)
-    await userEvent.type(minutesInput, '1')
-    await userEvent.click(screen.getAllByRole('button', { name: 'Start timer' })[0])
-    await screen.findByRole('button', { name: 'Pause timer' })
-
-    await act(async () => { rec.emitFinal('helper pause') })
-    await screen.findByRole('button', { name: 'Resume timer' })
-  }, 15000)
+    expect(window.speechSynthesis.speak).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Read step' })).toBeDisabled()
+  })
 
   it('exit cooking returns through history so back goes to main screen', async () => {
     render(
