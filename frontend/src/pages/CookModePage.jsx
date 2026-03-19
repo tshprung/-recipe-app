@@ -330,8 +330,13 @@ export default function CookModePage() {
             <button
               type="button"
               onClick={handleToggleReadAloud}
-              className="text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200"
+              className={`inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-2 rounded-xl border transition-colors shadow-sm ${
+                readAloudEnabled
+                  ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white'
+                  : 'bg-amber-500 hover:bg-amber-600 border-amber-400 text-white'
+              }`}
             >
+              <span>{readAloudEnabled ? '🔊' : '🔇'}</span>
               {readAloudEnabled ? t('turnReadAloudOff') : t('turnReadAloudOn')}
             </button>
           </div>

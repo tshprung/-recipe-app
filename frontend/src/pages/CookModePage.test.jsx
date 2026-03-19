@@ -140,7 +140,7 @@ describe('CookModePage', () => {
     await screen.findByText('Tomato Soup')
     expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(1)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
+    await userEvent.click(screen.getByRole('button', { name: /turn off/i }))
     expect(screen.getByRole('button', { name: 'Read step' })).toBeDisabled()
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }))
