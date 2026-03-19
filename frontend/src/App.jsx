@@ -8,6 +8,7 @@ import OnboardingPage from './pages/OnboardingPage'
 import AdminPage from './pages/AdminPage'
 import RecipeListPage from './pages/RecipeListPage'
 import RecipeDetailPage from './pages/RecipeDetailPage'
+import CookModePage from './pages/CookModePage'
 import DiscoverPage from './pages/DiscoverPage'
 import MealPlanPage from './pages/MealPlanPage'
 import SettingsPage from './pages/SettingsPage'
@@ -116,6 +117,7 @@ function AppRoutes() {
               <Route path="/discover" element={<DiscoverPage />} />
               <Route path="/meal-plan" element={<MealPlanPage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+              <Route path="/recipes/:id/cook" element={<CookModePage />} />
               <Route path="/settings"    element={<SettingsPage />} />
               <Route path="/verify"      element={<VerifyPage />} />
               <Route path="/terms" element={<TermsPage />} />

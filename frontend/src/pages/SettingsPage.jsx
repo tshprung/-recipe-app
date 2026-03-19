@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { api } from '../api/client'
 import { TARGET_LANGUAGES, COUNTRIES, ALLERGENS, TRIAL_SETTINGS_KEY } from '../constants'
+import { COOK_MODE_READ_ALOUD_KEY } from '../constants/storageKeys'
 
 function Field({ label, hint, value, onChange }) {
   return (
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState('')
   const [fetchStarterLoading, setFetchStarterLoading] = useState(false)
   const [fetchStarterMessage, setFetchStarterMessage] = useState(null)
+  const [cookModeReadAloudEnabled, setCookModeReadAloudEnabled] = useState(true)
 
   const set = key => v => setForm(f => ({ ...f, [key]: v }))
 
@@ -112,6 +114,15 @@ export default function SettingsPage() {
     }
   }, [user?.id, user?.target_language, user?.target_country, user?.target_city, user?.target_zip, user?.dish_preferences, user?.household_adults, user?.household_kids, user?.diet_filters, user?.default_servings, user?.measurement_system, user?.allergens, user?.custom_allergens_text, trialToken])
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COOK_MODE_READ_ALOUD_KEY)
+      setCookModeReadAloudEnabled(raw == null ? true : raw === '1')
+    } catch (_) {
+      setCookModeReadAloudEnabled(true)
+    }
+  }, [])
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
@@ -120,6 +131,7 @@ export default function SettingsPage() {
       if (!user && trialToken) {
         try {
           localStorage.setItem(TRIAL_SETTINGS_KEY, JSON.stringify(form))
+          localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, cookModeReadAloudEnabled ? '1' : '0')
         } catch (_) {}
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
@@ -128,6 +140,9 @@ export default function SettingsPage() {
         return
       }
       const updated = await api.patch('/users/me/settings', form)
+      try {
+        localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, cookModeReadAloudEnabled ? '1' : '0')
+      } catch (_) {}
       setUser(updated)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -239,6 +254,26 @@ export default function SettingsPage() {
             <p className="text-xs text-stone-400 mt-1.5">
               {t('defaultServingsHint')}
             </p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-600 mb-2">
+              {t('cookModeReadAloud')}
+            </label>
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+              <span>{cookModeReadAloudEnabled ? t('readAloudOn') : t('readAloudOff')}</span>
+              <button
+                type="button"
+                onClick={() => setCookModeReadAloudEnabled(v => !v)}
+                className={`px-3 py-1 rounded-lg border transition-colors ${
+                  cookModeReadAloudEnabled
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-white border-stone-300 text-stone-600'
+                }`}
+              >
+                {cookModeReadAloudEnabled ? t('turnReadAloudOff') : t('turnReadAloudOn')}
+              </button>
+            </label>
+            <p className="text-xs text-stone-400 mt-1.5">{t('cookModeReadAloudHint')}</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-stone-600 mb-2">

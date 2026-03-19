@@ -175,6 +175,23 @@ describe('RecipeDetailPage — adaptation', () => {
       ).toBeInTheDocument()
     })
   })
+
+  it('clicking Make faster triggers POST /recipes/1/adapt with transform preset', async () => {
+    api.post.mockResolvedValue({
+      can_adapt: true,
+      variant: { ...MOCK_VEGAN_VARIANT, variant_type: 'transform_alt0', title_pl: 'Make faster' },
+      alternatives: [],
+    })
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+
+    await userEvent.click(screen.getByRole('button', { name: /Make faster/ }))
+
+    expect(api.post).toHaveBeenCalledWith('/recipes/1/adapt', expect.objectContaining({
+      variant_type: 'transform',
+      custom_title: 'Make faster',
+    }))
+  })
 })
 
 describe('RecipeDetailPage — re-localize', () => {
@@ -305,3 +322,47 @@ describe('RecipeDetailPage — return to original', () => {
 })
 
 // UI language is fixed to English; RTL-specific tests removed.
+
+describe('RecipeDetailPage — cook mode entry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.get.mockImplementation(path => {
+      if (path === '/users/me') return Promise.resolve(DEFAULT_USER)
+      return path.endsWith('/variants') ? Promise.resolve([]) : Promise.resolve(MOCK_RECIPE)
+    })
+  })
+
+  it('shows Start cooking and navigates to cook route', async () => {
+    localStorage.setItem('token', 'test-token')
+    localStorage.setItem('recipe_app_remember_me', '1')
+    render(
+      <AuthProvider>
+        <LanguageProvider>
+          <ShoppingListProvider>
+            <MemoryRouter initialEntries={['/recipes/1']}>
+              <Routes>
+                <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+                <Route path="/recipes/:id/cook" element={<div>Cook route</div>} />
+              </Routes>
+            </MemoryRouter>
+          </ShoppingListProvider>
+        </LanguageProvider>
+      </AuthProvider>
+    )
+
+    await screen.findByText('Zupa Pomidorowa')
+    await userEvent.click(screen.getByRole('button', { name: 'Start cooking' }))
+    await screen.findByText('Cook route')
+  })
+
+  it('disables Start cooking when recipe has no steps', async () => {
+    api.get.mockImplementation(path => {
+      if (path === '/users/me') return Promise.resolve(DEFAULT_USER)
+      if (path.endsWith('/variants')) return Promise.resolve([])
+      return Promise.resolve({ ...MOCK_RECIPE, steps_pl: [] })
+    })
+    renderPage()
+    await screen.findByText('Zupa Pomidorowa')
+    expect(screen.getByRole('button', { name: 'Start cooking' })).toBeDisabled()
+  })
+})

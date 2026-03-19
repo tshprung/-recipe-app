@@ -973,7 +973,12 @@ def adapt_recipe_endpoint(
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    trial_session = enforce_trial_or_user_quota(request, db, current_user)
+    # Allow this specific transform flow to run even when user credits are exhausted
+    # (credits are clamped to 0 remaining after the run).
+    allow_overdraft = bool(getattr(payload, "custom_instruction", None)) and (
+        (getattr(payload, "variant_type", None) or "").strip() == "transform"
+    )
+    trial_session = enforce_trial_or_user_quota(request, db, current_user, allow_overdraft=allow_overdraft)
     recipe = get_recipe_or_404(recipe_id, current_user, trial_session, db)
 
     if current_user is not None and not current_user.is_verified:
@@ -1008,7 +1013,14 @@ def adapt_recipe_endpoint(
             return out
 
     if current_user is not None and not _has_unlimited_quota(current_user):
-        user_for_update.transformations_used += 1
+        # Clamp: if user has no remaining credits, still let this run, but never exceed the limit.
+        if user_for_update.transformations_limit != -1:
+            user_for_update.transformations_used = min(
+                user_for_update.transformations_used + 1,
+                user_for_update.transformations_limit,
+            )
+        else:
+            user_for_update.transformations_used += 1
     db.commit()
 
     custom_instruction = (
