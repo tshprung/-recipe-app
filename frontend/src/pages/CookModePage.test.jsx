@@ -83,7 +83,7 @@ describe('CookModePage', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Start timer' })[0])
 
     await screen.findByText('Timers')
-    expect(screen.getByText(/01:0[0-9]/)).toBeInTheDocument()
+    expect(screen.getAllByText(/01:0[0-9]/).length).toBeGreaterThan(0)
 
     await userEvent.click(screen.getByRole('button', { name: 'Pause timer' }))
     await userEvent.click(screen.getByRole('button', { name: 'Resume timer' }))

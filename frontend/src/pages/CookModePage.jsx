@@ -64,7 +64,7 @@ export default function CookModePage() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  })
+  }, [loading, finished, id])
 
   const steps = recipe?.steps_pl ?? []
   const hasSteps = steps.length > 0
@@ -117,7 +117,7 @@ export default function CookModePage() {
 
   function handleStartTimer() {
     const mins = Number(timerMinutes)
-    if (!Number.isFinite(mins) || mins <= 0) return
+    if (!Number.isFinite(mins) || mins <= 0 || mins > 180) return
     const totalSec = Math.round(mins * 60)
     setActiveTimers(prev => ({
       ...prev,
@@ -231,6 +231,9 @@ export default function CookModePage() {
   }
 
   const currentTimer = activeTimers[stepIndex]
+  const currentTimerRemainingSec = currentTimer?.status === 'running'
+    ? Math.max(0, Math.ceil((currentTimer.endAt - nowMs) / 1000))
+    : currentTimer?.remainingSec ?? null
 
   return (
     <div className="fixed inset-0 z-40 bg-[#111111] text-stone-50 flex flex-col">
@@ -262,6 +265,7 @@ export default function CookModePage() {
               <input
                 type="number"
                 min="1"
+                max="180"
                 value={timerMinutes}
                 onChange={(e) => setTimerMinutes(e.target.value)}
                 className="w-24 px-3 py-2 rounded-lg bg-black/30 border border-white/20"
@@ -303,6 +307,11 @@ export default function CookModePage() {
                 </button>
               )}
             </div>
+            {currentTimer && (
+              <p className="mt-3 text-sm text-stone-200" aria-live="polite">
+                {t('currentStepTimer')}: <span className="font-mono">{formatRemaining(currentTimerRemainingSec ?? 0)}</span>
+              </p>
+            )}
           </div>
 
           {timersList.length > 0 && (
@@ -316,7 +325,11 @@ export default function CookModePage() {
                     </span>
                     <span className="font-mono">{formatRemaining(timer.remainingSec)}</span>
                     <span className="text-stone-300">
-                      {timer.status === 'done' ? t('timerDone') : timer.status}
+                      {timer.status === 'done'
+                        ? t('timerDone')
+                        : timer.status === 'running'
+                          ? t('timerRunning')
+                          : t('timerPaused')}
                     </span>
                   </li>
                 ))}
@@ -326,13 +339,13 @@ export default function CookModePage() {
         </section>
       </main>
 
-      <footer className="px-4 sm:px-6 py-4 border-t border-white/10 bg-[#111111]">
+      <footer className="px-4 sm:px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-white/10 bg-[#111111]">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleBack}
             disabled={stepIndex === 0}
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {t('back')}
           </button>
@@ -340,7 +353,7 @@ export default function CookModePage() {
             <button
               type="button"
               onClick={handleNext}
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+              className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold"
             >
               {t('next')}
             </button>
@@ -348,7 +361,7 @@ export default function CookModePage() {
             <button
               type="button"
               onClick={handleFinishCooking}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
             >
               {t('finishCooking')}
             </button>
