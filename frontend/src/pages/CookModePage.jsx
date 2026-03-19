@@ -11,6 +11,27 @@ function formatRemaining(totalSec) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function normalizeLangCode(code) {
+  const c = String(code || '').trim().toLowerCase()
+  if (!c) return ''
+  if (c === 'he' || c.startsWith('he-') || c === 'iw') return 'he-IL'
+  if (c === 'pl' || c.startsWith('pl-')) return 'pl-PL'
+  if (c === 'en' || c.startsWith('en-')) return 'en-US'
+  return c
+}
+
+function detectSpeechLang(text, preferredLangs = []) {
+  const sample = String(text || '')
+  const hasHebrew = /[\u0590-\u05FF]/.test(sample)
+  if (hasHebrew) return 'he-IL'
+
+  for (const candidate of preferredLangs) {
+    const normalized = normalizeLangCode(candidate)
+    if (normalized) return normalized
+  }
+  return 'en-US'
+}
+
 export default function CookModePage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -26,6 +47,8 @@ export default function CookModePage() {
   const [nowMs, setNowMs] = useState(Date.now())
 
   const [readAloudEnabled, setReadAloudEnabled] = useState(true)
+  const [speechAvailable, setSpeechAvailable] = useState(true)
+  const [speechUnavailableNote, setSpeechUnavailableNote] = useState('')
   const [wakeLockSupported, setWakeLockSupported] = useState(false)
   const [wakeLockActive, setWakeLockActive] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -76,6 +99,22 @@ export default function CookModePage() {
       setReadAloudEnabled(true)
     }
   }, [])
+
+  useEffect(() => {
+    const hasSpeech = Boolean(
+      typeof window !== 'undefined'
+      && window.speechSynthesis
+      && window.SpeechSynthesisUtterance
+    )
+    setSpeechAvailable(hasSpeech)
+    if (!hasSpeech) {
+      setReadAloudEnabled(false)
+      setSpeechUnavailableNote(t('readAloudUnavailableNote'))
+      try { localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, '0') } catch (_) {}
+    } else {
+      setSpeechUnavailableNote('')
+    }
+  }, [t])
 
   useEffect(() => {
     setWakeLockSupported(Boolean(typeof navigator !== 'undefined' && navigator.wakeLock?.request))
@@ -198,16 +237,33 @@ export default function CookModePage() {
     try {
       const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
       const Utterance = typeof window !== 'undefined' ? window.SpeechSynthesisUtterance : null
-      if (!synth || !Utterance) return false
+      if (!synth || !Utterance) {
+        setSpeechAvailable(false)
+        setReadAloudEnabled(false)
+        setSpeechUnavailableNote(t('readAloudUnavailableNote'))
+        try { localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, '0') } catch (_) {}
+        return false
+      }
 
       synth.cancel()
       const u = new Utterance(text)
-      if (lang) u.lang = lang
+      const speechLang = detectSpeechLang(text, [
+        recipe?.target_language,
+        recipe?.detected_language,
+        lang,
+      ])
+      u.lang = speechLang
       u.rate = 1
       u.pitch = 1
       synth.speak(u)
+      setSpeechAvailable(true)
+      setSpeechUnavailableNote('')
       return true
     } catch (_) {
+      setSpeechAvailable(false)
+      setReadAloudEnabled(false)
+      setSpeechUnavailableNote(t('readAloudUnavailableNote'))
+      try { localStorage.setItem(COOK_MODE_READ_ALOUD_KEY, '0') } catch (_) {}
       return false
     }
   }
@@ -403,11 +459,12 @@ export default function CookModePage() {
             <button
               type="button"
               onClick={handleToggleReadAloud}
+              disabled={!speechAvailable}
               className={`inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-2 rounded-xl border transition-colors shadow-sm ${
                 readAloudEnabled
                   ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white'
                   : 'bg-amber-500 hover:bg-amber-600 border-amber-400 text-white'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <span>{readAloudEnabled ? '🔊' : '🔇'}</span>
               {readAloudEnabled ? t('turnReadAloudOff') : t('turnReadAloudOn')}
@@ -445,10 +502,13 @@ export default function CookModePage() {
                 type="button"
                 onClick={speakCurrentStep}
                 className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-sm font-semibold"
-                disabled={!readAloudEnabled}
+                disabled={!readAloudEnabled || !speechAvailable}
               >
                 {t('readStep')}
               </button>
+              {speechUnavailableNote && (
+                <p className="text-xs text-amber-300">{speechUnavailableNote}</p>
+              )}
             </div>
           </div>
 

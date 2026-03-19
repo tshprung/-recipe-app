@@ -24,6 +24,8 @@ const MOCK_RECIPE = {
   id: 1,
   title_pl: 'Tomato Soup',
   steps_pl: ['Chop onion.', 'Cook onion in oil.', 'Add tomatoes and simmer.'],
+  target_language: 'en',
+  detected_language: 'en',
 }
 
 function renderPage(initialEntries = ['/recipes/1/cook'], initialIndex) {
@@ -153,6 +155,34 @@ describe('CookModePage', () => {
     await screen.findByText('Tomato Soup')
     expect(window.speechSynthesis.speak).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Read step' })).toBeDisabled()
+  })
+
+  it('shows note and turns read aloud off when speech is unavailable', async () => {
+    // Simulate unsupported browser/device speech synthesis
+    window.speechSynthesis = undefined
+    window.SpeechSynthesisUtterance = undefined
+    renderPage()
+    await screen.findByText('Tomato Soup')
+
+    expect(screen.getByText('Read aloud: off')).toBeInTheDocument()
+    expect(
+      screen.getByText('Read aloud is not available on this device/browser, so it was turned off.')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Read step' })).toBeDisabled()
+  })
+
+  it('uses Hebrew speech language for Hebrew text', async () => {
+    api.get.mockResolvedValue({
+      ...MOCK_RECIPE,
+      steps_pl: ['קוצצים בצל ומטגנים עד הזהבה'],
+      target_language: 'en',
+      detected_language: 'en',
+    })
+    renderPage()
+    await screen.findByText('Tomato Soup')
+
+    const utterance = window.speechSynthesis.speak.mock.calls[0]?.[0]
+    expect(utterance?.lang).toBe('he-IL')
   })
 
   it('exit cooking returns through history so back goes to main screen', async () => {

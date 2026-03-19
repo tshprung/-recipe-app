@@ -192,6 +192,7 @@ export const translations = {
     readAloudOff: 'Read aloud: off',
     turnReadAloudOn: 'Turn on',
     turnReadAloudOff: 'Turn off',
+    readAloudUnavailableNote: 'Read aloud is not available on this device/browser, so it was turned off.',
     screenAwakeOn: 'Screen awake: on',
     screenAwakeOff: 'Screen awake: off',
     screenAwakeUnavailable: 'Screen awake: unavailable',
