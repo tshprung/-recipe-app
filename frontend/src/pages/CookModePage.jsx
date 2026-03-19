@@ -319,7 +319,7 @@ export default function CookModePage() {
 
   function handleExit() {
     stopRecognition()
-    navigate(`/recipes/${id}`)
+    navigate(-1)
   }
 
   function handleBack() {

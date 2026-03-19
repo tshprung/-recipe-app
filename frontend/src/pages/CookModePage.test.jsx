@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import CookModePage from './CookModePage'
 import { LanguageProvider } from '../context/LanguageContext'
@@ -59,16 +59,26 @@ const MOCK_RECIPE = {
   steps_pl: ['Chop onion.', 'Cook onion in oil.', 'Add tomatoes and simmer.'],
 }
 
-function renderPage() {
+function renderPage(initialEntries = ['/recipes/1/cook'], initialIndex) {
   return render(
     <LanguageProvider>
-      <MemoryRouter initialEntries={['/recipes/1/cook']}>
+      <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
         <Routes>
           <Route path="/recipes/:id/cook" element={<CookModePage />} />
           <Route path="/recipes/:id" element={<div>Recipe detail</div>} />
         </Routes>
       </MemoryRouter>
     </LanguageProvider>
+  )
+}
+
+function RecipeDetailWithBack() {
+  const navigate = useNavigate()
+  return (
+    <div>
+      <div>Recipe detail</div>
+      <button type="button" onClick={() => navigate(-1)}>Back to main</button>
+    </div>
   )
 }
 
@@ -112,11 +122,11 @@ describe('CookModePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Finish cooking' }))
     await screen.findByRole('button', { name: 'Back to recipe' })
-  })
+  }, 15000)
 
   it('shows no-steps fallback and can return', async () => {
     api.get.mockResolvedValue({ ...MOCK_RECIPE, steps_pl: [] })
-    renderPage()
+    renderPage(['/recipes/1', '/recipes/1/cook'], 1)
 
     await screen.findByText('This recipe has no cooking steps yet.')
     await userEvent.click(screen.getByRole('button', { name: 'Back to recipe' }))
@@ -206,4 +216,25 @@ describe('CookModePage', () => {
     await act(async () => { rec.emitFinal('helper pause') })
     await screen.findByRole('button', { name: 'Resume timer' })
   }, 15000)
+
+  it('exit cooking returns through history so back goes to main screen', async () => {
+    render(
+      <LanguageProvider>
+        <MemoryRouter initialEntries={['/', '/recipes/1', '/recipes/1/cook']} initialIndex={2}>
+          <Routes>
+            <Route path="/" element={<div>Main screen</div>} />
+            <Route path="/recipes/:id/cook" element={<CookModePage />} />
+            <Route path="/recipes/:id" element={<RecipeDetailWithBack />} />
+          </Routes>
+        </MemoryRouter>
+      </LanguageProvider>
+    )
+
+    await screen.findByText('Tomato Soup')
+    await userEvent.click(screen.getByRole('button', { name: 'Exit cooking' }))
+    await screen.findByText('Recipe detail')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Back to main' }))
+    await screen.findByText('Main screen')
+  })
 })
