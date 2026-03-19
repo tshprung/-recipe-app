@@ -26,9 +26,15 @@ export default function CookModePage() {
   const [nowMs, setNowMs] = useState(Date.now())
 
   const [readAloudEnabled, setReadAloudEnabled] = useState(true)
+  const [wakeLockSupported, setWakeLockSupported] = useState(false)
+  const [wakeLockActive, setWakeLockActive] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fullscreenSupported, setFullscreenSupported] = useState(false)
   const stepIndexRef = useRef(0)
   const stepsRef = useRef([])
   const currentTimerRef = useRef(null)
+  const wakeLockRef = useRef(null)
+  const pageRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -70,6 +76,71 @@ export default function CookModePage() {
       setReadAloudEnabled(true)
     }
   }, [])
+
+  useEffect(() => {
+    setWakeLockSupported(Boolean(typeof navigator !== 'undefined' && navigator.wakeLock?.request))
+    setFullscreenSupported(Boolean(typeof document !== 'undefined' && document.fullscreenEnabled))
+  }, [])
+
+  async function requestWakeLock() {
+    if (!(typeof navigator !== 'undefined' && navigator.wakeLock?.request)) return false
+    try {
+      const lock = await navigator.wakeLock.request('screen')
+      wakeLockRef.current = lock
+      setWakeLockActive(true)
+      lock.addEventListener?.('release', () => {
+        if (wakeLockRef.current === lock) wakeLockRef.current = null
+        setWakeLockActive(false)
+      })
+      return true
+    } catch (_) {
+      setWakeLockActive(false)
+      return false
+    }
+  }
+
+  async function releaseWakeLock() {
+    try {
+      await wakeLockRef.current?.release?.()
+    } catch (_) {}
+    wakeLockRef.current = null
+    setWakeLockActive(false)
+  }
+
+  useEffect(() => {
+    requestWakeLock()
+    const onVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && !wakeLockRef.current) {
+        await requestWakeLock()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      releaseWakeLock()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement))
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  async function handleToggleFullscreen() {
+    if (!fullscreenSupported) return
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        const target = pageRef.current || document.documentElement
+        await target.requestFullscreen?.()
+      }
+    } catch (_) {}
+  }
 
   useEffect(() => {
     const hasRunning = Object.values(activeTimers).some(timer => timer.status === 'running')
@@ -164,6 +235,7 @@ export default function CookModePage() {
   }, [])
 
   function handleExit() {
+    releaseWakeLock()
     navigate(-1)
   }
 
@@ -176,6 +248,7 @@ export default function CookModePage() {
   }
 
   function handleFinishCooking() {
+    releaseWakeLock()
     setFinished(true)
   }
 
@@ -316,7 +389,7 @@ export default function CookModePage() {
     : currentTimer?.remainingSec ?? null
 
   return (
-    <div className="fixed inset-0 z-40 bg-[#111111] text-stone-50 flex flex-col">
+    <div ref={pageRef} className="fixed inset-0 z-40 bg-[#111111] text-stone-50 flex flex-col">
       <header className="px-4 sm:px-6 py-4 border-b border-white/10 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold truncate">{recipe?.title_pl}</h1>
@@ -338,6 +411,19 @@ export default function CookModePage() {
             >
               <span>{readAloudEnabled ? '🔊' : '🔇'}</span>
               {readAloudEnabled ? t('turnReadAloudOff') : t('turnReadAloudOn')}
+            </button>
+            <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10 text-stone-200">
+              {wakeLockSupported
+                ? (wakeLockActive ? t('screenAwakeOn') : t('screenAwakeOff'))
+                : t('screenAwakeUnavailable')}
+            </span>
+            <button
+              type="button"
+              onClick={handleToggleFullscreen}
+              disabled={!fullscreenSupported}
+              className="text-xs px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-stone-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
             </button>
           </div>
         </div>
