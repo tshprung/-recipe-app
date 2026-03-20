@@ -98,7 +98,7 @@ function TrialFormModal({ onClose, onSubmit, error }) {
             <select
               value={form.recipe_language}
               onChange={(e) => setForm((f) => ({ ...f, recipe_language: e.target.value }))}
-              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
+              className="native-select-dark w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
             >
               {TARGET_LANGUAGES.map((opt) => (
                 <option key={opt.code} value={opt.code}>{opt.name}</option>
@@ -112,7 +112,7 @@ function TrialFormModal({ onClose, onSubmit, error }) {
             <select
               value={form.country}
               onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-              className="w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
+              className="native-select-dark w-full rounded-xl px-4 py-2.5 text-sm bg-white/5 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-white/30"
             >
               {countryOptions.map((opt) => (
                 <option key={opt.code} value={opt.code}>{opt.name}</option>

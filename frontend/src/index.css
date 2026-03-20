@@ -9,3 +9,18 @@
 }
 
 /* Safe area insets are applied per-component (navbar, modal, main) for notched phones */
+
+/*
+ * Native <select> on dark backgrounds (Chrome/Edge on Windows):
+ * The closed control can use light text, but the OS dropdown list often renders with a
+ * light background while still inheriting light text → invisible options until hover.
+ * color-scheme + option colors fix this where supported.
+ */
+select.native-select-dark {
+  color-scheme: dark;
+}
+
+select.native-select-dark option {
+  background-color: #1c1c1c;
+  color: #f8f8f6;
+}

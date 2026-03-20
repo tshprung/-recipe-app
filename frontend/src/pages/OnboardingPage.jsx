@@ -173,6 +173,8 @@ export default function OnboardingPage() {
   }
 
   const inputCls = 'w-full rounded-xl px-4 py-3 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors ring-1 ring-white/10 bg-black/30 text-white'
+  /** Native select dropdown list must stay readable on Windows/Chrome (see index.css). */
+  const selectCls = `${inputCls} native-select-dark`
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: COLORS.bg, color: COLORS.text }}>
@@ -217,7 +219,7 @@ export default function OnboardingPage() {
                 <select
                   value={data.target_language}
                   onChange={(e) => set('target_language')(e.target.value)}
-                  className={inputCls}
+                  className={selectCls}
                 >
                   {TARGET_LANGUAGES.map((l) => (
                     <option key={l.code} value={l.code}>{l.name}</option>
